@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Painel de Artistas — Imagine Films & Music
 
-## Getting Started
+Dashboard para acompanhamento do portfólio de artistas da **Imagine Films & Music**: métricas, health score, alertas, agenda, conteúdo e receita — tudo em um único lugar.
 
-First, run the development server:
+## Stack
+
+- **Next.js 14** (App Router) + **TypeScript**
+- **Tailwind CSS** + componentes shadcn/ui (Base UI)
+- **Firebase** — Authentication + Firestore
+- **EmailJS** — envio dos e-mails de convite
+- **Recharts** — gráficos
+
+## Pré-requisitos
+
+- **Node.js 18+** (recomendado 20+)
+- Acesso ao projeto Firebase `painel-imagine-music` (peça ao responsável)
+
+## Como rodar
 
 ```bash
+# 1. Clonar
+git clone https://github.com/ImagineMusic2026/dashboard-imagine-music.git
+cd dashboard-imagine-music
+
+# 2. Instalar dependências
+npm install
+
+# 3. Configurar variáveis de ambiente
+cp .env.example .env.local
+# (no Windows, se 'cp' não funcionar: copy .env.example .env.local)
+# depois preencha o .env.local — veja a seção abaixo
+
+# 4. Rodar
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# abre em http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variáveis de ambiente (`.env.local`)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Copie o `.env.example` para `.env.local` e preencha:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **`NEXT_PUBLIC_FIREBASE_*`** — config web do Firebase.
+  Pegue em: **Firebase Console → ⚙️ Configurações do projeto → Geral → "Seus apps" → SDK**.
+- **`NEXT_PUBLIC_EMAILJS_*`** — chaves do EmailJS (Service ID, Template ID, Public Key).
+  Pegue no painel do EmailJS ou peça ao responsável.
 
-## Learn More
+> ⚠️ O `.env.local` **não** vai para o git (cada dev cria o seu). Essas chaves `NEXT_PUBLIC_*` são públicas (vão para o client), então podem ser compartilhadas com a equipe — só não publique em lugar aberto.
 
-To learn more about Next.js, take a look at the following resources:
+## Acesso e papéis (RBAC)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Não há cadastro público — novos usuários entram por **convite** (Configurações → Membros do time → Convidar membro). Papéis:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **admin** — acesso total; gerencia o time e envia convites.
+- **marketing** — acesso parcial; **não** vê a receita dos artistas.
 
-## Deploy on Vercel
+## Scripts de administração (opcional)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Usam o **Firebase Admin SDK** e exigem um `serviceAccountKey.json` na raiz do projeto.
+Gere a **sua própria** chave em: **Firebase Console → Configurações do projeto → Contas de serviço → Gerar nova chave privada**.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> 🔒 O `serviceAccountKey.json` dá acesso **total** ao projeto. Ele está no `.gitignore` — **nunca** faça commit dele e **não** compartilhe a sua chave; cada dev gera a própria.
+
+```bash
+# Publica as regras do Firestore + cria/garante o documento do admin
+node scripts/bootstrap-firebase.mjs
+
+# Troca o papel de um usuário (útil para testes)
+node scripts/set-role.mjs admin|marketing [uid]
+```
+
+As regras de segurança do Firestore ficam em [`firestore.rules`](firestore.rules) (também aplicáveis pelo Console em Firestore → Regras).
+
+## Estrutura
+
+```
+src/
+  app/                 rotas (App Router)
+    (auth)/            login e aceitar convite
+    (dashboard)/       páginas do painel (home, artistas, alertas, etc.)
+  components/          UI, layout, auth, configurações
+  lib/                 firebase, users/roles, convites, e dados mock
+scripts/               scripts admin (bootstrap, set-role)
+firestore.rules        regras de segurança do Firestore
+```
+
+## Observações
+
+- As **métricas** (health score, receita, audiência, gráficos) ainda são **dados mock** em `src/lib/mock-data/`. A integração com as APIs reais (Spotify, OneRPM/DDEX, etc.) é um próximo passo planejado.
+- O cadastro de artistas e a entrada de dados reais virão depois do alinhamento de produto.

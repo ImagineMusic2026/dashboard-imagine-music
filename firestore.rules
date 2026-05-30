@@ -1,0 +1,65 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userData().role == 'admin';
+    }
+
+    function convite(token) {
+      return get(/databases/$(database)/documents/convites/$(token)).data;
+    }
+
+    // Perfis / membros do time
+    match /users/{userId} {
+      // Qualquer usuário autenticado pode ler a lista de membros e o próprio perfil.
+      allow read: if isSignedIn();
+
+      // Admin gerencia membros diretamente, OU a própria pessoa cria seu doc
+      // ao aceitar um convite válido (a role vem do convite — sem auto-promoção).
+      allow create: if isAdmin()
+        || (
+          request.auth.uid == userId
+          && request.resource.data.email == request.auth.token.email
+          && exists(/databases/$(database)/documents/convites/$(request.resource.data.conviteToken))
+          && convite(request.resource.data.conviteToken).status == 'pendente'
+          && convite(request.resource.data.conviteToken).email == request.resource.data.email
+          && convite(request.resource.data.conviteToken).role == request.resource.data.role
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // Convites
+    match /convites/{token} {
+      // Leitura de UM convite por token (link secreto, UUID) é liberada;
+      // listar todos é só admin.
+      allow get: if true;
+      allow list: if isAdmin();
+
+      allow create: if isAdmin();
+
+      // Admin gerencia; OU o convidado marca o próprio convite como aceito.
+      allow update: if isAdmin()
+        || (isSignedIn() && request.auth.token.email == resource.data.email);
+
+      allow delete: if isAdmin();
+    }
+
+    // Demais coleções ficam bloqueadas até serem modeladas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

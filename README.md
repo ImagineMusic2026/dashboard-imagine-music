@@ -1,6 +1,6 @@
-# Painel de Artistas — Imagine Films & Music
+# Painel de Artistas — Imagine Group
 
-Dashboard para acompanhamento do portfólio de artistas da **Imagine Films & Music**: métricas, health score, alertas, agenda, conteúdo e receita — tudo em um único lugar.
+Dashboard para acompanhamento do portfólio de artistas da **Imagine Group**: métricas, health score, alertas, agenda, conteúdo e receita — tudo em um único lugar.
 
 ## Stack
 

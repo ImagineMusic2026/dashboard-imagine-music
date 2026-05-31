@@ -16,7 +16,7 @@ export default function LoginPage() {
               <span className="text-[12px] tracking-[0.2em] text-ink-400 font-bold">
                 IMAGINE
               </span>
-              <span className="text-[14px] text-ink-300 font-semibold">Films & Music</span>
+              <span className="text-[14px] text-ink-300 font-semibold">Group</span>
             </div>
           </div>
 
@@ -42,7 +42,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-[12px] text-ink-500">
-            © 2026 Imagine Films & Music · Feira de Santana, BA
+            © 2026 Imagine Group · Feira de Santana, BA
           </div>
         </div>
       </div>

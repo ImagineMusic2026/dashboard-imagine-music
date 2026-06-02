@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 
 /**
@@ -75,7 +75,23 @@ export async function setUserAtivo(uid: string, ativo: boolean): Promise<void> {
   }
 }
 
-/** Remove um membro do time (apaga o perfil/role). */
+/**
+ * Remove um membro do time de forma definitiva. O servidor (Admin SDK, via
+ * `/api/membros/remover`) apaga a conta no Firebase Auth (o login deixa de existir)
+ * e o perfil no Firestore. Exige que quem chama seja um admin ativo.
+ */
 export async function removerAppUser(uid: string): Promise<void> {
-  await deleteDoc(doc(db, USERS, uid))
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+
+  const res = await fetch('/api/membros/remover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ uid }),
+  })
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(data?.error ?? 'Não foi possível remover o membro.')
+  }
 }

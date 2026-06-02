@@ -11,10 +11,16 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function isAdmin() {
+    // Autenticado, com perfil, e que NÃO esteja desativado.
+    // (campo `ativo` ausente = tratado como ativo, para retrocompatibilidade)
+    function isAtivo() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && userData().role == 'admin';
+        && userData().get('ativo', true) != false;
+    }
+
+    function isAdmin() {
+      return isAtivo() && userData().role == 'admin';
     }
 
     function convite(token) {
@@ -23,8 +29,10 @@ service cloud.firestore {
 
     // Perfis / membros do time
     match /users/{userId} {
-      // Qualquer usuário autenticado pode ler a lista de membros e o próprio perfil.
-      allow read: if isSignedIn();
+      // O próprio usuário sempre lê o seu doc (pra descobrir se foi desativado).
+      // Ler/listar os demais membros exige estar ativo.
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAtivo());
+      allow list: if isAtivo();
 
       // Admin gerencia membros diretamente, OU a própria pessoa cria seu doc
       // ao aceitar um convite válido (a role vem do convite — sem auto-promoção).
@@ -58,6 +66,7 @@ service cloud.firestore {
     }
 
     // Demais coleções ficam bloqueadas até serem modeladas.
+    // (ao modelar dados reais, exija isAtivo() — e isAdmin() para escrita sensível)
     match /{document=**} {
       allow read, write: if false;
     }

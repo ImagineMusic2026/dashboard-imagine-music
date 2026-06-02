@@ -1,5 +1,5 @@
 import { collection, deleteDoc, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 
 /**
  * Papéis (roles) da plataforma.
@@ -52,9 +52,27 @@ export async function updateUserRole(uid: string, role: Role): Promise<void> {
   await updateDoc(doc(db, USERS, uid), { role })
 }
 
-/** Ativa ou desativa um membro. */
+/**
+ * Ativa ou desativa um membro de verdade.
+ *
+ * Não é só um flag: o servidor (Admin SDK, via `/api/membros/ativo`) desabilita a
+ * credencial no Firebase Auth (bloqueia o login), derruba as sessões abertas e
+ * atualiza o perfil no Firestore. Exige que quem chama seja um admin ativo.
+ */
 export async function setUserAtivo(uid: string, ativo: boolean): Promise<void> {
-  await updateDoc(doc(db, USERS, uid), { ativo })
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+
+  const res = await fetch('/api/membros/ativo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ uid, ativo }),
+  })
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(data?.error ?? 'Não foi possível alterar o acesso.')
+  }
 }
 
 /** Remove um membro do time (apaga o perfil/role). */

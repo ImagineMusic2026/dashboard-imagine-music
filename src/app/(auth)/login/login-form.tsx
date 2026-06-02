@@ -62,6 +62,7 @@ export function LoginForm() {
   const [erro, setErro] = useState<string | null>(null)
   const [resetMsg, setResetMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   const [enviandoReset, setEnviandoReset] = useState(false)
+  const [avisoAcesso, setAvisoAcesso] = useState(false)
 
   // Recupera a preferência e o e-mail lembrado (localStorage só existe no cliente).
   useEffect(() => {
@@ -70,6 +71,9 @@ export function LoginForm() {
     setLembrar(prefere)
     const emailSalvo = localStorage.getItem(EMAIL_KEY)
     if (emailSalvo) setEmail(emailSalvo)
+    if (new URLSearchParams(window.location.search).get('desativado') === '1') {
+      setAvisoAcesso(true)
+    }
   }, [])
 
   async function handleSubmit(e: FormEvent) {
@@ -131,6 +135,14 @@ export function LoginForm() {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
+      {avisoAcesso && (
+        <div
+          role="alert"
+          className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-2.5"
+        >
+          Seu acesso foi desativado. Procure um administrador da Imagine.
+        </div>
+      )}
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-ink-300 mb-1.5">
           Email

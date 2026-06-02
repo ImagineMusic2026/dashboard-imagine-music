@@ -29,7 +29,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       return
     }
     if (inativo) {
-      signOut(auth).finally(() => router.replace('/login'))
+      signOut(auth).finally(() => router.replace('/login?desativado=1'))
     }
   }, [loading, user, inativo, router])
 

@@ -19,7 +19,7 @@ const statusOptions = [
   { value: 'onboarding', label: 'Onboarding' },
 ]
 
-const atualizadoMap = ['há 2h', 'há 1h', 'há 3h', 'há 1h', 'há 4h', 'há 1d', 'há 12h', 'há 5h', 'há 2h']
+const atualizadoMap = ['há 2h', 'há 1h', 'há 3h', 'há 1h', 'há 4h', 'há 1d', 'há 12h', 'há 5h', 'há 2h', 'agora']
 
 export default function ArtistasPage() {
   return (

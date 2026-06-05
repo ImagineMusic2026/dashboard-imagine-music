@@ -34,6 +34,24 @@ const corMap: Record<string, CorMap> = {
     barFrom: 'from-violet-500',
     barTo: 'to-violet-400',
   },
+  blue: {
+    iconBg: 'bg-blue-500',
+    iconColor: 'text-blue-100',
+    barFrom: 'from-blue-500',
+    barTo: 'to-blue-400',
+  },
+  amber: {
+    iconBg: 'bg-amber-500',
+    iconColor: 'text-amber-100',
+    barFrom: 'from-amber-500',
+    barTo: 'to-amber-400',
+  },
+  cyan: {
+    iconBg: 'bg-cyan-500',
+    iconColor: 'text-cyan-100',
+    barFrom: 'from-cyan-500',
+    barTo: 'to-cyan-400',
+  },
   gray: {
     iconBg: 'bg-bg-700',
     iconColor: 'text-ink-400',

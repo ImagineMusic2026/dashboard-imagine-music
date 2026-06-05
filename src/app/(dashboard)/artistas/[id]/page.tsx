@@ -24,9 +24,10 @@ import { HealthScoreBreakdown } from '@/components/artistas/health-score-breakdo
 import { HealthEvolutionChart } from '@/components/artistas/health-evolution-chart'
 import { PlataformaCard } from '@/components/artistas/plataforma-card'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
-import { ReceitaPlataformaItem } from '@/components/artistas/receita-plataforma-item'
+import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { KPICard } from '@/components/shared/kpi-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
+import { slugify } from '@/lib/onerpm/aggregate'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 
 interface Props {
@@ -71,7 +72,7 @@ export default function PerfilArtistaPage({ params }: Props) {
   const acoes = acoesSugeridas[artista.id] ?? acoesSugeridas.a2
   const evolucao = evolucaoHealthScore[artista.id] ?? evolucaoHealthScore.a2
 
-  const totalReceita = receitaItems.reduce((acc, r) => acc + r.receita, 0)
+  const slug = slugify(artista.nome)
 
   return (
     <div className="space-y-6">
@@ -372,69 +373,7 @@ export default function PerfilArtistaPage({ params }: Props) {
       </div>
 
       <ReceitaGate>
-      <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-        <div className="p-5 flex items-center justify-between border-b border-bg-700/30 gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-amber-500/15 grid place-items-center shrink-0">
-              <DollarSign className="w-5 h-5 text-amber-400" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-ink-100">Receita por plataforma</span>
-                <span className="text-[10px] tracking-wider font-bold text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
-                  FONTE: ONERPM · DDEX
-                </span>
-              </div>
-              <div className="text-[12px] text-ink-500 mt-0.5">
-                Dados oficiais de streaming · período de referência: abr/2026
-              </div>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
-              Total 30D
-            </div>
-            <div className="num text-2xl font-bold text-emerald-400">
-              {formatCurrency(totalReceita)}
-            </div>
-            <div className="text-[11px] text-emerald-400 num">↑ 24% vs. mês anterior</div>
-          </div>
-        </div>
-
-        <div className="divide-y divide-bg-700/30">
-          {receitaItems.map((item) => {
-            const tipoIcone =
-              item.plataforma === 'Spotify'
-                ? 'spotify'
-                : item.plataforma === 'Apple Music'
-                ? 'apple-music'
-                : item.plataforma === 'YouTube Music'
-                ? 'youtube'
-                : item.plataforma === 'Deezer'
-                ? 'deezer'
-                : 'generica'
-            return (
-              <ReceitaPlataformaItem
-                key={item.plataforma}
-                item={item}
-                icone={<PlataformaIcon tipo={tipoIcone} />}
-              />
-            )
-          })}
-        </div>
-
-        <div className="px-5 py-3 border-t border-bg-700/30 flex items-center justify-between">
-          <div className="text-[11px] text-ink-500 num">
-            Última atualização DDEX: 02/05/2026 02:14 · próxima coleta: em 14h
-          </div>
-          <button
-            type="button"
-            className="text-violet-400 hover:text-violet-300 text-sm transition-colors"
-          >
-            Exportar relatório completo ↓
-          </button>
-        </div>
-      </div>
+        <ReceitaArtistaCard slug={slug} fallbackItems={receitaItems} />
       </ReceitaGate>
 
       <div className="grid grid-cols-2 gap-4">

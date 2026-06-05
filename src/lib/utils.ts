@@ -14,7 +14,8 @@ export function formatNumber(n: number): string {
 export function formatCurrency(n: number): string {
   if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `R$ ${(n / 1_000).toFixed(1)}k`
-  return `R$ ${n.toFixed(0)}`
+  // Valores pequenos (ex.: micro-royalties da OneRPM) mostram centavos.
+  return `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formatVariation(n: number): { text: string; color: string; arrow: string } {

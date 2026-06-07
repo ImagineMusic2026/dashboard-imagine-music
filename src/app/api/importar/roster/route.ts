@@ -1,0 +1,128 @@
+import admin from 'firebase-admin'
+import { NextResponse } from 'next/server'
+import { adminAuth, adminDb } from '@/lib/firebase-admin'
+import { RosterParseError, lerRoster } from '@/lib/roster/parse'
+import { salvarRoster } from '@/lib/roster/firestore'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const TAMANHO_MAX = 25 * 1024 * 1024 // 25MB
+
+/**
+ * Importação do cadastro (roster) de artistas a partir do .xlsx de redes sociais.
+ *  - POST: parseia e faz upsert dos artistas (merge — preserva receita). Só admin.
+ *  - GET : devolve o último cadastro importado. Só admin.
+ */
+async function exigirAdmin(req: Request): Promise<{ uid: string; email: string } | NextResponse> {
+  const authz = req.headers.get('authorization') ?? ''
+  const token = authz.startsWith('Bearer ') ? authz.slice(7) : null
+  if (!token) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+
+  let uid: string
+  let tokenEmail: string | undefined
+  try {
+    const decoded = await adminAuth.verifyIdToken(token)
+    uid = decoded.uid
+    tokenEmail = decoded.email
+  } catch {
+    return NextResponse.json({ error: 'Sessão inválida. Entre novamente.' }, { status: 401 })
+  }
+
+  const snap = await adminDb.doc(`users/${uid}`).get()
+  const u = snap.data()
+  if (!snap.exists || u?.role !== 'admin' || u?.ativo === false) {
+    return NextResponse.json({ error: 'Apenas um admin pode importar o cadastro.' }, { status: 403 })
+  }
+  return { uid, email: (u?.email as string | undefined) ?? tokenEmail ?? '' }
+}
+
+export async function GET(req: Request) {
+  const auth = await exigirAdmin(req)
+  if (auth instanceof NextResponse) return auth
+  try {
+    const snap = await adminDb.collection('cadastros').orderBy('criadoEm', 'desc').limit(1).get()
+    const d = snap.docs[0]
+    if (!d) return NextResponse.json({ ultimo: null })
+    const x = d.data()
+    const ts = x.criadoEm as admin.firestore.Timestamp | undefined
+    return NextResponse.json({
+      ultimo: {
+        id: d.id,
+        arquivoNome: x.arquivoNome ?? '',
+        totais: x.totais ?? null,
+        criadoPorEmail: x.criadoPorEmail ?? '',
+        criadoEmISO: ts?.toDate ? ts.toDate().toISOString() : null,
+      },
+    })
+  } catch (e) {
+    console.error('[api/importar/roster GET]', e)
+    return NextResponse.json({ error: 'Não foi possível carregar o cadastro.' }, { status: 500 })
+  }
+}
+
+export async function POST(req: Request) {
+  const auth = await exigirAdmin(req)
+  if (auth instanceof NextResponse) return auth
+
+  let form: FormData
+  try {
+    form = await req.formData()
+  } catch {
+    return NextResponse.json({ error: 'Envio inválido.' }, { status: 400 })
+  }
+
+  const file = form.get('file')
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: 'Nenhum arquivo enviado.' }, { status: 400 })
+  }
+  if (file.size === 0) {
+    return NextResponse.json({ error: 'O arquivo está vazio.' }, { status: 400 })
+  }
+  if (file.size > TAMANHO_MAX) {
+    return NextResponse.json({ error: 'Arquivo muito grande (máx. 25MB).' }, { status: 413 })
+  }
+  if (!/\.(xlsx|xls)$/i.test(file.name || '')) {
+    return NextResponse.json({ error: 'Envie a planilha .xlsx do cadastro de artistas.' }, { status: 415 })
+  }
+
+  let buf: Buffer
+  try {
+    buf = Buffer.from(await file.arrayBuffer())
+  } catch {
+    return NextResponse.json({ error: 'Não consegui ler o conteúdo do arquivo.' }, { status: 400 })
+  }
+
+  let parsed
+  try {
+    parsed = lerRoster(buf)
+  } catch (e) {
+    if (e instanceof RosterParseError) {
+      return NextResponse.json({ error: e.message }, { status: 422 })
+    }
+    console.error('[api/importar/roster parse]', e)
+    return NextResponse.json({ error: 'Erro ao processar a planilha.' }, { status: 500 })
+  }
+
+  try {
+    const res = await salvarRoster(parsed, {
+      arquivoNome: file.name || 'roster.xlsx',
+      tamanhoBytes: file.size,
+      uid: auth.uid,
+      email: auth.email,
+    })
+    return NextResponse.json({
+      ok: true,
+      cadastroId: res.cadastroId,
+      gravados: res.gravados,
+      resumo: {
+        totais: parsed.totais,
+        avisos: parsed.avisos,
+        artistas: parsed.artistas,
+      },
+    })
+  } catch (e) {
+    console.error('[api/importar/roster save]', e)
+    return NextResponse.json({ error: 'A planilha foi lida, mas falhou ao salvar no banco.' }, { status: 500 })
+  }
+}

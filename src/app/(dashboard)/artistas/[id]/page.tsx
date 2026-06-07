@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation'
 import {
   Activity,
   Calendar,
@@ -9,6 +8,7 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react'
+import { PerfilArtistaReal } from '@/components/artistas/perfil-artista-real'
 import type { LucideIcon } from 'lucide-react'
 import { artistas } from '@/lib/mock-data/artistas'
 import { getGestorPorId } from '@/lib/mock-data/gestores'
@@ -61,7 +61,9 @@ const tabs = [
 
 export default function PerfilArtistaPage({ params }: Props) {
   const artista = artistas.find((a) => a.id === params.id)
-  if (!artista) notFound()
+  // Artista real (importado) -> perfil que lê do Firestore. Mock (a1-a9) -> layout demo.
+  if (!artista) return <PerfilArtistaReal slug={params.id} />
+
 
   const gestor = getGestorPorId(artista.gestorId)
   const variacao = artista.healthScore - artista.healthScoreAnterior

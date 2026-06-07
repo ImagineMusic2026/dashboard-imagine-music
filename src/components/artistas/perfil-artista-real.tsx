@@ -1,0 +1,239 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Activity, ArrowLeft, DollarSign, ExternalLink, Loader2, Music2, Plug, Users } from 'lucide-react'
+import { AvatarFallback } from '@/components/artistas/avatar-fallback'
+import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
+import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
+import { ReceitaGate } from '@/components/auth/receita-gate'
+import {
+  corAvatarDe,
+  getArtista,
+  iniciaisDe,
+  temReceita,
+  type ArtistaDoc,
+  type RedeSocialDoc,
+} from '@/lib/artistas/client'
+import { cn, formatCurrency, formatNumber } from '@/lib/utils'
+
+type EstadoReal = { st: 'load' } | { st: 'erro' } | { st: 'vazio' } | { st: 'ok'; a: ArtistaDoc }
+
+const LINKS: { tipo: PlataformaTipo; nome: string; cor: string; get: (a: ArtistaDoc) => RedeSocialDoc | null | undefined }[] = [
+  { tipo: 'spotify', nome: 'Spotify', cor: 'text-emerald-400', get: (a) => a.redes?.spotify },
+  { tipo: 'youtube', nome: 'YouTube', cor: 'text-red-400', get: (a) => a.redes?.youtube },
+  { tipo: 'instagram', nome: 'Instagram', cor: 'text-fuchsia-400', get: (a) => a.redes?.instagram },
+  { tipo: 'tiktok', nome: 'TikTok', cor: 'text-cyan-400', get: (a) => a.redes?.tiktok },
+]
+
+export function PerfilArtistaReal({ slug }: { slug: string }) {
+  const [estado, setEstado] = useState<EstadoReal>({ st: 'load' })
+
+  useEffect(() => {
+    let vivo = true
+    getArtista(slug)
+      .then((a) => {
+        if (!vivo) return
+        setEstado(a ? { st: 'ok', a } : { st: 'vazio' })
+      })
+      .catch(() => vivo && setEstado({ st: 'erro' }))
+    return () => {
+      vivo = false
+    }
+  }, [slug])
+
+  if (estado.st === 'load') {
+    return (
+      <div className="flex items-center gap-2 text-ink-400 text-sm py-16 justify-center">
+        <Loader2 className="w-4 h-4 animate-spin" /> Carregando artista…
+      </div>
+    )
+  }
+
+  if (estado.st === 'erro' || estado.st === 'vazio') {
+    return (
+      <div className="max-w-lg mx-auto text-center py-16">
+        <h1 className="text-xl font-bold text-ink-100">
+          {estado.st === 'vazio' ? 'Artista não encontrado' : 'Não foi possível carregar'}
+        </h1>
+        <p className="text-sm text-ink-400 mt-2">
+          {estado.st === 'vazio'
+            ? `Nenhum artista com o identificador "${slug}". Ele pode não ter sido importado ainda.`
+            : 'Verifique se você é admin e se as regras do Firestore estão deployadas.'}
+        </p>
+        <Link href="/artistas" className="inline-block mt-4 text-violet-400 hover:text-violet-300 text-sm">
+          ← Voltar pra lista
+        </Link>
+      </div>
+    )
+  }
+
+  const a = estado.a
+  const links = LINKS.map((l) => ({ ...l, rede: l.get(a) })).filter((l) => l.rede?.url)
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <Link href="/artistas" className="inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-200">
+        <ArrowLeft className="w-4 h-4" /> Artistas
+      </Link>
+
+      {/* Header */}
+      <div className="flex items-start gap-5">
+        <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="xl" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[10px] tracking-wider font-semibold uppercase text-ink-400 mb-1">
+            <span>{a.label ?? 'Imagine Music'}</span>
+            <span className="text-ink-600">·</span>
+            <span className="text-cyan-400">CADASTRO REAL</span>
+          </div>
+          <h1 className="text-3xl font-bold text-ink-100">{a.nome}</h1>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {links.length ? (
+              links.map((l) => (
+                <a
+                  key={l.tipo}
+                  href={l.rede!.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-[12px] text-ink-200 transition-colors"
+                >
+                  <span className={cn('w-3.5 h-3.5 block', l.cor)}>
+                    <PlataformaIcon tipo={l.tipo} />
+                  </span>
+                  {l.nome}
+                  <ExternalLink className="w-3 h-3 text-ink-500" />
+                </a>
+              ))
+            ) : (
+              <span className="text-[12px] text-ink-500">Sem links de redes cadastrados.</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-4 gap-4">
+        <ReceitaGate
+          restrito={<KpiPlaceholder label="Receita" nota="restrito ao financeiro" />}
+        >
+          <Kpi
+            icon={DollarSign}
+            label="Receita (OneRPM)"
+            valor={temReceita(a) ? formatCurrency(a.totalBRL ?? 0) : '—'}
+            nota={temReceita(a) ? 'líquido · ≈ R$' : 'sem import ainda'}
+            destaque={temReceita(a)}
+          />
+        </ReceitaGate>
+        <Kpi
+          icon={Music2}
+          label="Streams (OneRPM)"
+          valor={temReceita(a) ? formatNumber(a.streams ?? 0) : '—'}
+          nota={temReceita(a) ? 'no período' : 'sem import ainda'}
+        />
+        <KpiPlaceholder label="Audiência" nota="via integrações" />
+        <KpiPlaceholder label="Health score" nota="via integrações" />
+      </div>
+
+      {/* Receita real */}
+      {temReceita(a) ? (
+        <ReceitaGate>
+          <ReceitaArtistaCard slug={a.slug} fallbackItems={[]} />
+        </ReceitaGate>
+      ) : (
+        <ReceitaGate>
+          <div className="bg-bg-900 border border-bg-700/40 rounded-xl p-5 text-sm text-ink-400 flex items-center gap-3">
+            <DollarSign className="w-5 h-5 text-ink-600" />
+            Sem receita importada pra este artista ainda. Suba o relatório da OneRPM dele em
+            <Link href="/importar" className="text-violet-400 hover:text-violet-300">
+              {' '}Importar
+            </Link>
+            .
+          </div>
+        </ReceitaGate>
+      )}
+
+      {/* Redes cadastradas */}
+      <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-bg-700/30 font-bold text-ink-100">Redes sociais</div>
+        <div className="divide-y divide-bg-700/30">
+          {LINKS.map((l) => {
+            const rede = l.get(a)
+            return (
+              <div key={l.tipo} className="flex items-center gap-3 px-5 py-3">
+                <span className={cn('w-5 h-5 block shrink-0', rede?.url ? l.cor : 'text-ink-700')}>
+                  <PlataformaIcon tipo={l.tipo} />
+                </span>
+                <span className="text-sm text-ink-200 w-24 shrink-0">{l.nome}</span>
+                {rede?.url ? (
+                  <a
+                    href={rede.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[12px] num text-violet-400 hover:text-violet-300 truncate"
+                  >
+                    {rede.handle ? `@${rede.handle}` : rede.id ? `id: ${rede.id}` : rede.url}
+                  </a>
+                ) : (
+                  <span className="text-[12px] text-ink-600">— sem link</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Pendente de integração */}
+      <div className="bg-bg-900 border border-dashed border-bg-700/50 rounded-xl p-5 flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-bg-800 grid place-items-center shrink-0">
+          <Plug className="w-5 h-5 text-ink-500" />
+        </div>
+        <div>
+          <div className="font-semibold text-ink-200 text-sm">Métricas sociais aguardando integração</div>
+          <p className="text-[13px] text-ink-400 mt-0.5 max-w-2xl">
+            Seguidores, engajamento, ouvintes mensais e o health score vêm das APIs (Spotify, Meta,
+            YouTube, TikTok). O cadastro já tem os perfis acima — é a chave pra buscar esses números
+            quando as integrações forem conectadas.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Kpi({
+  icon: Icon,
+  label,
+  valor,
+  nota,
+  destaque,
+}: {
+  icon: typeof Users
+  label: string
+  valor: string
+  nota?: string
+  destaque?: boolean
+}) {
+  return (
+    <div className={cn('rounded-xl p-5 border', destaque ? 'bg-bg-900 border-emerald-500/30' : 'bg-bg-900 border-bg-700/40')}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">{label}</span>
+        <Icon className={cn('w-5 h-5', destaque ? 'text-emerald-400' : 'text-ink-500')} />
+      </div>
+      <div className={cn('num text-2xl font-bold', destaque ? 'text-ink-100' : 'text-ink-200')}>{valor}</div>
+      {nota && <div className="text-[11px] text-ink-500 num mt-1">{nota}</div>}
+    </div>
+  )
+}
+
+function KpiPlaceholder({ label, nota }: { label: string; nota: string }) {
+  return (
+    <div className="rounded-xl p-5 border border-bg-700/40 bg-bg-900/50">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] tracking-wider text-ink-500 font-semibold uppercase">{label}</span>
+        <Activity className="w-5 h-5 text-ink-700" />
+      </div>
+      <div className="num text-2xl font-bold text-ink-600">—</div>
+      <div className="text-[11px] text-ink-600 num mt-1">{nota}</div>
+    </div>
+  )
+}

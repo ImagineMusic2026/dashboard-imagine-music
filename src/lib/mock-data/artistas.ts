@@ -82,16 +82,4 @@ export const artistas: Artista[] = [
     audiencia: 122000, receita30d: 2800, receita30dVariacao: -28,
     healthHistory: [56,54,52,50,48,46,44,43,42,41,40,40,39,39,38,38,38,38,38,38,38,38,38,38,38,38,38,38,38,38],
   },
-  // Artista REAL — id = slug usado no Firestore ('rock-salles'). A receita no perfil
-  // vem da importação da OneRPM; audiência/health/social abaixo são placeholders
-  // (virão das integrações Meta/Spotify for Artists, ainda não conectadas).
-  {
-    id: 'rock-salles', nome: 'Rock Salles', handle: '@rocksalles',
-    iniciais: 'RS', corAvatar: 'from-amber-500 to-red-500',
-    genero: 'Arrocha', gestorId: 'g1', status: 'onboarding',
-    healthScore: 72, healthScoreAnterior: 70,
-    healthScoreBreakdown: { audiencia: 70, engajamento: 72, conteudo: 74, negocio: 71 },
-    audiencia: 0, receita30d: 0, receita30dVariacao: 0,
-    healthHistory: [70,70,71,71,71,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72,72],
-  },
 ]

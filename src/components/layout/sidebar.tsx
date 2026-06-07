@@ -78,10 +78,10 @@ export function Sidebar({ colapsada }: { colapsada: boolean }) {
   const { user, role } = useAuth()
   const [qtdArtistas, setQtdArtistas] = useState<number | null>(null)
 
-  // Contagem real de artistas no cadastro (Firestore). Só admin lê a coleção,
-  // então pros demais o badge simplesmente não aparece.
+  // Contagem real de artistas no cadastro (Firestore). A coleção `artistas` é
+  // legível por qualquer membro ativo, então o badge aparece p/ admin e marketing.
   useEffect(() => {
-    if (role !== 'admin') {
+    if (!role) {
       setQtdArtistas(null)
       return
     }

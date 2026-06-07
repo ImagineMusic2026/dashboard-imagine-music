@@ -1,14 +1,12 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { ReceitaPlataforma } from '@/types'
 
 /**
- * Leitura client (Firestore) dos artistas REAIS — o que veio das planilhas
- * (cadastro/roster + receita da OneRPM). Substitui o mock na lista e no perfil.
+ * Leitura client (Firestore) dos artistas REAIS — o que veio das planilhas.
  *
- * Obs: a coleção `artistas` é admin-read pelas regras (porque carrega receita),
- * então estas funções só retornam dados para admin; pros demais o getDocs falha
- * e a UI mostra um estado restrito.
+ * Importante: `artistas` (cadastro/redes) é legível por QUALQUER membro ativo,
+ * mas a RECEITA mora numa coleção separada `receitas` (admin-only). Por isso a
+ * lista chama `listarArtistas()` pra todo mundo e `listarReceitas()` só p/ admin.
  */
 
 export interface RedeSocialDoc {
@@ -28,12 +26,13 @@ export interface ArtistaDoc {
     instagram?: RedeSocialDoc | null
     tiktok?: RedeSocialDoc | null
   }
-  // Receita (presente só pra quem teve import da OneRPM)
-  receitaPorPlataforma?: ReceitaPlataforma[]
-  totalBRL?: number
-  streams?: number
-  totais?: { netPorMoeda?: Record<string, number> }
-  periodo?: { transactionMonths?: string[]; accountedFrom?: string | null; accountedTo?: string | null }
+}
+
+/** Resumo de receita (coleção `receitas`, admin-only). */
+export interface ReceitaResumo {
+  slug: string
+  totalBRL: number
+  streams: number
 }
 
 const PALETA = [
@@ -74,6 +73,13 @@ export async function getArtista(slug: string): Promise<ArtistaDoc | null> {
   return s.exists() ? { slug: s.id, ...(s.data() as Omit<ArtistaDoc, 'slug'>) } : null
 }
 
-export function temReceita(a: ArtistaDoc): boolean {
-  return !!(a.receitaPorPlataforma && a.receitaPorPlataforma.length)
+/** Mapa slug -> resumo de receita. Só admin consegue ler (regras). */
+export async function listarReceitas(): Promise<Map<string, ReceitaResumo>> {
+  const snap = await getDocs(collection(db, 'receitas'))
+  const m = new Map<string, ReceitaResumo>()
+  snap.docs.forEach((d) => {
+    const x = d.data()
+    m.set(d.id, { slug: d.id, totalBRL: Number(x.totalBRL ?? 0), streams: Number(x.streams ?? 0) })
+  })
+  return m
 }

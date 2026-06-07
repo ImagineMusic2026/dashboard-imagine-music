@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Activity, ArrowLeft, DollarSign, ExternalLink, Loader2, Music2, Plug, Users } from 'lucide-react'
+import { Activity, ArrowLeft, ExternalLink, Loader2, Plug } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
@@ -11,11 +11,10 @@ import {
   corAvatarDe,
   getArtista,
   iniciaisDe,
-  temReceita,
   type ArtistaDoc,
   type RedeSocialDoc,
 } from '@/lib/artistas/client'
-import { cn, formatCurrency, formatNumber } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 type EstadoReal = { st: 'load' } | { st: 'erro' } | { st: 'vazio' } | { st: 'ok'; a: ArtistaDoc }
 
@@ -111,46 +110,16 @@ export function PerfilArtistaReal({ slug }: { slug: string }) {
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
-        <ReceitaGate
-          restrito={<KpiPlaceholder label="Receita" nota="restrito ao financeiro" />}
-        >
-          <Kpi
-            icon={DollarSign}
-            label="Receita (OneRPM)"
-            valor={temReceita(a) ? formatCurrency(a.totalBRL ?? 0) : '—'}
-            nota={temReceita(a) ? 'líquido · ≈ R$' : 'sem import ainda'}
-            destaque={temReceita(a)}
-          />
-        </ReceitaGate>
-        <Kpi
-          icon={Music2}
-          label="Streams (OneRPM)"
-          valor={temReceita(a) ? formatNumber(a.streams ?? 0) : '—'}
-          nota={temReceita(a) ? 'no período' : 'sem import ainda'}
-        />
+      {/* Métricas sociais — pendentes de integração (visíveis a todos) */}
+      <div className="grid grid-cols-2 gap-4">
         <KpiPlaceholder label="Audiência" nota="via integrações" />
         <KpiPlaceholder label="Health score" nota="via integrações" />
       </div>
 
-      {/* Receita real */}
-      {temReceita(a) ? (
-        <ReceitaGate>
-          <ReceitaArtistaCard slug={a.slug} fallbackItems={[]} />
-        </ReceitaGate>
-      ) : (
-        <ReceitaGate>
-          <div className="bg-bg-900 border border-bg-700/40 rounded-xl p-5 text-sm text-ink-400 flex items-center gap-3">
-            <DollarSign className="w-5 h-5 text-ink-600" />
-            Sem receita importada pra este artista ainda. Suba o relatório da OneRPM dele em
-            <Link href="/importar" className="text-violet-400 hover:text-violet-300">
-              {' '}Importar
-            </Link>
-            .
-          </div>
-        </ReceitaGate>
-      )}
+      {/* Receita — só admin (lê a coleção `receitas`); o card cuida do estado vazio. */}
+      <ReceitaGate>
+        <ReceitaArtistaCard slug={a.slug} fallbackItems={[]} />
+      </ReceitaGate>
 
       {/* Redes cadastradas */}
       <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
@@ -196,31 +165,6 @@ export function PerfilArtistaReal({ slug }: { slug: string }) {
           </p>
         </div>
       </div>
-    </div>
-  )
-}
-
-function Kpi({
-  icon: Icon,
-  label,
-  valor,
-  nota,
-  destaque,
-}: {
-  icon: typeof Users
-  label: string
-  valor: string
-  nota?: string
-  destaque?: boolean
-}) {
-  return (
-    <div className={cn('rounded-xl p-5 border', destaque ? 'bg-bg-900 border-emerald-500/30' : 'bg-bg-900 border-bg-700/40')}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">{label}</span>
-        <Icon className={cn('w-5 h-5', destaque ? 'text-emerald-400' : 'text-ink-500')} />
-      </div>
-      <div className={cn('num text-2xl font-bold', destaque ? 'text-ink-100' : 'text-ink-200')}>{valor}</div>
-      {nota && <div className="text-[11px] text-ink-500 num mt-1">{nota}</div>}
     </div>
   )
 }

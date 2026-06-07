@@ -30,9 +30,10 @@ type Estado =
 
 /**
  * Card "Receita por plataforma" do perfil do artista.
- * Tenta ler dados REAIS da OneRPM em `artistas/{slug}` (Firestore). Se não houver
- * importação pra esse artista, cai no `fallbackItems` (mock) — comportamento
- * idêntico ao anterior pros artistas fictícios.
+ * Lê dados REAIS da OneRPM em `receitas/{slug}` (coleção admin-only). Se não houver
+ * receita: usa `fallbackItems` quando existir (artistas mock), senão mostra um
+ * estado "sem receita importada". O componente só deve ser montado dentro do
+ * <ReceitaGate> (admin).
  */
 export function ReceitaArtistaCard({
   slug,
@@ -47,7 +48,7 @@ export function ReceitaArtistaCard({
     let vivo = true
     ;(async () => {
       try {
-        const snap = await getDoc(doc(db, 'artistas', slug))
+        const snap = await getDoc(doc(db, 'receitas', slug))
         if (!vivo) return
         const data = snap.exists() ? (snap.data() as ReceitaArtistaDoc) : null
         if (data?.receitaPorPlataforma?.length) {
@@ -65,8 +66,28 @@ export function ReceitaArtistaCard({
     }
   }, [slug])
 
+  if (estado.tipo === 'carregando') {
+    return (
+      <div className="bg-bg-900 border border-bg-700/40 rounded-xl p-5 flex items-center gap-2 text-sm text-ink-400">
+        <span className="w-4 h-4 rounded-full border-2 border-ink-600 border-t-transparent animate-spin" />
+        Carregando receita…
+      </div>
+    )
+  }
+
   const real = estado.tipo === 'real' ? estado.dados : null
   const items = real ? real.receitaPorPlataforma : fallbackItems
+
+  // Artista real sem receita importada (e sem mock de fallback): estado limpo.
+  if (!real && items.length === 0) {
+    return (
+      <div className="bg-bg-900 border border-bg-700/40 rounded-xl p-5 text-sm text-ink-400 flex items-center gap-3">
+        <DollarSign className="w-5 h-5 text-ink-600" />
+        Sem receita importada para este artista ainda.
+      </div>
+    )
+  }
+
   const total = items.reduce((acc, r) => acc + r.receita, 0)
 
   const periodoLabel = real

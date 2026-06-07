@@ -24,6 +24,23 @@ const REDES: { tipo: PlataformaTipo; cor: string; get: (a: ArtistaDoc) => boolea
   { tipo: 'tiktok', cor: 'text-cyan-400', get: (a) => !!a.redes?.tiktok?.url },
 ]
 
+const TH = 'text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-4'
+
+/** Placeholder honesto pras colunas que ainda dependem de integração. */
+function Pendente() {
+  return <span className="num text-sm text-ink-600">—</span>
+}
+function HealthPendente() {
+  return <div className="w-16 h-1.5 rounded-full bg-bg-700/50" />
+}
+function TendenciaPendente() {
+  return (
+    <svg width="58" height="14" aria-hidden>
+      <line x1="2" y1="7" x2="56" y2="7" stroke="#3F3F52" strokeWidth="2" strokeDasharray="3 4" />
+    </svg>
+  )
+}
+
 export function ArtistasLista() {
   const { role, loading } = useAuth()
   const [artistas, setArtistas] = useState<ArtistaDoc[] | null>(null)
@@ -63,7 +80,7 @@ export function ArtistasLista() {
     )
   }
 
-  const colSpan = ehAdmin ? 4 : 3
+  const colSpan = ehAdmin ? 9 : 8
 
   return (
     <div className="space-y-4">
@@ -112,102 +129,121 @@ export function ArtistasLista() {
         </div>
       ) : (
         <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-bg-700/40">
-                <th className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-4 text-left">
-                  Artista
-                </th>
-                <th className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-4 text-left">
-                  Redes
-                </th>
-                <ReceitaGate>
-                  <th className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-4 text-right">
-                    Receita
-                  </th>
-                </ReceitaGate>
-                <th className="py-3 px-4" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-bg-700/30">
-              {filtrados.map((a) => {
-                const r = receitas.get(a.slug)
-                return (
-                  <tr key={a.slug} className="hover:bg-bg-800/40 transition-colors">
-                    <td className="px-4 py-3">
-                      <Link href={`/artistas/${a.slug}`} className="flex items-center gap-3 group">
-                        <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" />
-                        <div className="min-w-0">
-                          <div className="font-semibold text-sm text-ink-100 group-hover:text-violet-300 transition-colors truncate">
-                            {a.nome}
-                          </div>
-                          <div className="text-[11px] text-ink-500 num truncate">
-                            {a.redes?.instagram?.handle ? `@${a.redes.instagram.handle}` : a.slug}
-                          </div>
-                        </div>
-                      </Link>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {REDES.map(({ tipo, cor, get }) => {
-                          const tem = get(a)
-                          return (
-                            <span
-                              key={tipo}
-                              title={`${tipo}${tem ? '' : ' (sem link)'}`}
-                              className={cn('w-4 h-4 block', tem ? cor : 'text-ink-700')}
-                            >
-                              <PlataformaIcon tipo={tipo} />
-                            </span>
-                          )
-                        })}
-                      </div>
-                    </td>
-
-                    <ReceitaGate>
-                      <td className="px-4 py-3 text-right">
-                        {r ? (
-                          <div>
-                            <div className="num text-sm font-semibold text-emerald-400">
-                              {formatCurrency(r.totalBRL)}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-bg-700/40">
+                  <th className={cn(TH, 'text-left')}>Artista</th>
+                  <th className={cn(TH, 'text-left')}>Gênero</th>
+                  <th className={cn(TH, 'text-left')}>Health</th>
+                  <th className={cn(TH, 'text-left')}>Tendência</th>
+                  <th className={cn(TH, 'text-right')}>Audiência</th>
+                  <th className={cn(TH, 'text-left')}>Redes</th>
+                  <ReceitaGate>
+                    <th className={cn(TH, 'text-right')}>Receita</th>
+                  </ReceitaGate>
+                  <th className={cn(TH, 'text-center')}>Alertas</th>
+                  <th className="py-3 px-4" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-bg-700/30">
+                {filtrados.map((a) => {
+                  const r = receitas.get(a.slug)
+                  return (
+                    <tr key={a.slug} className="hover:bg-bg-800/40 transition-colors">
+                      <td className="px-4 py-3">
+                        <Link href={`/artistas/${a.slug}`} className="flex items-center gap-3 group">
+                          <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm text-ink-100 group-hover:text-violet-300 transition-colors truncate">
+                              {a.nome}
                             </div>
-                            <div className="text-[11px] num text-ink-500">{formatNumber(r.streams)} streams</div>
+                            <div className="text-[11px] text-ink-500 num truncate">
+                              {a.redes?.instagram?.handle ? `@${a.redes.instagram.handle}` : a.slug}
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-ink-600 num text-sm">—</span>
-                        )}
+                        </Link>
                       </td>
-                    </ReceitaGate>
 
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/artistas/${a.slug}`}
-                        className="text-violet-400 hover:text-violet-300 text-sm transition-colors"
-                      >
-                        ver →
-                      </Link>
+                      <td className="px-4 py-3">
+                        <Pendente />
+                      </td>
+                      <td className="px-4 py-3">
+                        <HealthPendente />
+                      </td>
+                      <td className="px-4 py-3">
+                        <TendenciaPendente />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Pendente />
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {REDES.map(({ tipo, cor, get }) => {
+                            const tem = get(a)
+                            return (
+                              <span
+                                key={tipo}
+                                title={`${tipo}${tem ? '' : ' (sem link)'}`}
+                                className={cn('w-4 h-4 block', tem ? cor : 'text-ink-700')}
+                              >
+                                <PlataformaIcon tipo={tipo} />
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </td>
+
+                      <ReceitaGate>
+                        <td className="px-4 py-3 text-right">
+                          {r ? (
+                            <div>
+                              <div className="num text-sm font-semibold text-emerald-400">
+                                {formatCurrency(r.totalBRL)}
+                              </div>
+                              <div className="text-[11px] num text-ink-500">{formatNumber(r.streams)} streams</div>
+                            </div>
+                          ) : (
+                            <span className="text-ink-600 num text-sm">—</span>
+                          )}
+                        </td>
+                      </ReceitaGate>
+
+                      <td className="px-4 py-3 text-center">
+                        <Pendente />
+                      </td>
+
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/artistas/${a.slug}`}
+                          className="text-violet-400 hover:text-violet-300 text-sm transition-colors"
+                        >
+                          ver →
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filtrados.length === 0 && (
+                  <tr>
+                    <td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-ink-500">
+                      Nenhum artista encontrado para “{busca}”.
                     </td>
                   </tr>
-                )
-              })}
-              {filtrados.length === 0 && (
-                <tr>
-                  <td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-ink-500">
-                    Nenhum artista encontrado para “{busca}”.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       <div className="flex items-start gap-2 text-[12px] text-ink-500">
         <DollarSign className="w-3.5 h-3.5 shrink-0 mt-0.5 text-ink-600" />
         <span>
-          Receita (visível só pro financeiro) vem da OneRPM. Métricas sociais virão das integrações —
-          a planilha de redes trouxe os perfis, não os números.
+          <b className="text-ink-400">Receita</b> (visível só pro financeiro) vem da OneRPM.{' '}
+          <b className="text-ink-400">Gênero, health, tendência, audiência e alertas</b> aparecem como “—”
+          por enquanto: chegam com as integrações das plataformas (ou cadastro manual, no caso do gênero).
         </span>
       </div>
     </div>

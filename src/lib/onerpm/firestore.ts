@@ -8,16 +8,20 @@ import type { OneRpmAggregate } from './types'
 /**
  * Persistência da importação da OneRPM (⚠️ só servidor — usa o Admin SDK).
  *
- * Grava em duas coleções, numa transação em lote:
- *  - `importacoes/{id}`  -> histórico completo (metadados + agregado cru)
- *  - `artistas/{slug}`   -> snapshot que o perfil do artista lê (receita pronta)
+ * Grava em três coleções, numa transação em lote:
+ *  - `importacoes/{id}`  -> histórico completo (metadados + agregado cru) — admin
+ *  - `receitas/{slug}`   -> receita pronta p/ o perfil — SÓ ADMIN lê
+ *  - `artistas/{slug}`   -> garante o cadastro do artista (nome/label) — público
  *
- * Guardamos os valores ORIGINAIS por moeda (em `totais`/`agregado`), então a
- * exibição (base net/gross e câmbio) pode ser recalculada sem reimportar.
+ * A receita (dado sensível) fica numa coleção SEPARADA de `artistas` de propósito:
+ * assim o marketing pode ver a lista/cadastro sem ver receita (regras do Firestore).
+ * Guardamos os valores ORIGINAIS por moeda, então a exibição (base net/gross e
+ * câmbio) pode ser recalculada sem reimportar.
  */
 
 const IMPORTACOES = 'importacoes'
 const ARTISTAS = 'artistas'
+const RECEITAS = 'receitas'
 
 export interface ImportMeta {
   arquivoNome: string
@@ -56,6 +60,7 @@ export async function salvarImportacao(
   // em vez de criar um registro duplicado.
   const importRef = adminDb.collection(IMPORTACOES).doc(importIdDe(agg))
   const artistaRef = adminDb.collection(ARTISTAS).doc(agg.artistaSlug)
+  const receitaRef = adminDb.collection(RECEITAS).doc(agg.artistaSlug)
 
   const batch = adminDb.batch()
 
@@ -81,25 +86,29 @@ export async function salvarImportacao(
     criadoPorEmail: meta.email,
   })
 
+  // Cadastro (NÃO sensível): só garante que o artista existe na lista pública.
   batch.set(
     artistaRef,
-    {
-      nome: agg.artistaNome,
-      slug: agg.artistaSlug,
-      label: agg.label,
-      fonte: 'onerpm',
-      receitaPorPlataforma, // já no formato que o painel exibe
-      totais: agg.totais,
-      totalBRL,
-      streams: agg.totais.streams,
-      moedas: agg.moedas,
-      periodo: agg.periodo,
-      configUsada: onerpmConfig,
-      ultimaImportacaoId: importRef.id,
-      atualizadoEm: agora,
-    },
+    { nome: agg.artistaNome, slug: agg.artistaSlug, label: agg.label, atualizadoEm: agora },
     { merge: true }
   )
+
+  // Receita (SENSÍVEL): coleção separada, admin-only.
+  batch.set(receitaRef, {
+    slug: agg.artistaSlug,
+    nome: agg.artistaNome,
+    label: agg.label,
+    fonte: 'onerpm',
+    receitaPorPlataforma, // já no formato que o painel exibe
+    totais: agg.totais,
+    totalBRL,
+    streams: agg.totais.streams,
+    moedas: agg.moedas,
+    periodo: agg.periodo,
+    configUsada: onerpmConfig,
+    ultimaImportacaoId: importRef.id,
+    atualizadoEm: agora,
+  })
 
   await batch.commit()
   return { importId: importRef.id, artistaSlug: agg.artistaSlug, totalBRL }

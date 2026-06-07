@@ -65,10 +65,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Receita da OneRPM (dados sensíveis): só admin ATIVO lê.
-    // A escrita é EXCLUSIVA do servidor (Admin SDK, via /api/importar/onerpm) —
-    // o client nunca grava direto.
+    // Cadastro do artista (nome, redes, label): NÃO é sensível.
+    // Qualquer membro ativo (admin ou marketing) pode ler. Escrita só servidor.
     match /artistas/{slug} {
+      allow read: if isAtivo();
+      allow write: if false;
+    }
+
+    // Receita (SENSÍVEL): só admin lê. Marketing não vê. Escrita só servidor.
+    match /receitas/{slug} {
       allow read: if isAdmin();
       allow write: if false;
     }

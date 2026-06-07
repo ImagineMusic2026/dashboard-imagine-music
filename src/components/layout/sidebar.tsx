@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Home,
@@ -15,7 +16,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { collection, getCountFromServer } from 'firebase/firestore'
+import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
 import { cn } from '@/lib/utils'
 
@@ -28,7 +30,7 @@ type NavItem = {
 
 const navPrincipal: NavItem[] = [
   { href: '/home', label: 'Home', icon: Home },
-  { href: '/artistas', label: 'Artistas', icon: Users, badge: { text: '127', tone: 'neutral' } },
+  { href: '/artistas', label: 'Artistas', icon: Users },
   { href: '/alertas', label: 'Alertas', icon: Bell, badge: { text: '7', tone: 'danger' } },
   { href: '/conteudo', label: 'Conteúdo', icon: Music },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
@@ -73,7 +75,24 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function Sidebar({ colapsada }: { colapsada: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, role } = useAuth()
+  const [qtdArtistas, setQtdArtistas] = useState<number | null>(null)
+
+  // Contagem real de artistas no cadastro (Firestore). Só admin lê a coleção,
+  // então pros demais o badge simplesmente não aparece.
+  useEffect(() => {
+    if (role !== 'admin') {
+      setQtdArtistas(null)
+      return
+    }
+    let vivo = true
+    getCountFromServer(collection(db, 'artistas'))
+      .then((s) => vivo && setQtdArtistas(s.data().count))
+      .catch(() => vivo && setQtdArtistas(null))
+    return () => {
+      vivo = false
+    }
+  }, [role])
 
   const handleLogout = async () => {
     await signOut(auth)
@@ -112,9 +131,13 @@ export function Sidebar({ colapsada }: { colapsada: boolean }) {
         <div className="text-[10px] tracking-[0.15em] text-ink-500 px-3 mb-2 font-semibold">
           PRINCIPAL
         </div>
-        {navPrincipal.map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(item.href)} />
-        ))}
+        {navPrincipal.map((item) => {
+          const it =
+            item.href === '/artistas' && qtdArtistas != null
+              ? { ...item, badge: { text: String(qtdArtistas), tone: 'neutral' as const } }
+              : item
+          return <NavLink key={item.href} item={it} active={isActive(item.href)} />
+        })}
 
         <div className="text-[10px] tracking-[0.15em] text-ink-500 px-3 mb-2 mt-6 font-semibold">
           DADOS

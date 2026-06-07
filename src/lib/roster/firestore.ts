@@ -20,6 +20,19 @@ export interface RosterMeta {
   email: string
 }
 
+export interface CadastroResumo {
+  id: string
+  arquivoNome: string
+  tamanhoBytes: number
+  total: number
+  comSpotifyId: number
+  comYoutube: number
+  comInstagram: number
+  comTiktok: number
+  criadoEmISO: string | null
+  criadoPorEmail: string
+}
+
 export async function salvarRoster(
   res: RosterParseResult,
   meta: RosterMeta
@@ -65,4 +78,25 @@ export async function salvarRoster(
 
   await batch.commit()
   return { cadastroId: cadastroRef.id, gravados }
+}
+
+export async function listarCadastros(max = 20): Promise<CadastroResumo[]> {
+  const snap = await adminDb.collection(CADASTROS).orderBy('criadoEm', 'desc').limit(max).get()
+  return snap.docs.map((d) => {
+    const x = d.data()
+    const ts = x.criadoEm as admin.firestore.Timestamp | undefined
+    const t = x.totais ?? {}
+    return {
+      id: d.id,
+      arquivoNome: x.arquivoNome ?? '',
+      tamanhoBytes: x.tamanhoBytes ?? 0,
+      total: t.total ?? 0,
+      comSpotifyId: t.comSpotifyId ?? 0,
+      comYoutube: t.comYoutube ?? 0,
+      comInstagram: t.comInstagram ?? 0,
+      comTiktok: t.comTiktok ?? 0,
+      criadoEmISO: ts ? ts.toDate().toISOString() : null,
+      criadoPorEmail: x.criadoPorEmail ?? '',
+    }
+  })
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import { AlertTriangle, CheckCircle2, Loader2, Lock, Users2, X } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -14,7 +14,25 @@ type Resumo = {
   artistas: RosterArtist[]
 }
 
+type Recente = {
+  id: string
+  arquivoNome: string
+  tamanhoBytes: number
+  total: number
+  criadoEmISO: string | null
+  criadoPorEmail: string
+}
+
 const fmtInt = (n: number) => n.toLocaleString('pt-BR')
+
+const fmtTamanho = (b: number) =>
+  b >= 1_048_576 ? `${(b / 1_048_576).toFixed(1)}MB` : b >= 1024 ? `${(b / 1024).toFixed(0)}KB` : `${b}B`
+
+const formatarData = (iso: string | null) => {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 
 function Chip({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -37,34 +55,55 @@ export function ImportadorRoster() {
   const [resultado, setResultado] = useState<Resumo | null>(null)
   const [nomeArquivo, setNomeArquivo] = useState<string | null>(null)
   const [arrastando, setArrastando] = useState(false)
+  const [recentes, setRecentes] = useState<Recente[]>([])
 
   const ehAdmin = role === 'admin'
 
-  const enviar = useCallback(async (file: File) => {
-    setErro(null)
-    setResultado(null)
-    setNomeArquivo(file.name)
-    setEnviando(true)
+  const carregarRecentes = useCallback(async () => {
     try {
-      if (!/\.(xlsx|xls)$/i.test(file.name)) throw new Error('Envie a planilha .xlsx do cadastro.')
       const token = await auth.currentUser?.getIdToken()
-      if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/importar/roster', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      })
+      if (!token) return
+      const res = await fetch('/api/importar/roster', { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.error ?? 'Não foi possível importar o cadastro.')
-      setResultado(data.resumo as Resumo)
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro inesperado ao importar.')
-    } finally {
-      setEnviando(false)
+      if (res.ok && data?.cadastros) setRecentes(data.cadastros)
+    } catch {
+      /* lista é secundária */
     }
   }, [])
+
+  useEffect(() => {
+    if (ehAdmin) void carregarRecentes()
+  }, [ehAdmin, carregarRecentes])
+
+  const enviar = useCallback(
+    async (file: File) => {
+      setErro(null)
+      setResultado(null)
+      setNomeArquivo(file.name)
+      setEnviando(true)
+      try {
+        if (!/\.(xlsx|xls)$/i.test(file.name)) throw new Error('Envie a planilha .xlsx do cadastro.')
+        const token = await auth.currentUser?.getIdToken()
+        if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch('/api/importar/roster', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(data?.error ?? 'Não foi possível importar o cadastro.')
+        setResultado(data.resumo as Resumo)
+        void carregarRecentes()
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : 'Erro inesperado ao importar.')
+      } finally {
+        setEnviando(false)
+      }
+    },
+    [carregarRecentes]
+  )
 
   const abrirSeletor = () => inputRef.current?.click()
   const aoSoltar = (e: DragEvent<HTMLDivElement>) => {
@@ -138,6 +177,43 @@ export function ImportadorRoster() {
       )}
 
       {resultado && <ResultadoRoster resumo={resultado} onFechar={() => setResultado(null)} />}
+
+      <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-bg-700/30 flex items-center justify-between">
+          <h3 className="font-bold text-ink-100">Importações recentes</h3>
+          <span className="text-[11px] text-ink-500 num">{recentes.length} no total</span>
+        </div>
+        {recentes.length === 0 ? (
+          <div className="p-8 text-center text-sm text-ink-500">
+            Nenhuma importação de cadastro ainda.
+          </div>
+        ) : (
+          <div className="divide-y divide-bg-700/30">
+            {recentes.map((c) => (
+              <div key={c.id} className="flex items-center gap-4 p-4 hover:bg-bg-800/30 transition-colors">
+                <div className="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-cyan-500/15 text-cyan-400">
+                  <Users2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-ink-100 truncate">{c.arquivoNome}</span>
+                    <span className="text-[10px] tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                      PROCESSADO
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-ink-500 num mt-0.5">
+                    {c.criadoPorEmail} · {fmtTamanho(c.tamanhoBytes)}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="num text-sm font-bold text-ink-200">{fmtInt(c.total)} artistas</div>
+                  <div className="text-[11px] text-ink-500 num">{formatarData(c.criadoEmISO)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

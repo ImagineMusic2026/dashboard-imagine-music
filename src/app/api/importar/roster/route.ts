@@ -1,8 +1,7 @@
-import admin from 'firebase-admin'
 import { NextResponse } from 'next/server'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { RosterParseError, lerRoster } from '@/lib/roster/parse'
-import { salvarRoster } from '@/lib/roster/firestore'
+import { listarCadastros, salvarRoster } from '@/lib/roster/firestore'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,23 +40,11 @@ export async function GET(req: Request) {
   const auth = await exigirAdmin(req)
   if (auth instanceof NextResponse) return auth
   try {
-    const snap = await adminDb.collection('cadastros').orderBy('criadoEm', 'desc').limit(1).get()
-    const d = snap.docs[0]
-    if (!d) return NextResponse.json({ ultimo: null })
-    const x = d.data()
-    const ts = x.criadoEm as admin.firestore.Timestamp | undefined
-    return NextResponse.json({
-      ultimo: {
-        id: d.id,
-        arquivoNome: x.arquivoNome ?? '',
-        totais: x.totais ?? null,
-        criadoPorEmail: x.criadoPorEmail ?? '',
-        criadoEmISO: ts?.toDate ? ts.toDate().toISOString() : null,
-      },
-    })
+    const cadastros = await listarCadastros(20)
+    return NextResponse.json({ cadastros })
   } catch (e) {
     console.error('[api/importar/roster GET]', e)
-    return NextResponse.json({ error: 'Não foi possível carregar o cadastro.' }, { status: 500 })
+    return NextResponse.json({ error: 'Não foi possível carregar os cadastros.' }, { status: 500 })
   }
 }
 

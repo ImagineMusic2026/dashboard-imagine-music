@@ -26,7 +26,14 @@ const LINKS: { tipo: PlataformaTipo; nome: string; cor: string; get: (a: Artista
   { tipo: 'tiktok', nome: 'TikTok', cor: 'text-cyan-400', get: (a) => a.redes?.tiktok },
 ]
 
-export function PerfilArtistaReal({ slug }: { slug: string }) {
+export function PerfilArtistaReal({
+  slug,
+  mostrarVoltar = true,
+}: {
+  slug: string
+  /** Esconde o link "← Artistas" (usado no portal do artista, que não tem roster). */
+  mostrarVoltar?: boolean
+}) {
   const [estado, setEstado] = useState<EstadoReal>({ st: 'load' })
 
   useEffect(() => {
@@ -73,9 +80,11 @@ export function PerfilArtistaReal({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Link href="/artistas" className="inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-200">
-        <ArrowLeft className="w-4 h-4" /> Artistas
-      </Link>
+      {mostrarVoltar && (
+        <Link href="/artistas" className="inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-200">
+          <ArrowLeft className="w-4 h-4" /> Artistas
+        </Link>
+      )}
 
       {/* Header */}
       <div className="flex items-start gap-5">

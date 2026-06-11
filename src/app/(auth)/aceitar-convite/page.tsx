@@ -84,6 +84,8 @@ function AceitarConviteInner() {
         role: convite.role,
         ativo: true,
         conviteToken: token,
+        // Só para artista: amarra o login ao slug do artista (validado nas regras).
+        ...(convite.artistaSlug ? { artistaSlug: convite.artistaSlug } : {}),
       })
       await marcarConviteAceito(token)
       router.push('/home')

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Check, Copy, RefreshCw, X } from 'lucide-react'
 import { FirebaseError } from 'firebase/app'
 import { useAuth } from '@/components/auth/auth-provider'
+import { listarArtistas, type ArtistaDoc } from '@/lib/artistas/client'
 import { copiarTexto } from '@/lib/clipboard'
 import { criarConvite } from '@/lib/invites'
 import { enviarEmailConvite } from '@/lib/email'
@@ -27,8 +28,17 @@ export function ConvidarMembroDialog({ onClose, onConcluido }: Props) {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>('marketing')
+  const [artistaSlug, setArtistaSlug] = useState('')
+  const [artistas, setArtistas] = useState<ArtistaDoc[]>([])
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+
+  // Lista de artistas pra amarrar um convite de 'artista' a um perfil.
+  useEffect(() => {
+    listarArtistas()
+      .then(setArtistas)
+      .catch(() => setArtistas([]))
+  }, [])
 
   const [link, setLink] = useState<string | null>(null)
   const [emailEnviado, setEmailEnviado] = useState(false)
@@ -38,9 +48,19 @@ export function ConvidarMembroDialog({ onClose, onConcluido }: Props) {
     e.preventDefault()
     if (enviando || !user) return
     setErro(null)
+    if (role === 'artista' && !artistaSlug) {
+      setErro('Selecione o artista que este login vai representar.')
+      return
+    }
     setEnviando(true)
     try {
-      const convite = await criarConvite({ email, nome, role, criadoPor: user.uid })
+      const convite = await criarConvite({
+        email,
+        nome,
+        role,
+        criadoPor: user.uid,
+        artistaSlug: role === 'artista' ? artistaSlug : undefined,
+      })
       const url = `${window.location.origin}/aceitar-convite?token=${convite.token}`
       setLink(url)
 
@@ -176,7 +196,7 @@ export function ConvidarMembroDialog({ onClose, onConcluido }: Props) {
 
             <div>
               <div className="block text-sm font-medium text-ink-300 mb-1.5">Papel</div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {(Object.keys(roleMeta) as Role[]).map((r) => (
                   <button
                     key={r}
@@ -196,9 +216,41 @@ export function ConvidarMembroDialog({ onClose, onConcluido }: Props) {
               <p className="text-[11px] text-ink-500 mt-2">
                 {role === 'admin'
                   ? 'Acesso total — vê tudo e gerencia o time.'
-                  : 'Acesso parcial — sem dados sensíveis de receita.'}
+                  : role === 'marketing'
+                    ? 'Acesso parcial — sem dados sensíveis de receita.'
+                    : 'Portal restrito — vê somente o próprio perfil de artista.'}
               </p>
             </div>
+
+            {role === 'artista' && (
+              <div>
+                <label htmlFor="conv-artista" className="block text-sm font-medium text-ink-300 mb-1.5">
+                  Artista
+                </label>
+                <select
+                  id="conv-artista"
+                  required
+                  value={artistaSlug}
+                  onChange={(e) => {
+                    const slug = e.target.value
+                    setArtistaSlug(slug)
+                    const a = artistas.find((x) => x.slug === slug)
+                    if (a) setNome(a.nome)
+                  }}
+                  className="w-full bg-bg-950 border border-bg-700/50 rounded-lg px-4 py-2.5 text-sm text-ink-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                >
+                  <option value="">Selecione o artista…</option>
+                  {artistas.map((a) => (
+                    <option key={a.slug} value={a.slug}>
+                      {a.nome}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-ink-500 mt-1.5">
+                  O login vai enxergar somente o perfil deste artista.
+                </p>
+              </div>
+            )}
 
             {erro && (
               <div
@@ -211,9 +263,9 @@ export function ConvidarMembroDialog({ onClose, onConcluido }: Props) {
 
             <button
               type="submit"
-              disabled={enviando}
+              disabled={enviando || (role === 'artista' && !artistaSlug)}
               aria-busy={enviando}
-              className="w-full bg-violet-500 hover:bg-violet-600 disabled:opacity-80 disabled:cursor-wait text-white font-semibold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
+              className="w-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
             >
               {enviando && <RefreshCw className="w-4 h-4 animate-spin" />}
               {enviando ? 'Criando convite...' : 'Criar convite e enviar'}

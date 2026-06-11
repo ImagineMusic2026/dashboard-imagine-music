@@ -10,3 +10,13 @@ import type { Role } from '@/lib/users'
 export function podeVerReceita(role: Role | null): boolean {
   return role === 'admin'
 }
+
+/** Equipe Imagine (admin ou marketing) — acessa o painel completo. */
+export function ehStaff(role: Role | null): boolean {
+  return role === 'admin' || role === 'marketing'
+}
+
+/** Artista — acesso restrito ao próprio perfil (portal /meu-perfil). */
+export function ehArtista(role: Role | null): boolean {
+  return role === 'artista'
+}

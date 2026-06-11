@@ -23,6 +23,8 @@ export type Convite = {
   role: Role
   status: ConviteStatus
   criadoPor?: string
+  /** Só para role 'artista': slug do artista que o convidado vai representar. */
+  artistaSlug?: string
 }
 
 const CONVITES = 'convites'
@@ -37,8 +39,13 @@ export async function criarConvite(params: {
   nome: string
   role: Role
   criadoPor: string
+  /** Obrigatório quando role === 'artista': o slug do artista representado. */
+  artistaSlug?: string
 }): Promise<Convite> {
   const token = novoToken()
+  // artistaSlug só faz sentido (e só é gravado) para convites de artista.
+  const artistaSlug =
+    params.role === 'artista' ? params.artistaSlug?.trim() || undefined : undefined
   const convite: Convite = {
     token,
     email: params.email.trim().toLowerCase(),
@@ -46,6 +53,7 @@ export async function criarConvite(params: {
     role: params.role,
     status: 'pendente',
     criadoPor: params.criadoPor,
+    ...(artistaSlug ? { artistaSlug } : {}),
   }
   await setDoc(doc(db, CONVITES, token), {
     email: convite.email,
@@ -54,6 +62,7 @@ export async function criarConvite(params: {
     status: convite.status,
     criadoPor: convite.criadoPor,
     criadoEm: serverTimestamp(),
+    ...(artistaSlug ? { artistaSlug } : {}),
   })
   return convite
 }

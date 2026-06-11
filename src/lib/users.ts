@@ -5,8 +5,9 @@ import { auth, db } from '@/lib/firebase'
  * Papéis (roles) da plataforma.
  * - admin: acesso total (vê tudo, gerencia o time).
  * - marketing: acesso parcial (sem dados sensíveis de receita).
+ * - artista: portal restrito — vê SOMENTE o próprio perfil (via artistaSlug).
  */
-export type Role = 'admin' | 'marketing'
+export type Role = 'admin' | 'marketing' | 'artista'
 
 /** Perfil do usuário armazenado em Firestore na coleção `users` (id = UID do Auth). */
 export type AppUser = {
@@ -15,6 +16,8 @@ export type AppUser = {
   nome: string
   role: Role
   ativo: boolean
+  /** Só para role 'artista': slug do artista que este login representa. */
+  artistaSlug?: string
 }
 
 export const roleMeta: Record<Role, { label: string; classe: string; gradient: string }> = {
@@ -27,6 +30,11 @@ export const roleMeta: Record<Role, { label: string; classe: string; gradient: s
     label: 'Marketing',
     classe: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
     gradient: 'from-amber-500 to-orange-600',
+  },
+  artista: {
+    label: 'Artista',
+    classe: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30',
+    gradient: 'from-fuchsia-500 to-pink-600',
   },
 }
 

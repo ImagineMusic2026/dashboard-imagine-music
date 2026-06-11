@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Eye, Grid3x3, Heart, TrendingUp, UserPlus, Users } from 'lucide-react'
+import { ChevronDown, ChevronUp, Eye, Grid3x3, Heart, TrendingUp, UserPlus, Users } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { getHistoricoInstagram, getMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { HistoricoDiaDoc, InstagramSnapshot } from '@/lib/metricas-sociais/types'
@@ -22,6 +22,7 @@ type Estado =
 
 export function InstagramArtistaCard({ slug }: { slug: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
+  const [aberto, setAberto] = useState(true)
 
   useEffect(() => {
     let vivo = true
@@ -79,7 +80,16 @@ export function InstagramArtistaCard({ slug }: { slug: string }) {
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-      <div className="p-5 flex items-center justify-between border-b border-bg-700/30 gap-4">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        title={aberto ? 'Recolher métricas' : 'Expandir métricas'}
+        className={cn(
+          'w-full text-left p-5 flex items-center justify-between gap-4 hover:bg-bg-800/30 transition-colors',
+          aberto && 'border-b border-bg-700/30',
+        )}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 grid place-items-center shrink-0 text-white">
             <span className="w-5 h-5 block">
@@ -98,65 +108,82 @@ export function InstagramArtistaCard({ slug }: { slug: string }) {
             </div>
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
-            Seguidores
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right">
+            <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
+              Seguidores
+            </div>
+            <div className="num text-2xl font-bold text-ink-100">{fmt(ig.seguidores)}</div>
+            {variacao != null && variacao !== 0 && (
+              <div
+                className={cn('text-[11px] num', variacao > 0 ? 'text-emerald-400' : 'text-red-400')}
+              >
+                {variacao > 0 ? '+' : '−'}
+                {formatNumber(Math.abs(variacao))} no período
+              </div>
+            )}
           </div>
-          <div className="num text-2xl font-bold text-ink-100">{fmt(ig.seguidores)}</div>
-          {variacao != null && variacao !== 0 && (
-            <div
-              className={cn('text-[11px] num', variacao > 0 ? 'text-emerald-400' : 'text-red-400')}
-            >
-              {variacao > 0 ? '+' : '−'}
-              {formatNumber(Math.abs(variacao))} no período
+          <span
+            className="grid place-items-center w-7 h-7 rounded-md text-ink-400 hover:text-ink-100 hover:bg-bg-700/40 transition-colors shrink-0"
+            aria-hidden
+          >
+            {aberto ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </span>
+        </div>
+      </button>
+
+      <div
+        className={cn(
+          'grid transition-all duration-300 ease-out',
+          aberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+        )}
+      >
+        <div className="overflow-hidden min-h-0">
+          {serie.length >= 2 && (
+            <div className="px-2 pt-3">
+              <div className="h-24">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={serie} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="ig-grad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#e879f9" stopOpacity={0.5} />
+                        <stop offset="100%" stopColor="#e879f9" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="dia" hide />
+                    <YAxis hide domain={['dataMin', 'dataMax']} />
+                    <Tooltip
+                      contentStyle={{
+                        background: '#1a1a1f',
+                        border: '1px solid #33333a',
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      labelStyle={{ color: '#a1a1aa' }}
+                      formatter={(value) => [formatNumber(Number(value)), 'Seguidores']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="seguidores"
+                      stroke="#e879f9"
+                      strokeWidth={2}
+                      fill="url(#ig-grad)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {serie.length >= 2 && (
-        <div className="px-2 pt-3">
-          <div className="h-24">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={serie} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="ig-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#e879f9" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="#e879f9" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="dia" hide />
-                <YAxis hide domain={['dataMin', 'dataMax']} />
-                <Tooltip
-                  contentStyle={{
-                    background: '#1a1a1f',
-                    border: '1px solid #33333a',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  labelStyle={{ color: '#a1a1aa' }}
-                  formatter={(value) => [formatNumber(Number(value)), 'Seguidores']}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="seguidores"
-                  stroke="#e879f9"
-                  strokeWidth={2}
-                  fill="url(#ig-grad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">
+            <Kpi icone={<Eye className="w-4 h-4" />} label="Alcance" valor={fmt(ig.alcance)} nota={`${ig.janelaDias}d`} />
+            <Kpi icone={<TrendingUp className="w-4 h-4" />} label="Visualizações" valor={fmt(ig.visualizacoes)} nota={`${ig.janelaDias}d`} />
+            <Kpi icone={<Heart className="w-4 h-4" />} label="Interações" valor={fmt(ig.interacoesTotais)} nota={`${ig.janelaDias}d`} />
+            <Kpi icone={<Users className="w-4 h-4" />} label="Contas engajadas" valor={fmt(ig.contasEngajadas)} nota={`${ig.janelaDias}d`} />
+            <Kpi icone={<UserPlus className="w-4 h-4" />} label="Visitas ao perfil" valor={fmt(ig.visitasPerfil)} nota={`${ig.janelaDias}d`} />
+            <Kpi icone={<Grid3x3 className="w-4 h-4" />} label="Publicações" valor={fmt(ig.publicacoes)} nota="total" />
           </div>
         </div>
-      )}
-
-      <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">
-        <Kpi icone={<Eye className="w-4 h-4" />} label="Alcance" valor={fmt(ig.alcance)} nota={`${ig.janelaDias}d`} />
-        <Kpi icone={<TrendingUp className="w-4 h-4" />} label="Visualizações" valor={fmt(ig.visualizacoes)} nota={`${ig.janelaDias}d`} />
-        <Kpi icone={<Heart className="w-4 h-4" />} label="Interações" valor={fmt(ig.interacoesTotais)} nota={`${ig.janelaDias}d`} />
-        <Kpi icone={<Users className="w-4 h-4" />} label="Contas engajadas" valor={fmt(ig.contasEngajadas)} nota={`${ig.janelaDias}d`} />
-        <Kpi icone={<UserPlus className="w-4 h-4" />} label="Visitas ao perfil" valor={fmt(ig.visitasPerfil)} nota={`${ig.janelaDias}d`} />
-        <Kpi icone={<Grid3x3 className="w-4 h-4" />} label="Publicações" valor={fmt(ig.publicacoes)} nota="total" />
       </div>
     </div>
   )

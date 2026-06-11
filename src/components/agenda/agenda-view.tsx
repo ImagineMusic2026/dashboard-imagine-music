@@ -29,9 +29,10 @@ const JANELAS: { key: Janela; label: string; dias: number }[] = [
   { key: 'mes', label: 'Mês', dias: 30 },
   { key: 'trimestre', label: 'Trimestre', dias: 92 },
   { key: 'ano', label: 'Ano', dias: 365 },
+  { key: 'tudo', label: 'Tudo', dias: Infinity },
 ]
 
-type Janela = 'mes' | 'trimestre' | 'ano'
+type Janela = 'mes' | 'trimestre' | 'ano' | 'tudo'
 type DialogState = null | { modo: 'novo' } | { modo: 'editar'; evento: EventoAgenda }
 
 /** Data local de hoje em 'YYYY-MM-DD' (sem conversão de fuso). */
@@ -53,7 +54,7 @@ export function AgendaView() {
   const { user } = useAuth()
   const [eventos, setEventos] = useState<EventoAgenda[] | null>(null)
   const [erro, setErro] = useState(false)
-  const [janela, setJanela] = useState<Janela>('mes')
+  const [janela, setJanela] = useState<Janela>('tudo')
   const [dialog, setDialog] = useState<DialogState>(null)
   const [excluindo, setExcluindo] = useState<string | null>(null)
 
@@ -72,8 +73,8 @@ export function AgendaView() {
   const dias = JANELAS.find((j) => j.key === janela)!.dias
   const { lista, contagem } = useMemo(() => {
     const hoje = hojeISO()
-    const fim = addDias(hoje, dias)
-    const lista = (eventos ?? []).filter((e) => e.data >= hoje && e.data <= fim)
+    const fim = Number.isFinite(dias) ? addDias(hoje, dias) : null
+    const lista = (eventos ?? []).filter((e) => e.data >= hoje && (fim === null || e.data <= fim))
     const contagem: Record<EventoTipo, number> = { release: 0, show: 0, contrato: 0, reuniao: 0 }
     for (const e of lista) contagem[e.tipo]++
     return { lista, contagem }
@@ -147,7 +148,9 @@ export function AgendaView() {
                     ? 'Próximos 30 dias'
                     : janela === 'trimestre'
                       ? 'Próximos 3 meses'
-                      : 'Próximo ano'}
+                      : janela === 'ano'
+                        ? 'Próximo ano'
+                        : 'Todos os próximos'}
                 </div>
               </div>
               <span className="text-[10px] num bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded font-semibold">
@@ -264,8 +267,19 @@ export function AgendaView() {
           evento={dialog.modo === 'editar' ? dialog.evento : null}
           uid={user?.uid ?? ''}
           onClose={() => setDialog(null)}
-          onSalvo={async () => {
+          onSalvo={async (dataEvento) => {
             setDialog(null)
+            // Garante que o evento salvo apareça: se cair fora da janela atual, expande.
+            if (dataEvento) {
+              const hoje = hojeISO()
+              const diasAtual = JANELAS.find((j) => j.key === janela)!.dias
+              const visivel =
+                dataEvento >= hoje && (!Number.isFinite(diasAtual) || dataEvento <= addDias(hoje, diasAtual))
+              if (!visivel) {
+                const alvo = JANELAS.find((j) => !Number.isFinite(j.dias) || dataEvento <= addDias(hoje, j.dias))
+                if (alvo) setJanela(alvo.key)
+              }
+            }
             await carregar()
           }}
         />

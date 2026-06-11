@@ -25,7 +25,7 @@ export function EventoDialog({
   evento: EventoAgenda | null
   uid: string
   onClose: () => void
-  onSalvo: () => void | Promise<void>
+  onSalvo: (dataEvento?: string) => void | Promise<void>
 }) {
   const editando = !!evento
   const [tipo, setTipo] = useState<EventoTipo>(evento?.tipo ?? 'release')
@@ -68,7 +68,7 @@ export function EventoDialog({
       }
       if (editando && evento) await atualizarEvento(evento.id, payload)
       else await criarEvento(payload, uid)
-      await onSalvo()
+      await onSalvo(data)
     } catch (err) {
       const msg =
         err instanceof FirebaseError && err.code === 'permission-denied'

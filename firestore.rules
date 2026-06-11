@@ -89,6 +89,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Métricas de redes sociais (Instagram via Meta): NÃO são sensíveis.
+    // Qualquer membro ativo (admin ou marketing) lê; escrita só servidor (Admin SDK).
+    match /metricas-sociais/{slug} {
+      allow read: if isAtivo();
+      allow write: if false;
+      match /historico/{dia} {
+        allow read: if isAtivo();
+        allow write: if false;
+      }
+    }
+
+    // Status das integrações (ex.: integracoes/meta). Leitura por membro ativo;
+    // escrita só servidor.
+    match /integracoes/{doc} {
+      allow read: if isAtivo();
+      allow write: if false;
+    }
+
     // Demais coleções ficam bloqueadas até serem modeladas.
     // (ao modelar dados reais, exija isAtivo() — e isAdmin() para escrita sensível)
     match /{document=**} {

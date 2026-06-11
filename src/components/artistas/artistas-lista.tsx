@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, DollarSign, Loader2, Search } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Search } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
@@ -26,6 +26,23 @@ const REDES: { tipo: PlataformaTipo; cor: string; get: (a: ArtistaDoc) => boolea
 
 const TH = 'text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-4'
 
+const POR_PAGINA = 15
+
+/** Páginas a mostrar no controle (com reticências quando são muitas). */
+function paginasVisiveis(atual: number, total: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const alvo = new Set([1, total, atual, atual - 1, atual + 1])
+  const ordenadas = Array.from(alvo).filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+  const out: (number | '…')[] = []
+  let anterior = 0
+  for (const p of ordenadas) {
+    if (p - anterior > 1) out.push('…')
+    out.push(p)
+    anterior = p
+  }
+  return out
+}
+
 /** Placeholder honesto pras colunas que ainda dependem de integração. */
 function Pendente() {
   return <span className="num text-sm text-ink-600">—</span>
@@ -47,6 +64,7 @@ export function ArtistasLista() {
   const [receitas, setReceitas] = useState<Map<string, ReceitaResumo>>(new Map())
   const [erro, setErro] = useState(false)
   const [busca, setBusca] = useState('')
+  const [pagina, setPagina] = useState(1)
 
   const ehAdmin = role === 'admin'
 
@@ -71,6 +89,11 @@ export function ArtistasLista() {
     const q = busca.trim().toLowerCase()
     return q ? artistas.filter((a) => a.nome.toLowerCase().includes(q)) : artistas
   }, [artistas, busca])
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
+  const paginaAtual = Math.min(pagina, totalPaginas)
+  const inicio = (paginaAtual - 1) * POR_PAGINA
+  const paginados = filtrados.slice(inicio, inicio + POR_PAGINA)
 
   if (loading) {
     return (
@@ -108,7 +131,10 @@ export function ArtistasLista() {
           <input
             type="text"
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) => {
+              setBusca(e.target.value)
+              setPagina(1)
+            }}
             placeholder="Filtrar por nome…"
             className="w-full pl-9 pr-3 py-2 bg-bg-800/50 border border-bg-700/40 rounded-lg text-sm text-ink-200 placeholder:text-ink-500 focus:outline-none focus:border-violet-500/40"
           />
@@ -147,7 +173,7 @@ export function ArtistasLista() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bg-700/30">
-                {filtrados.map((a) => {
+                {paginados.map((a) => {
                   const r = receitas.get(a.slug)
                   return (
                     <tr key={a.slug} className="hover:bg-bg-800/40 transition-colors">
@@ -235,6 +261,60 @@ export function ArtistasLista() {
               </tbody>
             </table>
           </div>
+
+          {totalPaginas > 1 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-bg-700/40">
+              <span className="text-[12px] text-ink-500">
+                Mostrando{' '}
+                <span className="num text-ink-300">
+                  {inicio + 1}–{Math.min(inicio + POR_PAGINA, filtrados.length)}
+                </span>{' '}
+                de <span className="num text-ink-300">{filtrados.length}</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPagina(paginaAtual - 1)}
+                  disabled={paginaAtual === 1}
+                  aria-label="Página anterior"
+                  className="w-8 h-8 grid place-items-center rounded-lg border border-bg-700/50 text-ink-300 hover:bg-bg-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {paginasVisiveis(paginaAtual, totalPaginas).map((p, i) =>
+                  p === '…' ? (
+                    <span key={`e${i}`} className="w-8 h-8 grid place-items-center text-ink-600 text-sm">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPagina(p)}
+                      aria-current={p === paginaAtual ? 'page' : undefined}
+                      className={cn(
+                        'min-w-8 h-8 px-2 grid place-items-center rounded-lg border text-sm num transition-colors',
+                        p === paginaAtual
+                          ? 'border-violet-500/40 bg-violet-500/15 text-violet-300 font-semibold'
+                          : 'border-bg-700/50 text-ink-300 hover:bg-bg-800',
+                      )}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPagina(paginaAtual + 1)}
+                  disabled={paginaAtual === totalPaginas}
+                  aria-label="Próxima página"
+                  className="w-8 h-8 grid place-items-center rounded-lg border border-bg-700/50 text-ink-300 hover:bg-bg-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

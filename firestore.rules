@@ -122,6 +122,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Agenda (eventos: releases, shows, contratos, reuniões). Dado manual da
+    // equipe — staff (admin/marketing) lê e escreve direto do client (CRUD do painel).
+    match /agenda/{id} {
+      allow read: if isStaff();
+      allow create, update, delete: if isStaff();
+    }
+
     // Demais coleções ficam bloqueadas até serem modeladas.
     // (ao modelar dados reais, exija isAtivo() — e isAdmin() para escrita sensível)
     match /{document=**} {

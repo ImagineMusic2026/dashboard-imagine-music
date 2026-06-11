@@ -18,6 +18,7 @@ import {
   oneRpmStats,
 } from '@/lib/mock-data/integracoes'
 import { IntegracaoCard } from '@/components/integracoes/integracao-card'
+import { MetaInstagramCard } from '@/components/integracoes/meta-instagram-card'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { KPICard } from '@/components/shared/kpi-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
@@ -276,14 +277,20 @@ export default function IntegracoesPage() {
           cor="violet"
         />
         <div className="grid grid-cols-3 gap-4">
-          {integracoesEngajamento.map((integ) => (
-            <IntegracaoCard
-              key={integ.id}
-              integracao={integ}
-              icone={<PlataformaIcon tipo={tipoIconKey[integ.tipo]} />}
-              corIcone={corIconePorTipo[integ.tipo]}
-            />
-          ))}
+          {/* Instagram (Meta) — integração REAL via Graph API */}
+          <MetaInstagramCard />
+          {/* Demais redes desta seção seguem como mock até serem integradas.
+              'meta' e 'instagram' saem do mock pois o card real acima os cobre. */}
+          {integracoesEngajamento
+            .filter((integ) => integ.tipo !== 'instagram' && integ.tipo !== 'meta')
+            .map((integ) => (
+              <IntegracaoCard
+                key={integ.id}
+                integracao={integ}
+                icone={<PlataformaIcon tipo={tipoIconKey[integ.tipo]} />}
+                corIcone={corIconePorTipo[integ.tipo]}
+              />
+            ))}
         </div>
       </section>
 

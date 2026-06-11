@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Activity, ArrowLeft, ExternalLink, Loader2, Plug } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
+import { InstagramArtistaCard } from '@/components/artistas/instagram-artista-card'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import {
@@ -110,10 +111,13 @@ export function PerfilArtistaReal({ slug }: { slug: string }) {
         </div>
       </div>
 
-      {/* Métricas sociais — pendentes de integração (visíveis a todos) */}
+      {/* Instagram — métricas reais via Meta (visíveis a todos os membros) */}
+      <InstagramArtistaCard slug={a.slug} />
+
+      {/* Demais métricas — pendentes de integração (visíveis a todos) */}
       <div className="grid grid-cols-2 gap-4">
-        <KpiPlaceholder label="Audiência" nota="via integrações" />
-        <KpiPlaceholder label="Health score" nota="via integrações" />
+        <KpiPlaceholder label="Audiência total" nota="Spotify · YouTube · TikTok" />
+        <KpiPlaceholder label="Health score" nota="cálculo via integrações" />
       </div>
 
       {/* Receita — só admin (lê a coleção `receitas`); o card cuida do estado vazio. */}
@@ -157,11 +161,11 @@ export function PerfilArtistaReal({ slug }: { slug: string }) {
           <Plug className="w-5 h-5 text-ink-500" />
         </div>
         <div>
-          <div className="font-semibold text-ink-200 text-sm">Métricas sociais aguardando integração</div>
+          <div className="font-semibold text-ink-200 text-sm">Demais métricas aguardando integração</div>
           <p className="text-[13px] text-ink-400 mt-0.5 max-w-2xl">
-            Seguidores, engajamento, ouvintes mensais e o health score vêm das APIs (Spotify, Meta,
-            YouTube, TikTok). O cadastro já tem os perfis acima — é a chave pra buscar esses números
-            quando as integrações forem conectadas.
+            O Instagram já é coletado via Meta (card acima). Spotify, YouTube e TikTok — e o health
+            score consolidado — entram conforme as próximas integrações forem conectadas. O cadastro
+            de redes acima é a chave pra buscar esses números.
           </p>
         </div>
       </div>

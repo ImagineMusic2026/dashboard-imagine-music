@@ -6,7 +6,6 @@ const secoes = [
   { key: 'time', label: 'Time', ativo: true },
   { key: 'permissoes', label: 'Permissões', ativo: false },
   { key: 'notificacoes', label: 'Notificações', ativo: false },
-  { key: 'plano', label: 'Plano e cobrança', ativo: false },
   { key: 'integracoes', label: 'Integrações', ativo: false, link: '/integracoes' },
   { key: 'preferencias', label: 'Preferências', ativo: false },
 ]

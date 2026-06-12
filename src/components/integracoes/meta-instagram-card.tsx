@@ -18,6 +18,11 @@ import { cn } from '@/lib/utils'
 
 type AcaoEmAndamento = null | 'descobrir' | 'sincronizar'
 
+type ResultadoDescoberta = {
+  casados: { slug: string; username: string }[]
+  contasNaoUsadas: string[]
+}
+
 export function MetaInstagramCard() {
   const { role } = useAuth()
   const isAdmin = role === 'admin'
@@ -26,6 +31,7 @@ export function MetaInstagramCard() {
   const [carregando, setCarregando] = useState(true)
   const [acao, setAcao] = useState<AcaoEmAndamento>(null)
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const [descoberta, setDescoberta] = useState<ResultadoDescoberta | null>(null)
 
   const recarregar = useCallback(async () => {
     try {
@@ -45,6 +51,7 @@ export function MetaInstagramCard() {
     async (qual: 'descobrir' | 'sincronizar') => {
       setAcao(qual)
       setMsg(null)
+      setDescoberta(null)
       try {
         const token = await auth.currentUser?.getIdToken()
         if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
@@ -63,6 +70,12 @@ export function MetaInstagramCard() {
                   data.falhas ? ` · ${data.falhas} falha(s)` : ''
                 }.`,
         })
+        if (qual === 'descobrir') {
+          setDescoberta({
+            casados: data.casados ?? [],
+            contasNaoUsadas: data.contasNaoUsadas ?? [],
+          })
+        }
         await recarregar()
       } catch (e) {
         setMsg({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Erro inesperado.' })
@@ -163,6 +176,48 @@ export function MetaInstagramCard() {
         {!msg && erro && status?.erro && (
           <div className="mt-3 text-[12px] rounded-lg px-3 py-2 border text-red-300 bg-red-500/10 border-red-500/30">
             {status.erro}
+          </div>
+        )}
+
+        {descoberta && (descoberta.casados.length > 0 || descoberta.contasNaoUsadas.length > 0) && (
+          <div className="mt-3 space-y-2">
+            {descoberta.casados.length > 0 && (
+              <div className="text-[11px] rounded-lg px-3 py-2 border border-bg-700/40 bg-bg-950/40">
+                <div className="text-ink-400 font-semibold mb-1.5">
+                  Vinculados ({descoberta.casados.length})
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {descoberta.casados.map((c) => (
+                    <span
+                      key={c.slug}
+                      className="num text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5"
+                    >
+                      @{c.username}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {descoberta.contasNaoUsadas.length > 0 && (
+              <div className="text-[11px] rounded-lg px-3 py-2 border border-amber-500/30 bg-amber-500/5">
+                <div className="text-amber-400 font-semibold mb-1">
+                  Encontradas no Meta, sem artista correspondente ({descoberta.contasNaoUsadas.length})
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {descoberta.contasNaoUsadas.map((u) => (
+                    <span
+                      key={u}
+                      className="num text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5"
+                    >
+                      @{u}
+                    </span>
+                  ))}
+                </div>
+                <div className="text-amber-200/70 text-[10px] leading-snug">
+                  Provável @ digitado diferente no cadastro do artista — ajuste o handle pra casar.
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -2,10 +2,11 @@
 
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Bell, SlidersHorizontal } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
 import { MatrizPermissoes } from '@/components/configuracoes/matriz-permissoes'
+import { Preferencias } from '@/components/configuracoes/preferencias'
 import { cn } from '@/lib/utils'
 
 type Aba = 'time' | 'permissoes' | 'notificacoes' | 'preferencias'
@@ -71,13 +72,7 @@ export function ConfiguracoesView() {
               descricao="Configurar quais eventos notificam a equipe e por qual canal. Entra junto com a feature de Alertas."
             />
           )}
-          {aba === 'preferencias' && (
-            <EmBreve
-              icone={<SlidersHorizontal className="w-5 h-5" />}
-              titulo="Preferências"
-              descricao="Preferências de exibição do painel (tema, idioma, formato de data)."
-            />
-          )}
+          {aba === 'preferencias' && <Preferencias />}
         </div>
       </div>
     </div>

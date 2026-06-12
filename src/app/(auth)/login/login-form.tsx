@@ -12,6 +12,7 @@ import {
   signInWithEmailAndPassword,
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { getHomePadrao } from '@/lib/preferencias'
 
 const EMAIL_KEY = 'painel:email'
 const LEMBRAR_KEY = 'painel:lembrar'
@@ -103,7 +104,7 @@ export function LoginForm() {
         localStorage.setItem(LEMBRAR_KEY, 'false')
       }
 
-      router.push('/home')
+      router.push(getHomePadrao())
     } catch (err) {
       setErro(mensagemErro(err))
       setLoading(false)

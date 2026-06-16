@@ -104,8 +104,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Métricas de redes sociais (Instagram via Meta): NÃO são sensíveis para a equipe.
-    // Staff lê tudo; o artista lê só o próprio slug. Escrita só servidor (Admin SDK).
+    // Métricas de redes sociais (Instagram via Meta, TikTok via Display API): NÃO
+    // são sensíveis para a equipe. Staff lê tudo; o artista lê só o próprio slug.
+    // Escrita só servidor (Admin SDK).
     match /metricas-sociais/{slug} {
       allow read: if isStaff() || isArtistaDe(slug);
       allow write: if false;
@@ -113,6 +114,24 @@ service cloud.firestore {
         allow read: if isStaff() || isArtistaDe(slug);
         allow write: if false;
       }
+      match /historico-tiktok/{dia} {
+        allow read: if isStaff() || isArtistaDe(slug);
+        allow write: if false;
+      }
+      match /historico-youtube/{dia} {
+        allow read: if isStaff() || isArtistaDe(slug);
+        allow write: if false;
+      }
+    }
+
+    // Tokens OAuth (SEGREDO: access/refresh token) do TikTok e do YouTube.
+    // Ninguém lê/escreve pelo client — só o Admin SDK no servidor. (O catch-all
+    // abaixo já negaria, mas explicitamos para deixar a intenção clara.)
+    match /tiktok-tokens/{slug} {
+      allow read, write: if false;
+    }
+    match /youtube-tokens/{slug} {
+      allow read, write: if false;
     }
 
     // Status das integrações (ex.: integracoes/meta). Leitura só staff;

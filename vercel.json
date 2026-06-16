@@ -3,6 +3,14 @@
     {
       "path": "/api/integracoes/meta/sincronizar",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/integracoes/tiktok/sincronizar",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/integracoes/youtube/sincronizar",
+      "schedule": "0 8 * * *"
     }
   ]
 }

@@ -36,6 +36,49 @@ export async function exigirAdmin(req: Request): Promise<AdminAuth | NextRespons
   return { uid, email: (u?.email as string | undefined) ?? tokenEmail ?? '' }
 }
 
+export interface SessaoAtiva {
+  uid: string
+  email: string
+  /** 'admin' | 'marketing' | 'artista' | ''. */
+  role: string
+  /** Slug do artista vinculado ao login (só para role 'artista'). */
+  artistaSlug: string | null
+}
+
+/**
+ * Exige um usuário ativo qualquer (admin, marketing ou artista). Diferente de
+ * `exigirAdmin`, não restringe por papel — quem chama decide o que cada papel
+ * pode fazer (ex.: artista só age sobre o próprio slug). Usado por
+ * conectar/desconectar do TikTok, onde o artista autoriza a própria conta.
+ */
+export async function exigirSessaoAtiva(req: Request): Promise<SessaoAtiva | NextResponse> {
+  const authz = req.headers.get('authorization') ?? ''
+  const token = authz.startsWith('Bearer ') ? authz.slice(7) : null
+  if (!token) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+
+  let uid: string
+  let tokenEmail: string | undefined
+  try {
+    const decoded = await adminAuth.verifyIdToken(token)
+    uid = decoded.uid
+    tokenEmail = decoded.email
+  } catch {
+    return NextResponse.json({ error: 'Sessão inválida. Entre novamente.' }, { status: 401 })
+  }
+
+  const snap = await adminDb.doc(`users/${uid}`).get()
+  const u = snap.data()
+  if (!snap.exists || u?.ativo === false) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+  }
+  return {
+    uid,
+    email: (u?.email as string | undefined) ?? tokenEmail ?? '',
+    role: (u?.role as string | undefined) ?? '',
+    artistaSlug: (u?.artistaSlug as string | undefined) ?? null,
+  }
+}
+
 export type CronAuth = { cron: true }
 
 /**

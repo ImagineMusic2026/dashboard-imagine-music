@@ -1,6 +1,14 @@
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { HistoricoDiaDoc, IntegracaoMetaDoc, MetricasSociaisDoc } from './types'
+import type {
+  HistoricoDiaDoc,
+  HistoricoTikTokDiaDoc,
+  HistoricoYouTubeDiaDoc,
+  IntegracaoMetaDoc,
+  IntegracaoTikTokDoc,
+  IntegracaoYouTubeDoc,
+  MetricasSociaisDoc,
+} from './types'
 
 /**
  * Leitura client (Firestore) das métricas sociais. Liberada para qualquer
@@ -41,4 +49,44 @@ export async function getHistoricoInstagram(
 export async function getStatusMeta(): Promise<IntegracaoMetaDoc | null> {
   const s = await getDoc(doc(db, 'integracoes', 'meta'))
   return s.exists() ? (s.data() as IntegracaoMetaDoc) : null
+}
+
+/** Histórico diário do TikTok (ordenado por dia asc), últimos `limite` dias. */
+export async function getHistoricoTikTok(
+  slug: string,
+  limite = 90,
+): Promise<HistoricoTikTokDiaDoc[]> {
+  const q = query(
+    collection(db, 'metricas-sociais', slug, 'historico-tiktok'),
+    orderBy('dia', 'asc'),
+  )
+  const snap = await getDocs(q)
+  const arr = snap.docs.map((d) => d.data() as HistoricoTikTokDiaDoc)
+  return arr.slice(-limite)
+}
+
+/** Status da integração TikTok (doc `integracoes/tiktok`). */
+export async function getStatusTikTok(): Promise<IntegracaoTikTokDoc | null> {
+  const s = await getDoc(doc(db, 'integracoes', 'tiktok'))
+  return s.exists() ? (s.data() as IntegracaoTikTokDoc) : null
+}
+
+/** Histórico diário do YouTube (ordenado por dia asc), últimos `limite` dias. */
+export async function getHistoricoYouTube(
+  slug: string,
+  limite = 90,
+): Promise<HistoricoYouTubeDiaDoc[]> {
+  const q = query(
+    collection(db, 'metricas-sociais', slug, 'historico-youtube'),
+    orderBy('dia', 'asc'),
+  )
+  const snap = await getDocs(q)
+  const arr = snap.docs.map((d) => d.data() as HistoricoYouTubeDiaDoc)
+  return arr.slice(-limite)
+}
+
+/** Status da integração YouTube (doc `integracoes/youtube`). */
+export async function getStatusYouTube(): Promise<IntegracaoYouTubeDoc | null> {
+  const s = await getDoc(doc(db, 'integracoes', 'youtube'))
+  return s.exists() ? (s.data() as IntegracaoYouTubeDoc) : null
 }

@@ -19,6 +19,8 @@ import {
 } from '@/lib/mock-data/integracoes'
 import { IntegracaoCard } from '@/components/integracoes/integracao-card'
 import { MetaInstagramCard } from '@/components/integracoes/meta-instagram-card'
+import { TikTokCard } from '@/components/integracoes/tiktok-card'
+import { YouTubeCard } from '@/components/integracoes/youtube-card'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { KPICard } from '@/components/shared/kpi-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
@@ -277,12 +279,16 @@ export default function IntegracoesPage() {
           cor="violet"
         />
         <div className="grid grid-cols-3 gap-4">
-          {/* Instagram (Meta) — integração REAL via Graph API */}
+          {/* Instagram (Meta) e TikTok — integrações REAIS (Graph API / Display API) */}
           <MetaInstagramCard />
+          <TikTokCard />
           {/* Demais redes desta seção seguem como mock até serem integradas.
-              'meta' e 'instagram' saem do mock pois o card real acima os cobre. */}
+              'meta', 'instagram' e 'tiktok' saem do mock pois os cards reais acima os cobrem. */}
           {integracoesEngajamento
-            .filter((integ) => integ.tipo !== 'instagram' && integ.tipo !== 'meta')
+            .filter(
+              (integ) =>
+                integ.tipo !== 'instagram' && integ.tipo !== 'meta' && integ.tipo !== 'tiktok',
+            )
             .map((integ) => (
               <IntegracaoCard
                 key={integ.id}
@@ -300,14 +306,19 @@ export default function IntegracoesPage() {
           cor="cyan"
         />
         <div className="grid grid-cols-2 gap-4">
-          {integracoesComplementares.map((integ) => (
-            <IntegracaoCard
-              key={integ.id}
-              integracao={integ}
-              icone={<PlataformaIcon tipo={tipoIconKey[integ.tipo]} />}
-              corIcone={corIconePorTipo[integ.tipo]}
-            />
-          ))}
+          {/* YouTube — integração REAL (Data API + Analytics). */}
+          <YouTubeCard />
+          {/* Spotify for Artists segue mock até ser integrado. */}
+          {integracoesComplementares
+            .filter((integ) => integ.tipo !== 'youtube')
+            .map((integ) => (
+              <IntegracaoCard
+                key={integ.id}
+                integracao={integ}
+                icone={<PlataformaIcon tipo={tipoIconKey[integ.tipo]} />}
+                corIcone={corIconePorTipo[integ.tipo]}
+              />
+            ))}
         </div>
       </section>
 

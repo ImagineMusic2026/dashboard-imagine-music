@@ -30,4 +30,14 @@ function credencial() {
 const app = admin.apps.length ? admin.app() : admin.initializeApp({ credential: credencial() })
 
 export const adminAuth = admin.auth(app)
-export const adminDb = admin.firestore(app)
+
+const db = admin.firestore(app)
+// Ignora campos `undefined` nas escritas (ex.: `avisos` quando não há aviso) em
+// vez de lançar — senão o Admin SDK rejeita o documento inteiro. settings() só
+// pode ser chamado uma vez por instância; o try/catch cobre o hot-reload do dev.
+try {
+  db.settings({ ignoreUndefinedProperties: true })
+} catch {
+  // já configurado nesta instância (re-import no dev)
+}
+export const adminDb = db

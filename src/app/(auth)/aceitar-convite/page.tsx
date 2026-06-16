@@ -11,6 +11,7 @@ import { auth, db } from '@/lib/firebase'
 import { getConvite, marcarConviteAceito, type Convite } from '@/lib/invites'
 import { roleMeta } from '@/lib/users'
 import { cn } from '@/lib/utils'
+import { BrandLogo } from '@/components/shared/logo'
 
 function mensagemErro(err: unknown): string {
   if (err instanceof FirebaseError) {
@@ -27,14 +28,7 @@ function mensagemErro(err: unknown): string {
 }
 
 function Marca() {
-  return (
-    <div className="flex items-center gap-3 mb-8">
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-amber-400 grid place-items-center text-bg-950 font-bold">
-        i
-      </div>
-      <span className="text-[12px] tracking-[0.2em] text-ink-400 font-bold">IMAGINE</span>
-    </div>
-  )
+  return <BrandLogo className="h-8 mb-8" />
 }
 
 function AceitarConviteInner() {

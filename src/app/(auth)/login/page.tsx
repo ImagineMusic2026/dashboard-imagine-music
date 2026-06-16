@@ -1,47 +1,72 @@
+import { Activity, BadgeDollarSign, Bell } from 'lucide-react'
+import { BrandLogo } from '@/components/shared/logo'
 import { LoginForm } from './login-form'
+
+const destaques = [
+  { icon: Activity, titulo: 'Health Score automático', desc: 'A saúde de cada artista, calculada sozinha' },
+  { icon: Bell, titulo: 'Alertas em tempo real', desc: 'Quedas e oportunidades, assim que acontecem' },
+  { icon: BadgeDollarSign, titulo: 'Receita consolidada', desc: 'OneRPM e DDEX reunidos num só lugar' },
+]
 
 export default function LoginPage() {
   return (
     <>
-      <div className="hidden lg:block w-1/2 bg-gradient-to-br from-bg-900 via-violet-950/30 to-bg-950 relative overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="hidden lg:block w-1/2 relative overflow-hidden bg-bg-950">
+        {/* Fundo: gradiente base + aurora animada + grade de pontos com máscara */}
+        <div className="absolute inset-0 bg-gradient-to-br from-bg-900 via-violet-950/40 to-bg-950" />
+        <div className="absolute -top-24 -left-24 w-[30rem] h-[30rem] bg-violet-600/25 rounded-full blur-3xl animate-aurora pointer-events-none" />
+        <div className="absolute -bottom-24 -right-16 w-[28rem] h-[28rem] bg-amber-500/15 rounded-full blur-3xl animate-aurora [animation-delay:-7s] pointer-events-none" />
+        <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-fuchsia-500/15 rounded-full blur-3xl animate-aurora [animation-delay:-14s] pointer-events-none" />
+        <div
+          className="absolute inset-0 opacity-40 pointer-events-none"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
+            backgroundSize: '22px 22px',
+            maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 78%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black 30%, transparent 78%)',
+          }}
+        />
 
         <div className="relative z-10 flex flex-col justify-between p-12 h-full">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-amber-400 grid place-items-center text-bg-950 font-bold text-xl">
-              i
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-[12px] tracking-[0.2em] text-ink-400 font-bold">
-                IMAGINE
-              </span>
-              <span className="text-[14px] text-ink-300 font-semibold">Group</span>
-            </div>
-          </div>
+          <BrandLogo className="h-7 self-start animate-rise" priority />
 
-          <div>
-            <h2 className="text-4xl font-bold text-ink-100 leading-tight max-w-md">
-              Painel de Acompanhamento de Artistas
+          <div className="max-w-md">
+            <h2 className="text-[2.75rem] leading-[1.05] font-bold text-ink-100 animate-rise [animation-delay:80ms]">
+              Painel de Acompanhamento de{' '}
+              <span className="animate-gradient-text">
+                Artistas
+              </span>
             </h2>
-            <p className="text-ink-300 text-lg mt-4 max-w-md">
+
+            <p className="mt-4 text-ink-300 text-lg leading-relaxed animate-rise [animation-delay:200ms]">
               Centralize métricas, alertas e oportunidades de todo o seu portfólio em um único
               lugar.
             </p>
-            <div className="mt-8 flex items-center gap-3 flex-wrap">
-              <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-500/20">
-                ✓ Health Score automático
-              </span>
-              <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-500/20">
-                ✓ Alertas em tempo real
-              </span>
-              <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-500/20">
-                ✓ Receita via OneRPM/DDEX
-              </span>
+
+            <div className="mt-9 space-y-3.5">
+              {destaques.map((d, i) => {
+                const Icon = d.icon
+                return (
+                  <div
+                    key={d.titulo}
+                    className="group flex items-center gap-3.5 animate-rise"
+                    style={{ animationDelay: `${280 + i * 80}ms` }}
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-bg-800/60 border border-bg-700/60 grid place-items-center text-violet-300 shrink-0 backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-violet-500/50 group-hover:text-violet-200 group-hover:shadow-lg group-hover:shadow-violet-500/10">
+                      <Icon className="w-[18px] h-[18px]" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-ink-100">{d.titulo}</div>
+                      <div className="text-[12px] text-ink-400">{d.desc}</div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
-          <div className="text-[12px] text-ink-500">
+          <div className="text-[12px] text-ink-500 animate-rise [animation-delay:560ms]">
             © 2026 Imagine Group · Feira de Santana, BA
           </div>
         </div>
@@ -49,13 +74,8 @@ export default function LoginPage() {
 
       <div className="w-full lg:w-1/2 lg:flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md animate-fade-in">
-          <div className="lg:hidden flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-amber-400 grid place-items-center text-bg-950 font-bold">
-              i
-            </div>
-            <span className="text-[12px] tracking-[0.2em] text-ink-400 font-bold">
-              IMAGINE
-            </span>
+          <div className="lg:hidden mb-10">
+            <BrandLogo className="h-8" />
           </div>
 
           <div className="mb-8">

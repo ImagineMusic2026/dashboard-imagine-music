@@ -22,6 +22,43 @@
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
   }
+
+  /* Entrada suave (fade + sobe). Use com [animation-delay:*] para escalonar. */
+  .animate-rise {
+    animation: rise 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Blobs do fundo aurora — deriva lenta e contínua. */
+  .animate-aurora {
+    animation: aurora 20s ease-in-out infinite;
+  }
+
+  /* Flutuação vertical sutil. */
+  .animate-floaty {
+    animation: floaty 8s ease-in-out infinite;
+  }
+
+  /* Texto com gradiente que flui de leve (vai-e-volta, sem emenda) + brilho
+     sutil pulsando. Já inclui o background-clip: text. */
+  .animate-gradient-text {
+    background-image: linear-gradient(
+      110deg,
+      #c4b5fd 0%,
+      #a78bfa 18%,
+      #e879f9 38%,
+      #fcd34d 50%,
+      #e879f9 62%,
+      #a78bfa 82%,
+      #c4b5fd 100%
+    );
+    background-size: 220% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation:
+      gradient-pan 7s ease-in-out infinite alternate,
+      glow-pulse 5s ease-in-out infinite;
+  }
 }
 
 @keyframes fadeIn {
@@ -32,6 +69,73 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(40px, -30px) scale(1.12);
+  }
+  66% {
+    transform: translate(-30px, 25px) scale(0.92);
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes gradient-pan {
+  from {
+    background-position: 0% center;
+  }
+  to {
+    background-position: 100% center;
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.12));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(232, 121, 249, 0.28));
+  }
+}
+
+/* Respeita quem prefere menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-aurora,
+  .animate-floaty,
+  .animate-gradient-text {
+    animation: none !important;
+  }
+  .animate-rise {
+    opacity: 1;
+    transform: none;
   }
 }
 

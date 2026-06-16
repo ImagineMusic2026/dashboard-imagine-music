@@ -7,9 +7,8 @@ import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { InstagramArtistaCard } from '@/components/artistas/instagram-artista-card'
 import { TikTokArtistaCard } from '@/components/artistas/tiktok-artista-card'
-import { TikTokConectar } from '@/components/artistas/tiktok-conectar'
 import { YouTubeArtistaCard } from '@/components/artistas/youtube-artista-card'
-import { YouTubeConectar } from '@/components/artistas/youtube-conectar'
+import { ConectarPlataforma } from '@/components/artistas/conectar-plataforma'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import {
@@ -93,7 +92,7 @@ export function PerfilArtistaReal({
       {/* Header */}
       <div className="flex items-start gap-5">
         <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="xl" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[10px] tracking-wider font-semibold uppercase text-ink-400 mb-1">
             <span>{a.label ?? 'Imagine Music'}</span>
             <span className="text-ink-600">·</span>
@@ -122,6 +121,13 @@ export function PerfilArtistaReal({
             )}
           </div>
         </div>
+
+        {/* Conexões — gera link de autorização (admin) ou o próprio artista conecta.
+            Cada ícone abre um popover com a explicação e o botão. Some pra marketing. */}
+        <div className="flex items-center gap-2 shrink-0">
+          <ConectarPlataforma plataforma="tiktok" slug={a.slug} />
+          <ConectarPlataforma plataforma="youtube" slug={a.slug} />
+        </div>
       </div>
 
       {/* Instagram — métricas reais via Meta (visíveis a todos os membros) */}
@@ -129,13 +135,9 @@ export function PerfilArtistaReal({
 
       {/* TikTok — métricas reais via Display API (visíveis a todos os membros) */}
       <TikTokArtistaCard slug={a.slug} />
-      {/* Conexão do TikTok (admin gera link / o próprio artista conecta no portal) */}
-      <TikTokConectar slug={a.slug} />
 
       {/* YouTube — base pública (Data API) + Analytics (OAuth) para quem conectar */}
       <YouTubeArtistaCard slug={a.slug} />
-      {/* Conexão da camada Analytics do YouTube */}
-      <YouTubeConectar slug={a.slug} />
 
       {/* Demais métricas — pendentes de integração (visíveis a todos) */}
       <div className="grid grid-cols-2 gap-4">

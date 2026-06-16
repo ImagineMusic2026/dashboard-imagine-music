@@ -19,6 +19,7 @@ import { signOut } from 'firebase/auth'
 import { collection, getCountFromServer } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
+import { BrandLogo } from '@/components/shared/logo'
 import { cn } from '@/lib/utils'
 
 type NavItem = {
@@ -115,17 +116,9 @@ export function Sidebar({ colapsada }: { colapsada: boolean }) {
       )}
     >
       <div className="w-60 h-screen bg-bg-900 border-r border-bg-700/50 flex flex-col">
-        <div className="p-5 border-b border-bg-700/40 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-amber-400 flex items-center justify-center">
-          <span className="text-bg-950 font-bold text-sm">i</span>
+        <div className="p-5 border-b border-bg-700/40 flex justify-center">
+          <BrandLogo className="h-7" />
         </div>
-        <div className="flex flex-col leading-tight">
-          <span className="text-[11px] tracking-[0.18em] text-ink-400 font-semibold uppercase">
-            IMAGINE
-          </span>
-          <span className="text-[13px] font-bold text-ink-100">Painel de Artistas</span>
-        </div>
-      </div>
 
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         <div className="text-[10px] tracking-[0.15em] text-ink-500 px-3 mb-2 font-semibold">

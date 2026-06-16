@@ -21,13 +21,15 @@ function mensagemErro(err: unknown): string {
 type Props = {
   onClose: () => void
   onConcluido: () => void
+  /** Papel já selecionado ao abrir (ex.: 'artista' a partir da seção de Artistas). */
+  roleInicial?: Role
 }
 
-export function ConvidarMembroDialog({ onClose, onConcluido }: Props) {
+export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'marketing' }: Props) {
   const { user, appUser } = useAuth()
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<Role>('marketing')
+  const [role, setRole] = useState<Role>(roleInicial)
   const [artistaSlug, setArtistaSlug] = useState('')
   const [artistas, setArtistas] = useState<ArtistaDoc[]>([])
   const [enviando, setEnviando] = useState(false)
@@ -106,7 +108,7 @@ export function ConvidarMembroDialog({ onClose, onConcluido }: Props) {
       <div className="relative w-full max-w-md bg-bg-900 border border-bg-700/50 rounded-2xl shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-bg-700/40">
           <div className="font-bold text-ink-100">
-            {sucesso ? 'Convite criado' : 'Convidar membro'}
+            {sucesso ? 'Convite criado' : role === 'artista' ? 'Convidar artista' : 'Convidar membro'}
           </div>
           <button
             type="button"

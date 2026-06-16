@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Activity, BadgeDollarSign, Bell } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/logo'
 import { LoginForm } from './login-form'
@@ -84,6 +85,16 @@ export default function LoginPage() {
           </div>
 
           <LoginForm />
+
+          <p className="mt-8 text-center text-[11px] text-ink-600">
+            <Link href="/privacidade" className="hover:text-ink-400 transition-colors">
+              Política de Privacidade
+            </Link>
+            <span className="mx-2">·</span>
+            <Link href="/termos" className="hover:text-ink-400 transition-colors">
+              Termos de Uso
+            </Link>
+          </p>
         </div>
       </div>
     </>

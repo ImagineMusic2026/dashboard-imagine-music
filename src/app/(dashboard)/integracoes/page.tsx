@@ -379,7 +379,9 @@ export default function IntegracoesPage() {
           <Link2 className="w-3 h-3" />
           Todas as conexões usam OAuth 2.0 ou API keys criptografadas (AES-256) ·{' '}
           <a
-            href="#"
+            href="/privacidade"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-violet-400 hover:text-violet-300 transition-colors"
           >
             Política de privacidade

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { Bell } from 'lucide-react'
 import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
@@ -11,11 +10,10 @@ import { cn } from '@/lib/utils'
 
 type Aba = 'time' | 'permissoes' | 'notificacoes' | 'preferencias'
 
-const ABAS: { key: Aba | 'integracoes'; label: string; link?: string }[] = [
+const ABAS: { key: Aba; label: string }[] = [
   { key: 'time', label: 'Time' },
   { key: 'permissoes', label: 'Permissões' },
   { key: 'notificacoes', label: 'Notificações' },
-  { key: 'integracoes', label: 'Integrações', link: '/integracoes' },
   { key: 'preferencias', label: 'Preferências' },
 ]
 
@@ -29,31 +27,21 @@ export function ConfiguracoesView() {
       <div className="grid grid-cols-3 gap-6">
         <aside className="col-span-1">
           <nav className="bg-bg-900 border border-bg-700/40 rounded-xl p-2 sticky top-24 space-y-1">
-            {ABAS.map((item) =>
-              item.link ? (
-                <Link
-                  key={item.key}
-                  href={item.link}
-                  className="block px-3 py-2 rounded-lg text-sm text-ink-300 hover:bg-bg-800 border border-transparent transition-colors"
-                >
-                  {item.label}
-                </Link>
-              ) : (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setAba(item.key as Aba)}
-                  className={cn(
-                    'w-full text-left block px-3 py-2 rounded-lg text-sm transition-colors border',
-                    aba === item.key
-                      ? 'bg-violet-500/10 text-violet-400 font-semibold border-violet-500/20'
-                      : 'text-ink-300 hover:bg-bg-800 border-transparent',
-                  )}
-                >
-                  {item.label}
-                </button>
-              ),
-            )}
+            {ABAS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setAba(item.key)}
+                className={cn(
+                  'w-full text-left block px-3 py-2 rounded-lg text-sm transition-colors border',
+                  aba === item.key
+                    ? 'bg-violet-500/10 text-violet-400 font-semibold border-violet-500/20'
+                    : 'text-ink-300 hover:bg-bg-800 border-transparent',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
           </nav>
         </aside>
 

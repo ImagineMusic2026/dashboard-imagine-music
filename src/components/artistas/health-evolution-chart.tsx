@@ -1,17 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceDot,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
+import { ChartResponsivo } from '@/components/shared/chart-responsivo'
 
 type Point = { mes: string; score: number }
 
@@ -53,79 +43,67 @@ export function HealthEvolutionChart({
   releaseLabel,
   scoreAtual,
 }: HealthEvolutionChartProps) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
   const ultimoMes = data[data.length - 1]?.mes
   const ultimoScore = scoreAtual ?? data[data.length - 1]?.score
 
-  if (!mounted) {
-    return <div className="relative h-64" aria-hidden />
-  }
-
   return (
     <div className="relative h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-          <defs>
-            <linearGradient id="violetArea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid stroke="#2A2540" strokeDasharray="3 3" vertical={false} />
-          <XAxis
-            dataKey="mes"
-            stroke="#64748B"
-            tick={{ fill: '#94A3B8', fontSize: 11 }}
-            tickLine={false}
-            axisLine={{ stroke: '#2A2540' }}
-          />
-          <YAxis
-            domain={[0, 100]}
-            stroke="#64748B"
-            tick={{ fill: '#94A3B8', fontSize: 11 }}
-            tickLine={false}
-            axisLine={false}
-            width={32}
-          />
-          <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#2A2540', strokeWidth: 1 }} />
-          {releaseMes && (
-            <ReferenceLine
-              x={releaseMes}
-              stroke="#A78BFA"
-              strokeDasharray="3 3"
-              strokeOpacity={0.6}
-              label={{
-                value: releaseLabel ?? 'Release',
-                fill: '#A78BFA',
-                fontSize: 10,
-                position: 'insideTopRight',
-                offset: 6,
-              }}
+      <ChartResponsivo altura={256}>
+        {(largura) => (
+          <AreaChart width={largura} height={256} data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+            <defs>
+              <linearGradient id="violetArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#2A2540" strokeDasharray="3 3" vertical={false} />
+            <XAxis
+              dataKey="mes"
+              stroke="#64748B"
+              tick={{ fill: '#94A3B8', fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: '#2A2540' }}
             />
-          )}
-          <Area
-            type="monotone"
-            dataKey="score"
-            stroke="#8B5CF6"
-            strokeWidth={2}
-            fill="url(#violetArea)"
-            dot={{ r: 3, fill: '#8B5CF6', stroke: '#0F0B1F', strokeWidth: 2 }}
-            activeDot={{ r: 5, fill: '#A78BFA', stroke: '#0F0B1F', strokeWidth: 2 }}
-          />
-          {ultimoMes && typeof ultimoScore === 'number' && (
-            <ReferenceDot
-              x={ultimoMes}
-              y={ultimoScore}
-              r={5}
-              fill="#A78BFA"
-              stroke="#0F0B1F"
+            <YAxis
+              domain={[0, 100]}
+              stroke="#64748B"
+              tick={{ fill: '#94A3B8', fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              width={32}
+            />
+            <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#2A2540', strokeWidth: 1 }} />
+            {releaseMes && (
+              <ReferenceLine
+                x={releaseMes}
+                stroke="#A78BFA"
+                strokeDasharray="3 3"
+                strokeOpacity={0.6}
+                label={{
+                  value: releaseLabel ?? 'Release',
+                  fill: '#A78BFA',
+                  fontSize: 10,
+                  position: 'insideTopRight',
+                  offset: 6,
+                }}
+              />
+            )}
+            <Area
+              type="monotone"
+              dataKey="score"
+              stroke="#8B5CF6"
               strokeWidth={2}
+              fill="url(#violetArea)"
+              dot={{ r: 3, fill: '#8B5CF6', stroke: '#0F0B1F', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: '#A78BFA', stroke: '#0F0B1F', strokeWidth: 2 }}
             />
-          )}
-        </AreaChart>
-      </ResponsiveContainer>
+            {ultimoMes && typeof ultimoScore === 'number' && (
+              <ReferenceDot x={ultimoMes} y={ultimoScore} r={5} fill="#A78BFA" stroke="#0F0B1F" strokeWidth={2} />
+            )}
+          </AreaChart>
+        )}
+      </ChartResponsivo>
 
       {typeof ultimoScore === 'number' && (
         <div className="absolute top-4 right-6 num bg-violet-500/15 text-violet-300 px-2 py-1 rounded-md text-[11px] font-semibold">

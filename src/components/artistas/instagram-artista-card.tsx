@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChevronDown, ChevronUp, Eye, Grid3x3, Heart, TrendingUp, UserPlus, Users } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
+import { MiniAreaChart } from '@/components/artistas/mini-area-chart'
 import { getHistoricoInstagram, getMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { HistoricoDiaDoc, InstagramSnapshot } from '@/lib/metricas-sociais/types'
 import { cn, formatNumber } from '@/lib/utils'
@@ -139,40 +139,8 @@ export function InstagramArtistaCard({ slug }: { slug: string }) {
         )}
       >
         <div className="overflow-hidden min-h-0">
-          {serie.length >= 2 && (
-            <div className="px-2 pt-3">
-              <div className="h-24">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={serie} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="ig-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#e879f9" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#e879f9" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="dia" hide />
-                    <YAxis hide domain={['dataMin', 'dataMax']} />
-                    <Tooltip
-                      contentStyle={{
-                        background: '#1a1a1f',
-                        border: '1px solid #33333a',
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                      labelStyle={{ color: '#a1a1aa' }}
-                      formatter={(value) => [formatNumber(Number(value)), 'Seguidores']}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="seguidores"
-                      stroke="#e879f9"
-                      strokeWidth={2}
-                      fill="url(#ig-grad)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          {aberto && serie.length >= 2 && (
+            <MiniAreaChart data={serie} dataKey="seguidores" cor="#e879f9" label="Seguidores" gradId="ig-grad" />
           )}
 
           <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">

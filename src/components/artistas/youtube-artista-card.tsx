@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { MiniAreaChart } from '@/components/artistas/mini-area-chart'
 import {
   ChevronDown,
   ChevronUp,
@@ -164,34 +164,8 @@ export function YouTubeArtistaCard({ slug }: { slug: string }) {
         )}
       >
         <div className="overflow-hidden min-h-0">
-          {serie.length >= 2 && (
-            <div className="px-2 pt-3">
-              <div className="h-24">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={serie} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="yt-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#ef4444" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="dia" hide />
-                    <YAxis hide domain={['dataMin', 'dataMax']} />
-                    <Tooltip
-                      contentStyle={{
-                        background: '#1a1a1f',
-                        border: '1px solid #33333a',
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                      labelStyle={{ color: '#a1a1aa' }}
-                      formatter={(value) => [formatNumber(Number(value)), 'Inscritos']}
-                    />
-                    <Area type="monotone" dataKey="inscritos" stroke="#ef4444" strokeWidth={2} fill="url(#yt-grad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          {aberto && serie.length >= 2 && (
+            <MiniAreaChart data={serie} dataKey="inscritos" cor="#ef4444" label="Inscritos" gradId="yt-grad" />
           )}
 
           <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">

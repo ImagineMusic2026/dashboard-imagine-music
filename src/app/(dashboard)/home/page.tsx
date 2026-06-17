@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   Calendar,
   PlayCircle,
-  Plus,
   Users,
 } from 'lucide-react'
 import { artistas } from '@/lib/mock-data/artistas'
@@ -43,13 +42,6 @@ export default function HomePage() {
           >
             <Calendar className="w-4 h-4" />
             Últimos 30 dias
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-2 bg-violet-500 hover:bg-violet-600 text-white text-sm font-semibold px-3 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Novo artista
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { slugify } from '../onerpm/aggregate'
-import type { RedeSocial, RosterArtist, RosterParseResult } from './types'
+import { extrairInstagram, extrairSpotify, extrairTiktok, extrairYoutube } from './extrair'
+import type { RosterArtist, RosterParseResult } from './types'
 
 /**
  * Leitura do XLSX de cadastro de artistas (⚠️ só servidor — usa `xlsx`).
@@ -17,31 +18,6 @@ export class RosterParseError extends Error {
 
 function limpa(v: unknown): string {
   return v == null ? '' : String(v).trim()
-}
-
-function extrairSpotify(url: string): RedeSocial | null {
-  if (!url) return null
-  const m = url.match(/\/artist\/([A-Za-z0-9]+)/)
-  return { url, id: m ? m[1] : null, handle: null }
-}
-
-function extrairYoutube(url: string): RedeSocial | null {
-  if (!url) return null
-  const ch = url.match(/\/channel\/([^/?#\s]+)/)
-  if (ch) return { url, id: ch[1], handle: null }
-  const at = url.match(/\/@([^/?#\s]+)/)
-  if (at) return { url, id: null, handle: at[1] }
-  const user = url.match(/\/user\/([^/?#\s]+)/)
-  if (user) return { url, id: null, handle: user[1] }
-  return { url, id: null, handle: null }
-}
-
-function extrairHandle(url: string, dominio: RegExp): RedeSocial | null {
-  if (!url) return null
-  const m = url.match(dominio)
-  if (!m) return { url, id: null, handle: null }
-  const h = m[1].replace(/^@/, '').replace(/\/+$/, '').trim()
-  return { url, id: null, handle: h || null }
 }
 
 export function lerRoster(buf: Buffer | ArrayBuffer | Uint8Array): RosterParseResult {
@@ -88,8 +64,8 @@ export function lerRoster(buf: Buffer | ArrayBuffer | Uint8Array): RosterParseRe
 
     const spotify = cSpotify >= 0 ? extrairSpotify(limpa(r[cSpotify])) : null
     const youtube = cYoutube >= 0 ? extrairYoutube(limpa(r[cYoutube])) : null
-    const instagram = cInstagram >= 0 ? extrairHandle(limpa(r[cInstagram]), /instagram\.com\/@?([^/?#\s]+)/i) : null
-    const tiktok = cTiktok >= 0 ? extrairHandle(limpa(r[cTiktok]), /tiktok\.com\/@?([^/?#\s]+)/i) : null
+    const instagram = cInstagram >= 0 ? extrairInstagram(limpa(r[cInstagram])) : null
+    const tiktok = cTiktok >= 0 ? extrairTiktok(limpa(r[cTiktok])) : null
 
     const avisos: string[] = []
     if (spotify && spotify.url && !spotify.id) {

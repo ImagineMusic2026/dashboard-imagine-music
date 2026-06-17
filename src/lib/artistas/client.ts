@@ -18,6 +18,7 @@ export interface RedeSocialDoc {
 export interface ArtistaDoc {
   slug: string
   nome: string
+  genero?: string
   label?: string
   fonteCadastro?: string
   redes?: {

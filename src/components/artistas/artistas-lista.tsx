@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Search } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, UserPlus } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
+import { CriarArtistaDialog } from '@/components/artistas/criar-artista-dialog'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import {
@@ -65,24 +66,30 @@ export function ArtistasLista() {
   const [erro, setErro] = useState(false)
   const [busca, setBusca] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [dialogAberto, setDialogAberto] = useState(false)
 
   const ehAdmin = role === 'admin'
 
+  const recarregar = useCallback(async () => {
+    try {
+      setArtistas(await listarArtistas())
+      setErro(false)
+    } catch {
+      setErro(true)
+    }
+    if (ehAdmin) {
+      try {
+        setReceitas(await listarReceitas())
+      } catch {
+        /* receita é secundária */
+      }
+    }
+  }, [ehAdmin])
+
   useEffect(() => {
     if (loading || !role) return
-    let vivo = true
-    listarArtistas()
-      .then((as) => vivo && setArtistas(as))
-      .catch(() => vivo && setErro(true))
-    if (ehAdmin) {
-      listarReceitas()
-        .then((m) => vivo && setReceitas(m))
-        .catch(() => {})
-    }
-    return () => {
-      vivo = false
-    }
-  }, [loading, role, ehAdmin])
+    void recarregar()
+  }, [loading, role, recarregar])
 
   const filtrados = useMemo(() => {
     if (!artistas) return []
@@ -126,18 +133,30 @@ export function ArtistasLista() {
             )}
           </p>
         </div>
-        <div className="relative w-full max-w-xs">
-          <Search className="w-4 h-4 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={busca}
-            onChange={(e) => {
-              setBusca(e.target.value)
-              setPagina(1)
-            }}
-            placeholder="Filtrar por nome…"
-            className="w-full pl-9 pr-3 py-2 bg-bg-800/50 border border-bg-700/40 rounded-lg text-sm text-ink-200 placeholder:text-ink-500 focus:outline-none focus:border-violet-500/40"
-          />
+        <div className="flex items-center gap-2">
+          {ehAdmin && (
+            <button
+              type="button"
+              onClick={() => setDialogAberto(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-semibold whitespace-nowrap transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Novo artista
+            </button>
+          )}
+          <div className="relative w-full max-w-xs">
+            <Search className="w-4 h-4 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value)
+                setPagina(1)
+              }}
+              placeholder="Filtrar por nome…"
+              className="w-full pl-9 pr-3 py-2 bg-bg-800/50 border border-bg-700/40 rounded-lg text-sm text-ink-200 placeholder:text-ink-500 focus:outline-none focus:border-violet-500/40"
+            />
+          </div>
         </div>
       </div>
 
@@ -192,7 +211,11 @@ export function ArtistasLista() {
                       </td>
 
                       <td className="px-4 py-3">
-                        <Pendente />
+                        {a.genero ? (
+                          <span className="text-sm text-ink-300">{a.genero}</span>
+                        ) : (
+                          <Pendente />
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <HealthPendente />
@@ -326,6 +349,10 @@ export function ArtistasLista() {
           por enquanto: chegam com as integrações das plataformas (ou cadastro manual, no caso do gênero).
         </span>
       </div>
+
+      {dialogAberto && (
+        <CriarArtistaDialog onClose={() => setDialogAberto(false)} onCreated={() => void recarregar()} />
+      )}
     </div>
   )
 }

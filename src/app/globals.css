@@ -125,12 +125,89 @@
   }
 }
 
+/* ── Mini-gráficos dos cards da landing: animam no hover do card (.group) ── */
+@property --fx-saude {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 92;
+}
+
+/* Métricas: as barras crescem uma a uma (o delay por barra vem inline). */
+.fx-bar {
+  transform-origin: bottom;
+}
+.group:hover .fx-bar {
+  animation: fx-bar-grow 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes fx-bar-grow {
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* Saúde: o anel verde preenche de 0 a 92% (270°, casa com a geometria do JSX). */
+.group:hover .fx-ring-prog {
+  animation: fx-ring-fill 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes fx-ring-fill {
+  from {
+    stroke-dasharray: 0 113.097;
+  }
+  to {
+    stroke-dasharray: 78.037 113.097;
+  }
+}
+
+/* Saúde: o número conta de 0 a 92 (@property + counter, sem JS). */
+.fx-count {
+  counter-reset: fx-saude var(--fx-saude);
+}
+.fx-count::after {
+  content: counter(fx-saude);
+}
+.group:hover .fx-count {
+  animation: fx-count-up 1.1s ease-out forwards;
+}
+@keyframes fx-count-up {
+  from {
+    --fx-saude: 0;
+  }
+  to {
+    --fx-saude: 92;
+  }
+}
+
+/* Receita: o gráfico inteiro "sai do chão" e sobe (escala vertical a partir da base). */
+.fx-rise {
+  transform-origin: bottom;
+}
+.group:hover .fx-rise {
+  animation: fx-rise-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes fx-rise-up {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
 /* Respeita quem prefere menos movimento. */
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-aurora,
   .animate-floaty,
-  .animate-gradient-text {
+  .animate-gradient-text,
+  .group:hover .fx-bar,
+  .group:hover .fx-ring-prog,
+  .group:hover .fx-count,
+  .group:hover .fx-rise {
     animation: none !important;
   }
   .animate-rise {

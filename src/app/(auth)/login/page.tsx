@@ -30,7 +30,13 @@ export default function LoginPage() {
         />
 
         <div className="relative z-10 flex flex-col justify-between p-12 h-full">
-          <BrandLogo className="h-7 self-start animate-rise" priority />
+          <Link
+            href="/"
+            aria-label="Página inicial"
+            className="self-start animate-rise transition-opacity hover:opacity-80"
+          >
+            <BrandLogo className="h-7" priority />
+          </Link>
 
           <div className="max-w-md">
             <h2 className="text-[2.75rem] leading-[1.05] font-bold text-ink-100 animate-rise [animation-delay:80ms]">
@@ -76,7 +82,13 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 lg:flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md animate-fade-in">
           <div className="lg:hidden mb-10">
-            <BrandLogo className="h-8" />
+            <Link
+              href="/"
+              aria-label="Página inicial"
+              className="inline-block transition-opacity hover:opacity-80"
+            >
+              <BrandLogo className="h-8" />
+            </Link>
           </div>
 
           <div className="mb-8">

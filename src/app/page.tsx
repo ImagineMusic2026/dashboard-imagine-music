@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 export const metadata: Metadata = {
   title: 'Painel de Artistas — Imagine',
   description:
-    'Plataforma da Imagine para acompanhar métricas e receita dos artistas do selo, consolidando dados de YouTube, Instagram, TikTok e OneRPM mediante autorização do titular de cada conta.',
+    'Plataforma da Imagine e dos seus artistas para acompanhar métricas e receita, consolidando dados de YouTube, Instagram, TikTok e OneRPM mediante autorização do titular de cada conta.',
 }
 
 type Accent = 'violet' | 'emerald' | 'amber'
@@ -127,13 +127,13 @@ export default function LandingPage() {
               {/* Texto */}
               <div className="max-w-xl">
                 <h1 className="text-4xl sm:text-5xl font-bold leading-[1.1] tracking-tight text-ink-100 animate-rise">
-                  Acompanhe seus artistas{' '}
+                  Acompanhe a carreira dos artistas{' '}
                   <span className="animate-gradient-text">num só painel.</span>
                 </h1>
                 <p className="mt-6 text-lg leading-relaxed text-ink-300 animate-rise [animation-delay:120ms]">
-                  A ferramenta da Imagine para acompanhar métricas e receita dos artistas do selo,
-                  reunindo YouTube, Instagram, TikTok e OneRPM, sempre com a autorização do titular
-                  de cada conta.
+                  Plataforma da Imagine e dos artistas do selo, reunindo as métricas e a receita de
+                  YouTube, Instagram, TikTok e OneRPM, sempre com a autorização do titular de cada
+                  conta.
                 </p>
                 <div className="mt-9 flex flex-wrap items-center gap-4 animate-rise [animation-delay:240ms]">
                   <Link

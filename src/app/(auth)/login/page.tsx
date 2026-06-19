@@ -47,8 +47,7 @@ export default function LoginPage() {
             </h2>
 
             <p className="mt-4 text-ink-300 text-lg leading-relaxed animate-rise [animation-delay:200ms]">
-              Centralize métricas, alertas e oportunidades de todo o seu portfólio em um único
-              lugar.
+              Centralize métricas, alertas e oportunidades em um único lugar.
             </p>
 
             <div className="mt-9 space-y-3.5">

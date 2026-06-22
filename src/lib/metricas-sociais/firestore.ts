@@ -258,6 +258,14 @@ export async function removerTokenYouTube(slug: string): Promise<void> {
   await adminDb.doc(`youtube-tokens/${slug}`).delete()
 }
 
+/**
+ * Zera a camada Analytics no snapshot do artista (mantém a pública). Usado ao
+ * desconectar o OAuth, pra os dados privados não ficarem presos no card.
+ */
+export async function limparAnalyticsYouTube(slug: string): Promise<void> {
+  await adminDb.doc(`metricas-sociais/${slug}`).set({ youtube: { analytics: null } }, { merge: true })
+}
+
 /** Salva o snapshot mais recente do YouTube + o ponto diário de histórico. */
 export async function salvarSnapshotYouTube(
   slug: string,

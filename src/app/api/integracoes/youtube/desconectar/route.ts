@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { exigirSessaoAtiva } from '@/lib/server-auth'
 import {
   gravarStatusYouTube,
+  limparAnalyticsYouTube,
   listarArtistasYouTube,
   listarTokensYouTube,
   removerTokenYouTube,
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
 
   try {
     await removerTokenYouTube(slug)
+    await limparAnalyticsYouTube(slug)
     const [tokens, artistas] = await Promise.all([listarTokensYouTube(), listarArtistasYouTube()])
     await gravarStatusYouTube({
       contasConectadas: tokens.length,

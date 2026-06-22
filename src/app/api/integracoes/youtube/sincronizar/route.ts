@@ -67,6 +67,10 @@ async function handle(req: Request) {
           } catch (e) {
             snap.avisos = [...(snap.avisos ?? []), `analytics: ${mensagem(e)}`]
           }
+        } else {
+          // Sem token (nunca conectou ou desconectou) -> zera o Analytics, senão um
+          // snapshot antigo (de outra conta/canal) fica preso pelo merge.
+          snap.analytics = null
         }
 
         await salvarSnapshotYouTube(a.slug, snap, dia)

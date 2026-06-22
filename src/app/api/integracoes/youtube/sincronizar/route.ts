@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { autorizarCronOuAdmin } from '@/lib/server-auth'
 import { youtubeDataConfigurado, YouTubeConfigError } from '@/lib/youtube/config'
 import { renovarToken, YouTubeApiException } from '@/lib/youtube/client'
-import { buscarMetricasCanal } from '@/lib/youtube/channel'
+import { buscarMetricasCanal, resolverChannelId } from '@/lib/youtube/channel'
 import { buscarAnalytics } from '@/lib/youtube/analytics'
 import {
   gravarStatusYouTube,
@@ -10,6 +10,7 @@ import {
   listarTokensYouTube,
   salvarSnapshotYouTube,
   salvarTokenYouTube,
+  salvarVinculoYouTube,
 } from '@/lib/metricas-sociais/firestore'
 import type { YouTubeTokenDoc } from '@/lib/metricas-sociais/types'
 
@@ -46,6 +47,27 @@ async function handle(req: Request) {
 
   try {
     const todos = await listarArtistasYouTube()
+
+    // Auto-descoberta: resolve quem tem handle mas ainda não tem channelId (ex.:
+    // link recém-trocado pelo "Editar"), pra um sync já pegar o canal certo sem
+    // precisar rodar "Descobrir canais" antes.
+    const aResolver = todos.filter(
+      (a) => !a.channelId && a.handle && (!slugFiltro || a.slug === slugFiltro),
+    )
+    if (aResolver.length) {
+      await emLotes(aResolver, 3, async (a) => {
+        try {
+          const channelId = await resolverChannelId(a.handle)
+          if (channelId) {
+            await salvarVinculoYouTube(a.slug, channelId)
+            a.channelId = channelId // reflete na lista em memória
+          }
+        } catch {
+          /* segue sem esse canal — o sync apenas o ignora */
+        }
+      })
+    }
+
     const mapeados = todos.filter((a) => a.channelId)
     const alvos = slugFiltro ? mapeados.filter((a) => a.slug === slugFiltro) : mapeados
     const tokens = await listarTokensYouTube()

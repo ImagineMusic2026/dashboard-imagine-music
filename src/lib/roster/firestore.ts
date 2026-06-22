@@ -172,6 +172,102 @@ export async function salvarArtistaManual(
   return { slug, nome, genero, jaExistia, redes: { spotify, youtube, instagram, tiktok }, avisos }
 }
 
+/** Mesma rede social — compara id, depois handle, depois url. */
+function mesmaIdentidade(a: RedeSocial, b: RedeSocial): boolean {
+  if (a.id && b.id) return a.id === b.id
+  if (a.handle && b.handle) return a.handle.toLowerCase() === b.handle.toLowerCase()
+  return Boolean(a.url && b.url && a.url === b.url)
+}
+
+export interface AtualizarArtistaInput {
+  slug: string
+  nome: string
+  genero?: string | null
+  spotifyUrl?: string | null
+  youtubeUrl?: string | null
+  instagramUrl?: string | null
+  tiktokUrl?: string | null
+}
+
+/**
+ * Edição de um artista JÁ cadastrado. Ao contrário do upsert de criação, aqui a
+ * ausência de uma rede REMOVE o vínculo (`FieldValue.delete`), e trocar a URL
+ * faz o `id` (channelId/artistId) sair junto — assim o "descobrir" re-mapeia o
+ * canal/perfil. URL idêntica à atual é preservada (mantém o id já resolvido).
+ *
+ * O slug (id do doc) é ESTÁVEL: renomear o artista não muda o slug nem quebra os
+ * vínculos por slug (metricas-sociais, receitas, youtube-tokens).
+ */
+export async function atualizarArtistaManual(
+  input: AtualizarArtistaInput,
+  meta: { uid: string; email: string }
+): Promise<ArtistaManualResultado> {
+  const slug = (input.slug ?? '').trim()
+  if (!slug) throw new ArtistaInputError('Artista inválido.')
+
+  const ref = adminDb.collection(ARTISTAS).doc(slug)
+  const snap = await ref.get()
+  if (!snap.exists) throw new ArtistaInputError('Artista não encontrado.')
+
+  const nome = (input.nome ?? '').trim()
+  if (!nome) throw new ArtistaInputError('Informe o nome do artista.')
+  const genero = (input.genero ?? '').trim() || null
+
+  const atuais = (snap.data()?.redes ?? {}) as Record<string, RedeSocial | null | undefined>
+
+  const specs: {
+    key: 'spotify' | 'youtube' | 'instagram' | 'tiktok'
+    url?: string | null
+    extrair: (u: string) => RedeSocial | null
+  }[] = [
+    { key: 'spotify', url: input.spotifyUrl, extrair: extrairSpotify },
+    { key: 'youtube', url: input.youtubeUrl, extrair: extrairYoutube },
+    { key: 'instagram', url: input.instagramUrl, extrair: extrairInstagram },
+    { key: 'tiktok', url: input.tiktokUrl, extrair: extrairTiktok },
+  ]
+
+  const agora = admin.firestore.FieldValue.serverTimestamp()
+  const updates: Record<string, unknown> = {
+    nome,
+    genero: genero ?? admin.firestore.FieldValue.delete(),
+    cadastroAtualizadoEm: agora,
+    cadastroPorEmail: meta.email,
+  }
+
+  const redes: ArtistaManualResultado['redes'] = { spotify: null, youtube: null, instagram: null, tiktok: null }
+
+  for (const { key, url, extrair } of specs) {
+    const u = (url ?? '').trim()
+    const atual = atuais[key] ?? null
+    if (!u) {
+      // Esvaziou o campo -> remove o vínculo da rede.
+      if (atual) updates[`redes.${key}`] = admin.firestore.FieldValue.delete()
+      continue
+    }
+    const nova = extrair(u)
+    if (!nova) {
+      if (atual) updates[`redes.${key}`] = admin.firestore.FieldValue.delete()
+      continue
+    }
+    // Mesma identidade (id/handle/url) -> preserva (mantém o id já resolvido).
+    if (atual && mesmaIdentidade(atual, nova)) {
+      redes[key] = atual
+      continue
+    }
+    updates[`redes.${key}`] = nova
+    redes[key] = nova
+  }
+
+  const avisos: string[] = []
+  if (redes.spotify && redes.spotify.url && !redes.spotify.id) {
+    avisos.push('O link do Spotify não parece ser de artista (provável álbum/faixa) — salvei sem o ID.')
+  }
+
+  await ref.update(updates)
+
+  return { slug, nome, genero, jaExistia: true, redes, avisos }
+}
+
 export async function listarCadastros(max = 20): Promise<CadastroResumo[]> {
   const snap = await adminDb.collection(CADASTROS).orderBy('criadoEm', 'desc').limit(max).get()
   return snap.docs.map((d) => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Activity, ArrowLeft, ExternalLink, Loader2, Plug } from 'lucide-react'
+import { Activity, ArrowLeft, ExternalLink, Loader2, Pencil, Plug } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { InstagramArtistaCard } from '@/components/artistas/instagram-artista-card'
@@ -11,6 +11,8 @@ import { YouTubeArtistaCard } from '@/components/artistas/youtube-artista-card'
 import { ConectarPlataforma } from '@/components/artistas/conectar-plataforma'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
+import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
+import { useAuth } from '@/components/auth/auth-provider'
 import {
   corAvatarDe,
   getArtista,
@@ -37,7 +39,11 @@ export function PerfilArtistaReal({
   /** Esconde o link "← Artistas" (usado no portal do artista, que não tem roster). */
   mostrarVoltar?: boolean
 }) {
+  const { role } = useAuth()
+  const ehAdmin = role === 'admin'
   const [estado, setEstado] = useState<EstadoReal>({ st: 'load' })
+  const [editando, setEditando] = useState(false)
+  const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
     let vivo = true
@@ -50,7 +56,7 @@ export function PerfilArtistaReal({
     return () => {
       vivo = false
     }
-  }, [slug])
+  }, [slug, nonce])
 
   if (estado.st === 'load') {
     return (
@@ -127,6 +133,15 @@ export function PerfilArtistaReal({
         <div className="flex items-center gap-2 shrink-0">
           <ConectarPlataforma plataforma="tiktok" slug={a.slug} />
           <ConectarPlataforma plataforma="youtube" slug={a.slug} />
+          {ehAdmin && (
+            <button
+              type="button"
+              onClick={() => setEditando(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Editar
+            </button>
+          )}
         </div>
       </div>
 
@@ -194,6 +209,14 @@ export function PerfilArtistaReal({
           </p>
         </div>
       </div>
+
+      {editando && ehAdmin && (
+        <EditarArtistaDialog
+          artista={a}
+          onClose={() => setEditando(false)}
+          onSaved={() => setNonce((n) => n + 1)}
+        />
+      )}
     </div>
   )
 }

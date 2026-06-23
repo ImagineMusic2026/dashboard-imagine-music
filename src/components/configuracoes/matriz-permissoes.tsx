@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Loader2, Minus, RotateCcw } from 'lucide-react'
+import { Check, Loader2, RotateCcw } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import {
@@ -10,9 +10,8 @@ import {
   updateUserPermissoes,
   type AppUser,
   type Capacidade,
-  type Role,
 } from '@/lib/users'
-import { CAPACIDADES, padraoDoPapel, temPermissao } from '@/lib/permissions'
+import { CAPACIDADES, temPermissao } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 /**
@@ -20,8 +19,6 @@ import { cn } from '@/lib/utils'
  * restringir capacidades POR PESSOA — um override gravado em
  * `users/{uid}.permissoes`, honrado nas 3 camadas (UI, API e regras do Firestore).
  */
-
-const PAPEIS: Role[] = ['admin', 'marketing', 'artista']
 
 function iniciaisDe(u: AppUser): string {
   const base = u.nome?.trim() || u.email
@@ -89,11 +86,8 @@ export function MatrizPermissoes() {
 
   return (
     <div className="space-y-4">
-      {/* Referência: padrão por papel */}
-      <ReferenciaPapeis />
-
       {/* Editor por pessoa — só admin */}
-      {ehAdmin && (
+      {ehAdmin ? (
         <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-bg-700/30">
             <div className="font-bold text-ink-100">Exceções por pessoa</div>
@@ -120,7 +114,7 @@ export function MatrizPermissoes() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-bg-700/40">
-                    <th className="text-left text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-5">
+                    <th className="sticky left-0 z-10 bg-bg-900 border-r border-bg-700/40 text-left text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-5">
                       Membro
                     </th>
                     {CAPACIDADES.map((c) => (
@@ -139,8 +133,8 @@ export function MatrizPermissoes() {
                   {users.map((u) => {
                     const temOverride = u.permissoes && Object.keys(u.permissoes).length > 0
                     return (
-                      <tr key={u.uid} className="hover:bg-bg-800/30 transition-colors">
-                        <td className="py-3 px-5">
+                      <tr key={u.uid} className="group hover:bg-bg-800/30 transition-colors">
+                        <td className="sticky left-0 z-10 bg-bg-900 group-hover:bg-bg-800 border-r border-bg-700/40 py-3 px-5">
                           <div className="flex items-center gap-3">
                             <AvatarFallback iniciais={iniciaisDe(u)} gradient={roleMeta[u.role].gradient} size="sm" />
                             <div className="min-w-0">
@@ -186,14 +180,10 @@ export function MatrizPermissoes() {
               </table>
             </div>
           )}
-
-          <div className="px-5 py-3 border-t border-bg-700/30 text-[11px] text-ink-500">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-violet-400" /> ponto roxo = personalizado (difere
-              do padrão do papel). Acessar o painel, ver artistas e gerenciar o time seguem o papel e
-              não são editáveis aqui.
-            </span>
-          </div>
+        </div>
+      ) : (
+        <div className="bg-bg-900 border border-dashed border-bg-700/50 rounded-xl px-5 py-8 text-center text-sm text-ink-500">
+          Só admins gerenciam permissões.
         </div>
       )}
     </div>
@@ -241,56 +231,5 @@ function Switch({
         ) : null}
       </span>
     </button>
-  )
-}
-
-/** Tabela read-only do padrão de cada capacidade por papel. */
-function ReferenciaPapeis() {
-  return (
-    <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-bg-700/30">
-        <div className="font-bold text-ink-100">Padrão por papel</div>
-        <p className="text-[12px] text-ink-400 mt-0.5">
-          O que cada papel pode fazer por padrão. O admin ajusta exceções por pessoa abaixo.
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-bg-700/40">
-              <th className="text-left text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-5">
-                Capacidade
-              </th>
-              {PAPEIS.map((p) => (
-                <th key={p} className="py-3 px-4 text-center">
-                  <span className={cn('text-[10px] tracking-wider font-bold px-2 py-0.5 rounded border', roleMeta[p].classe)}>
-                    {roleMeta[p].label}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-bg-700/30">
-            {CAPACIDADES.map((c) => (
-              <tr key={c.cap} className="hover:bg-bg-800/30 transition-colors">
-                <td className="py-3 px-5 text-sm text-ink-200">
-                  {c.label}
-                  <div className="hidden sm:block text-[11px] text-ink-500">{c.descricao}</div>
-                </td>
-                {PAPEIS.map((p) => (
-                  <td key={p} className="py-3 px-4 text-center">
-                    {padraoDoPapel(p, c.cap) ? (
-                      <Check className="w-4 h-4 text-emerald-400 inline-block" />
-                    ) : (
-                      <Minus className="w-4 h-4 text-ink-700 inline-block" />
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
   )
 }

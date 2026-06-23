@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, UserPlus, Users } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, UserPlus, Users } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { CriarArtistaDialog } from '@/components/artistas/criar-artista-dialog'
@@ -93,6 +93,52 @@ function HealthLinha({ score }: { score: number }) {
   )
 }
 
+type ColunaSort = 'nome' | 'genero' | 'health' | 'audiencia' | 'receita' | 'alertas'
+type EstadoSort = { coluna: ColunaSort | null; dir: 'asc' | 'desc' }
+
+/** Direção inicial ao clicar uma coluna: texto começa A→Z, número começa do maior. */
+const dirPadrao = (c: ColunaSort): 'asc' | 'desc' => (c === 'nome' || c === 'genero' ? 'asc' : 'desc')
+
+/** Cabeçalho clicável: ordena pela coluna; clicar de novo inverte a direção. */
+function ThOrdenavel({
+  coluna,
+  label,
+  align = 'left',
+  sort,
+  onOrdenar,
+}: {
+  coluna: ColunaSort
+  label: string
+  align?: 'left' | 'right' | 'center'
+  sort: EstadoSort
+  onOrdenar: (c: ColunaSort) => void
+}) {
+  const ativo = sort.coluna === coluna
+  const Icone = ativo ? (sort.dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
+  const alinhar = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
+  return (
+    <th className={cn(TH, alinhar)}>
+      <button
+        type="button"
+        onClick={() => onOrdenar(coluna)}
+        aria-label={`Ordenar por ${label}`}
+        className={cn(
+          'group/s inline-flex items-center gap-1 uppercase tracking-wider transition-colors',
+          ativo ? 'text-ink-200' : 'hover:text-ink-200',
+        )}
+      >
+        <span>{label}</span>
+        <Icone
+          className={cn(
+            'w-3 h-3 shrink-0',
+            ativo ? 'text-violet-400' : 'text-ink-600 opacity-0 group-hover/s:opacity-100',
+          )}
+        />
+      </button>
+    </th>
+  )
+}
+
 export function ArtistasLista() {
   const { role, loading } = useAuth()
   const [artistas, setArtistas] = useState<ArtistaDoc[] | null>(null)
@@ -100,6 +146,7 @@ export function ArtistasLista() {
   const [metricas, setMetricas] = useState<Map<string, MetricasSociaisDoc>>(new Map())
   const [erro, setErro] = useState(false)
   const [busca, setBusca] = useState('')
+  const [sort, setSort] = useState<EstadoSort>({ coluna: null, dir: 'asc' })
   const [pagina, setPagina] = useState(1)
   const [dialogAberto, setDialogAberto] = useState(false)
   const [histHealth, setHistHealth] = useState<Map<string, number[]>>(new Map())
@@ -149,10 +196,55 @@ export function ArtistasLista() {
     return { saudePorSlug: saude, alertasPorSlug: alertas }
   }, [artistas, metricas])
 
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
+  // Aplica a ordenação por coluna (sobre a lista já filtrada). Sem dado vai pro
+  // fim, independente da direção, pra não confundir "pior" com "não medido".
+  const ordenados = useMemo(() => {
+    if (!sort.coluna) return filtrados
+    const col = sort.coluna
+    const chave = (a: ArtistaDoc): number | string | null => {
+      const saude = saudePorSlug.get(a.slug)
+      switch (col) {
+        case 'nome':
+          return a.nome
+        case 'genero':
+          return a.genero?.trim() || null
+        case 'health':
+          return saude?.score ?? null
+        case 'audiencia':
+          return saude && saude.seguidoresTotal > 0 ? saude.seguidoresTotal : null
+        case 'receita':
+          return receitas.get(a.slug)?.totalBRL ?? null
+        case 'alertas':
+          return alertasPorSlug.get(a.slug) ?? 0
+      }
+    }
+    return [...filtrados].sort((a, b) => {
+      const va = chave(a)
+      const vb = chave(b)
+      if (va == null && vb == null) return 0
+      if (va == null) return 1
+      if (vb == null) return -1
+      const base =
+        typeof va === 'string' || typeof vb === 'string'
+          ? String(va).localeCompare(String(vb), 'pt-BR')
+          : (va as number) - (vb as number)
+      return sort.dir === 'asc' ? base : -base
+    })
+  }, [filtrados, sort, saudePorSlug, alertasPorSlug, receitas])
+
+  function aoOrdenar(coluna: ColunaSort) {
+    setSort((prev) =>
+      prev.coluna === coluna
+        ? { coluna, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { coluna, dir: dirPadrao(coluna) },
+    )
+    setPagina(1)
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / POR_PAGINA))
   const paginaAtual = Math.min(pagina, totalPaginas)
   const inicio = (paginaAtual - 1) * POR_PAGINA
-  const paginados = filtrados.slice(inicio, inicio + POR_PAGINA)
+  const paginados = ordenados.slice(inicio, inicio + POR_PAGINA)
 
   // Série do Health Score (sparkline da Tendência) só dos artistas VISÍVEIS da
   // página — evita ler o histórico dos 74 de uma vez. Cacheado por slug.
@@ -262,16 +354,16 @@ export function ArtistasLista() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-bg-700/40">
-                  <th className={cn(TH, 'text-left')}>Artista</th>
-                  <th className={cn(TH, 'text-left')}>Gênero</th>
-                  <th className={cn(TH, 'text-left')}>Health</th>
+                  <ThOrdenavel coluna="nome" label="Artista" sort={sort} onOrdenar={aoOrdenar} />
+                  <ThOrdenavel coluna="genero" label="Gênero" sort={sort} onOrdenar={aoOrdenar} />
+                  <ThOrdenavel coluna="health" label="Health" sort={sort} onOrdenar={aoOrdenar} />
                   <th className={cn(TH, 'text-left')}>Tendência</th>
-                  <th className={cn(TH, 'text-right')}>Audiência</th>
+                  <ThOrdenavel coluna="audiencia" label="Audiência" align="right" sort={sort} onOrdenar={aoOrdenar} />
                   <th className={cn(TH, 'text-left')}>Redes</th>
                   <ReceitaGate>
-                    <th className={cn(TH, 'text-right')}>Receita</th>
+                    <ThOrdenavel coluna="receita" label="Receita" align="right" sort={sort} onOrdenar={aoOrdenar} />
                   </ReceitaGate>
-                  <th className={cn(TH, 'text-center')}>Alertas</th>
+                  <ThOrdenavel coluna="alertas" label="Alertas" align="center" sort={sort} onOrdenar={aoOrdenar} />
                   <th className="py-3 px-4" />
                 </tr>
               </thead>
@@ -388,6 +480,40 @@ export function ArtistasLista() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: ordenação (no desktop é pelos cabeçalhos clicáveis) */}
+          <div className="lg:hidden flex items-center gap-2 px-4 py-3 border-b border-bg-700/40">
+            <span className="text-[11px] tracking-wider text-ink-500 uppercase shrink-0">Ordenar</span>
+            <select
+              value={sort.coluna ?? ''}
+              onChange={(e) => {
+                const c = e.target.value as ColunaSort | ''
+                setSort(c ? { coluna: c, dir: dirPadrao(c) } : { coluna: null, dir: 'asc' })
+                setPagina(1)
+              }}
+              className="flex-1 bg-bg-800/50 border border-bg-700/40 rounded-lg px-2 py-1.5 text-sm text-ink-200 focus:outline-none focus:border-violet-500/40"
+            >
+              <option value="">Padrão (A–Z)</option>
+              <option value="health">Health</option>
+              <option value="audiencia">Audiência</option>
+              {ehAdmin && <option value="receita">Receita</option>}
+              <option value="alertas">Alertas</option>
+              <option value="genero">Gênero</option>
+            </select>
+            {sort.coluna && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSort((s) => ({ ...s, dir: s.dir === 'asc' ? 'desc' : 'asc' }))
+                  setPagina(1)
+                }}
+                aria-label="Inverter direção"
+                className="shrink-0 w-9 h-9 grid place-items-center rounded-lg border border-bg-700/50 text-ink-300 hover:bg-bg-800 transition-colors"
+              >
+                {sort.dir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+              </button>
+            )}
           </div>
 
           {/* Mobile: cards (a tabela larga não cabe no celular) */}

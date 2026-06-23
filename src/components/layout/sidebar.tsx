@@ -20,9 +20,7 @@ import { collection, getCountFromServer } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
 import { BrandLogo } from '@/components/shared/logo'
-import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
-import { listarArtistas } from '@/lib/artistas/client'
-import { derivarAlertas } from '@/lib/alertas/derivar'
+import { useQtdAlertas } from '@/lib/alertas/use-qtd-alertas'
 import { cn } from '@/lib/utils'
 
 type NavItem = {
@@ -81,7 +79,7 @@ export function Sidebar({ colapsada }: { colapsada: boolean }) {
   const router = useRouter()
   const { user, role } = useAuth()
   const [qtdArtistas, setQtdArtistas] = useState<number | null>(null)
-  const [qtdAlertas, setQtdAlertas] = useState<number | null>(null)
+  const qtdAlertas = useQtdAlertas()
 
   // Contagem real de artistas no cadastro (Firestore). A coleção `artistas` é
   // legível por qualquer membro ativo, então o badge aparece p/ admin e marketing.
@@ -94,28 +92,6 @@ export function Sidebar({ colapsada }: { colapsada: boolean }) {
     getCountFromServer(collection(db, 'artistas'))
       .then((s) => vivo && setQtdArtistas(s.data().count))
       .catch(() => vivo && setQtdArtistas(null))
-    return () => {
-      vivo = false
-    }
-  }, [role])
-
-  // Contagem real de alertas (derivada das métricas) — pro badge do menu.
-  useEffect(() => {
-    if (!role) {
-      setQtdAlertas(null)
-      return
-    }
-    let vivo = true
-    ;(async () => {
-      try {
-        const [mapa, arts] = await Promise.all([listarMetricasSociais(), listarArtistas()])
-        if (!vivo) return
-        const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-        setQtdAlertas(derivarAlertas(mapa, nome).length)
-      } catch {
-        if (vivo) setQtdAlertas(null)
-      }
-    })()
     return () => {
       vivo = false
     }

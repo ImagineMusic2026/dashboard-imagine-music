@@ -1,8 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell, Menu, Search } from 'lucide-react'
-import { artistas } from '@/lib/mock-data/artistas'
+import { getArtista } from '@/lib/artistas/client'
+import { useQtdAlertas } from '@/lib/alertas/use-qtd-alertas'
 
 const routeLabels: Record<string, string> = {
   '/home': 'Home',
@@ -15,24 +18,34 @@ const routeLabels: Record<string, string> = {
   '/configuracoes': 'Configurações',
 }
 
-function getBreadcrumbTrail(pathname: string): string[] {
-  const segments = pathname.split('/').filter(Boolean)
-  if (segments.length === 0) return []
-
-  const first = '/' + segments[0]
-  const trail: string[] = [routeLabels[first] ?? segments[0]]
-
-  if (segments[0] === 'artistas' && segments[1]) {
-    const artista = artistas.find((a) => a.id === segments[1])
-    trail.push(artista?.nome ?? segments[1])
-  }
-
-  return trail
-}
-
 export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const pathname = usePathname()
-  const trail = getBreadcrumbTrail(pathname)
+  const qtdAlertas = useQtdAlertas()
+
+  const segments = pathname.split('/').filter(Boolean)
+  const slugArtista = segments[0] === 'artistas' && segments[1] ? segments[1] : null
+
+  // Breadcrumb do perfil: nome REAL do artista (antes vinha do mock e nem batia).
+  const [nomeArtista, setNomeArtista] = useState<string | null>(null)
+  useEffect(() => {
+    if (!slugArtista) {
+      setNomeArtista(null)
+      return
+    }
+    let vivo = true
+    getArtista(slugArtista)
+      .then((a) => vivo && setNomeArtista(a?.nome ?? null))
+      .catch(() => vivo && setNomeArtista(null))
+    return () => {
+      vivo = false
+    }
+  }, [slugArtista])
+
+  const trail: string[] = []
+  if (segments.length) {
+    trail.push(routeLabels['/' + segments[0]] ?? segments[0])
+    if (slugArtista) trail.push(nomeArtista ?? slugArtista)
+  }
 
   return (
     <header className="h-16 sticky top-0 z-10 bg-bg-900/40 backdrop-blur border-b border-bg-700/40 flex items-center px-8 gap-4">
@@ -51,9 +64,7 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
             <span className="text-ink-500">›</span>
             <span
               className={
-                idx === trail.length - 1
-                  ? 'font-semibold text-ink-100'
-                  : 'text-ink-500'
+                idx === trail.length - 1 ? 'font-semibold text-ink-100' : 'text-ink-500'
               }
             >
               {label}
@@ -77,16 +88,18 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
       </div>
 
       <div className="shrink-0">
-        <button
-          type="button"
-          className="relative bg-bg-800 hover:bg-bg-700 rounded-lg p-2 transition-colors"
-          aria-label="Notificações"
+        <Link
+          href="/alertas"
+          className="relative grid place-items-center bg-bg-800 hover:bg-bg-700 rounded-lg p-2 transition-colors"
+          aria-label={qtdAlertas ? `Notificações — ${qtdAlertas} alertas` : 'Notificações'}
         >
           <Bell className="w-4 h-4 text-ink-300" />
-          <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] num font-bold rounded-full w-4 h-4 flex items-center justify-center">
-            7
-          </span>
-        </button>
+          {qtdAlertas != null && qtdAlertas > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] num font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">
+              {qtdAlertas > 99 ? '99+' : qtdAlertas}
+            </span>
+          )}
+        </Link>
       </div>
     </header>
   )

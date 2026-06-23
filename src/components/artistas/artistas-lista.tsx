@@ -310,7 +310,7 @@ export function ArtistasLista() {
                         {(() => {
                           const h = histHealth.get(a.slug)
                           return h && h.length > 0 ? (
-                            <Sparkline data={h} width={58} height={16} />
+                            <Sparkline data={h} width={64} height={24} />
                           ) : (
                             <TendenciaPendente />
                           )

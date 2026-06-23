@@ -287,7 +287,10 @@ function montar(
       ? Math.max(0.05, (ts(d.agora) - ts(d.medidoAntesEm)) / 3_600_000)
       : null
   return {
-    key: `${plataforma}-${d.id}`,
+    // Inclui o slug: o mesmo vídeo pode vir em 2 artistas (colab/canal
+    // compartilhado), e `plataforma-id` colidiria — keys duplicadas quebram a
+    // reconciliação do React (cards stale ao alternar os filtros).
+    key: `${slug}-${plataforma}-${d.id}`,
     artistaSlug: slug,
     artistaNome: nome,
     plataforma,

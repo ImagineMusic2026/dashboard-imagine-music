@@ -189,7 +189,7 @@ export function ImportadorOneRpm() {
       />
 
       {/* Cards de fonte */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button
           type="button"
           onClick={abrirSeletor}
@@ -256,7 +256,7 @@ export function ImportadorOneRpm() {
         onDragLeave={() => setArrastando(false)}
         onDrop={aoSoltar}
         className={cn(
-          'border-2 border-dashed rounded-xl p-12 text-center transition-colors',
+          'border-2 border-dashed rounded-xl p-8 sm:p-12 text-center transition-colors',
           enviando ? 'cursor-wait' : 'cursor-pointer',
           arrastando
             ? 'border-amber-500/60 bg-amber-500/5'
@@ -371,7 +371,7 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-px bg-bg-700/30">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-bg-700/30">
         <Kpi icon={Music2} label="Streams" valor={fmtInt(resumo.totais.streams)} />
         <Kpi
           icon={DollarSign}
@@ -432,7 +432,7 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
       </div>
 
       {/* Top faixas + países */}
-      <div className="grid grid-cols-2 gap-px bg-bg-700/30 border-t border-bg-700/30">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-bg-700/30 border-t border-bg-700/30">
         <div className="bg-bg-900 p-5">
           <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase mb-3">
             Top faixas

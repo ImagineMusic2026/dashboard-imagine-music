@@ -99,9 +99,10 @@ export function PerfilArtistaReal({
       )}
 
       {/* Header */}
-      <div className="flex items-start gap-5">
-        <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="xl" />
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+        <div className="flex items-start gap-4 sm:gap-5 min-w-0 flex-1">
+          <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="xl" />
+          <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[10px] tracking-wider font-semibold uppercase text-ink-400 mb-1">
             <span>{a.label ?? 'Imagine Music'}</span>
             <span className="text-ink-600">·</span>
@@ -129,6 +130,7 @@ export function PerfilArtistaReal({
               <span className="text-[12px] text-ink-500">Sem links de redes cadastrados.</span>
             )}
           </div>
+        </div>
         </div>
 
         {/* Conexões — gera link de autorização (admin) ou o próprio artista conecta.

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, UserPlus } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, UserPlus, Users } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { CriarArtistaDialog } from '@/components/artistas/criar-artista-dialog'
@@ -198,7 +198,7 @@ export function ArtistasLista() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-ink-100">Artistas</h1>
           <p className="text-sm text-ink-400 mt-1">
@@ -258,7 +258,7 @@ export function ArtistasLista() {
         </div>
       ) : (
         <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto hidden lg:block">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-bg-700/40">
@@ -388,6 +388,74 @@ export function ArtistasLista() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: cards (a tabela larga não cabe no celular) */}
+          <div className="lg:hidden divide-y divide-bg-700/30">
+            {paginados.map((a) => {
+              const r = receitas.get(a.slug)
+              const saude = saudePorSlug.get(a.slug)
+              const nAlertas = alertasPorSlug.get(a.slug) ?? 0
+              return (
+                <Link
+                  key={a.slug}
+                  href={`/artistas/${a.slug}`}
+                  className="block p-4 hover:bg-bg-800/40 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-ink-100 truncate">{a.nome}</div>
+                      <div className="text-[11px] text-ink-500 num truncate">
+                        {a.redes?.instagram?.handle ? `@${a.redes.instagram.handle}` : a.slug}
+                        {a.genero ? ` · ${a.genero}` : ''}
+                      </div>
+                    </div>
+                    {saude ? (
+                      <div className="text-right shrink-0">
+                        <div className={cn('num font-bold text-lg leading-none', getHealthColor(saude.score))}>
+                          {saude.score}
+                        </div>
+                        <div className="text-[9px] tracking-wider text-ink-500 uppercase mt-0.5">health</div>
+                      </div>
+                    ) : (
+                      <span className="num text-sm text-ink-600 shrink-0">—</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-3 text-[12px]">
+                    <span className="inline-flex items-center gap-1 text-ink-300">
+                      <Users className="w-3.5 h-3.5 text-ink-500" />
+                      <span className="num">
+                        {saude && saude.seguidoresTotal > 0 ? formatNumber(saude.seguidoresTotal) : '—'}
+                      </span>
+                    </span>
+                    {nAlertas > 0 && (
+                      <span className="num text-[11px] bg-red-500/15 text-red-400 px-2 py-0.5 rounded font-semibold">
+                        {nAlertas} {nAlertas === 1 ? 'alerta' : 'alertas'}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-2 ml-auto">
+                      {REDES.map(({ tipo, cor, get }) => (
+                        <span key={tipo} className={cn('w-4 h-4 block', get(a) ? cor : 'text-ink-700')}>
+                          <PlataformaIcon tipo={tipo} />
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                  {ehAdmin && r && (
+                    <div className="mt-2 text-[12px] num text-emerald-400">
+                      {formatCurrency(r.totalBRL)}{' '}
+                      <span className="text-ink-500">· {formatNumber(r.streams)} streams</span>
+                    </div>
+                  )}
+                </Link>
+              )
+            })}
+            {filtrados.length === 0 && (
+              <div className="px-4 py-10 text-center text-sm text-ink-500">
+                Nenhum artista encontrado para “{busca}”.
+              </div>
+            )}
           </div>
 
           {totalPaginas > 1 && (

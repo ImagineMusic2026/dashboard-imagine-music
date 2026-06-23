@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, ExternalLink, Loader2, Pencil, Plug } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
@@ -41,6 +42,7 @@ export function PerfilArtistaReal({
   mostrarVoltar?: boolean
 }) {
   const { role } = useAuth()
+  const router = useRouter()
   const ehAdmin = role === 'admin'
   const [estado, setEstado] = useState<EstadoReal>({ st: 'load' })
   const [editando, setEditando] = useState(false)
@@ -213,6 +215,7 @@ export function PerfilArtistaReal({
           artista={a}
           onClose={() => setEditando(false)}
           onSaved={() => setNonce((n) => n + 1)}
+          onDeleted={() => router.push('/artistas')}
         />
       )}
     </div>

@@ -301,6 +301,47 @@ export async function atualizarArtistaManual(
   return { slug, nome, genero, jaExistia: true, redes, avisos }
 }
 
+/**
+ * EXCLUSÃO definitiva de um artista (admin). Remove o cadastro e tudo que é
+ * keyed por slug: métricas + subcoleções de histórico (recursiveDelete), receita
+ * e tokens OAuth. Deixa um registro de auditoria em `cadastros`. Irreversível.
+ */
+export async function excluirArtista(
+  slug: string,
+  meta: { uid: string; email: string }
+): Promise<{ slug: string; nome: string | null }> {
+  const s = (slug ?? '').trim()
+  if (!s) throw new ArtistaInputError('Artista inválido.')
+
+  const ref = adminDb.collection(ARTISTAS).doc(s)
+  const snap = await ref.get()
+  if (!snap.exists) throw new ArtistaInputError('Artista não encontrado.')
+  const nome = (snap.data()?.nome as string | undefined) ?? null
+
+  // Métricas têm subcoleções (historico, historico-tiktok/-youtube/-health) ->
+  // recursiveDelete apaga o doc + tudo abaixo. As demais são docs simples
+  // (delete de doc inexistente é no-op).
+  await adminDb.recursiveDelete(adminDb.doc(`metricas-sociais/${s}`))
+  await Promise.all([
+    adminDb.doc(`receitas/${s}`).delete(),
+    adminDb.doc(`tiktok-tokens/${s}`).delete(),
+    adminDb.doc(`youtube-tokens/${s}`).delete(),
+  ])
+  await ref.delete()
+
+  // Auditoria: quem excluiu o quê e quando.
+  await adminDb.collection(CADASTROS).add({
+    fonte: 'exclusao',
+    artistaSlug: s,
+    artistaNome: nome,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    criadoPorUid: meta.uid,
+    criadoPorEmail: meta.email,
+  })
+
+  return { slug: s, nome }
+}
+
 export async function listarCadastros(max = 20): Promise<CadastroResumo[]> {
   const snap = await adminDb.collection(CADASTROS).orderBy('criadoEm', 'desc').limit(max).get()
   return snap.docs.map((d) => {

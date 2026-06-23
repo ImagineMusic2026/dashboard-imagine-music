@@ -49,7 +49,7 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
     interno ? (
       <Link
         href={a.url}
-        className="text-violet-400 hover:text-violet-300 text-sm font-semibold shrink-0 self-center transition-colors"
+        className="text-violet-400 hover:text-violet-300 text-sm font-semibold shrink-0 self-start sm:self-center transition-colors"
       >
         {a.acaoSugerida} →
       </Link>
@@ -58,7 +58,7 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
         href={a.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-violet-400 hover:text-violet-300 text-sm font-semibold shrink-0 self-center transition-colors"
+        className="text-violet-400 hover:text-violet-300 text-sm font-semibold shrink-0 self-start sm:self-center transition-colors"
       >
         {a.acaoSugerida} →
       </a>
@@ -69,20 +69,22 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
     <div className="relative flex items-start gap-3 p-4 hover:bg-bg-800/30 transition-colors">
       <div className={cn('absolute left-0 top-0 bottom-0 w-1', sev.borderL)} />
       <AvatarFallback iniciais={iniciaisDe(a.artistaNome)} gradient={corAvatarDe(a.artistaSlug)} size="sm" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className={cn('text-[10px] font-bold tracking-wider px-2 py-0.5 rounded', sev.badgeBg, sev.badgeText)}>
-            {sev.label}
-          </span>
-          <span className="text-[11px] text-ink-500 num">{tempoRelativo(a.ts)}</span>
+      <div className="flex-1 min-w-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={cn('text-[10px] font-bold tracking-wider px-2 py-0.5 rounded', sev.badgeBg, sev.badgeText)}>
+              {sev.label}
+            </span>
+            <span className="text-[11px] text-ink-500 num">{tempoRelativo(a.ts)}</span>
+          </div>
+          <div className="font-semibold text-sm text-ink-100">{a.artistaNome}</div>
+          <div className="text-[13px] text-ink-300 mt-0.5 flex items-start gap-1.5">
+            <Icone className={cn('w-3.5 h-3.5 mt-0.5 shrink-0', sev.badgeText)} />
+            <span className="min-w-0">{a.descricao}</span>
+          </div>
         </div>
-        <div className="font-semibold text-sm text-ink-100">{a.artistaNome}</div>
-        <div className="text-[13px] text-ink-300 mt-0.5 flex items-start gap-1.5">
-          <Icone className={cn('w-3.5 h-3.5 mt-0.5 shrink-0', sev.badgeText)} />
-          <span className="min-w-0">{a.descricao}</span>
-        </div>
+        {acao}
       </div>
-      {acao}
     </div>
   )
 }

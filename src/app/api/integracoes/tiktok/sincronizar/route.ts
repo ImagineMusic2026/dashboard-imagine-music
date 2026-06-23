@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { autorizarCronOuAdmin } from '@/lib/server-auth'
+import { autorizarCronOuPermissao } from '@/lib/server-auth'
 import { tiktokConfigurado, TikTokConfigError } from '@/lib/tiktok/config'
 import { renovarToken, TikTokApiException } from '@/lib/tiktok/client'
 import { buscarMetricas } from '@/lib/tiktok/insights'
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 }
 
 async function handle(req: Request) {
-  const auth = await autorizarCronOuAdmin(req)
+  const auth = await autorizarCronOuPermissao(req, 'integracoes')
   if (auth instanceof NextResponse) return auth
 
   if (!tiktokConfigurado()) {

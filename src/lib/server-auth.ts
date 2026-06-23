@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
+import { temPermissao } from '@/lib/permissions'
+import type { Capacidade, Role } from '@/lib/users'
 
 /**
  * Guardas de autenticação para Route Handlers (server-only). Mesmo formato já
@@ -43,6 +45,8 @@ export interface SessaoAtiva {
   role: string
   /** Slug do artista vinculado ao login (só para role 'artista'). */
   artistaSlug: string | null
+  /** Exceções de permissão por pessoa (override do padrão do papel). */
+  permissoes?: Partial<Record<Capacidade, boolean>>
 }
 
 /**
@@ -76,6 +80,7 @@ export async function exigirSessaoAtiva(req: Request): Promise<SessaoAtiva | Nex
     email: (u?.email as string | undefined) ?? tokenEmail ?? '',
     role: (u?.role as string | undefined) ?? '',
     artistaSlug: (u?.artistaSlug as string | undefined) ?? null,
+    permissoes: u?.permissoes as Partial<Record<Capacidade, boolean>> | undefined,
   }
 }
 
@@ -95,4 +100,36 @@ export async function autorizarCronOuAdmin(
   const bearer = authz.startsWith('Bearer ') ? authz.slice(7) : null
   if (secret && bearer && bearer === secret) return { cron: true }
   return exigirAdmin(req)
+}
+
+/**
+ * Exige um usuário ativo COM a capacidade `cap` (override por pessoa ou padrão do
+ * papel — ver `@/lib/permissions`). Admin tem todas por padrão; o admin pode
+ * conceder uma a um marketing. Retorna NextResponse (erro) ou os dados do usuário.
+ */
+export async function exigirPermissao(
+  req: Request,
+  cap: Capacidade,
+): Promise<AdminAuth | NextResponse> {
+  const sessao = await exigirSessaoAtiva(req)
+  if (sessao instanceof NextResponse) return sessao
+  if (!temPermissao({ role: sessao.role as Role, permissoes: sessao.permissoes }, cap)) {
+    return NextResponse.json({ error: 'Você não tem permissão para esta ação.' }, { status: 403 })
+  }
+  return { uid: sessao.uid, email: sessao.email }
+}
+
+/**
+ * Como `autorizarCronOuAdmin`, mas o fallback manual exige a capacidade `cap` em
+ * vez de admin — pra um membro com a permissão poder disparar a ação pelo painel.
+ */
+export async function autorizarCronOuPermissao(
+  req: Request,
+  cap: Capacidade,
+): Promise<AdminAuth | CronAuth | NextResponse> {
+  const secret = process.env.CRON_SECRET?.trim()
+  const authz = req.headers.get('authorization') ?? ''
+  const bearer = authz.startsWith('Bearer ') ? authz.slice(7) : null
+  if (secret && bearer && bearer === secret) return { cron: true }
+  return exigirPermissao(req, cap)
 }

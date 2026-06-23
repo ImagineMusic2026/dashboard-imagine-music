@@ -2,11 +2,11 @@
 
 import type { ReactNode } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
-import { podeVerReceita } from '@/lib/permissions'
 
 /**
- * Mostra `children` (conteúdo de receita) só para quem tem permissão (admin).
- * Para os demais — ou enquanto a role carrega — mostra `restrito` (ou nada).
+ * Mostra `children` (conteúdo de receita) só para quem tem a permissão `verReceita`
+ * (padrão: admin; o admin pode conceder a outra pessoa). Para os demais — ou
+ * enquanto carrega — mostra `restrito` (ou nada).
  */
 export function ReceitaGate({
   children,
@@ -15,7 +15,7 @@ export function ReceitaGate({
   children: ReactNode
   restrito?: ReactNode
 }) {
-  const { role, loading } = useAuth()
-  if (!loading && podeVerReceita(role)) return <>{children}</>
+  const { pode, loading } = useAuth()
+  if (!loading && pode('verReceita')) return <>{children}</>
   return <>{restrito}</>
 }

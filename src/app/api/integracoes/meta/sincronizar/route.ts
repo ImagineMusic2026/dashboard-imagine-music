@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { autorizarCronOuAdmin } from '@/lib/server-auth'
+import { autorizarCronOuPermissao } from '@/lib/server-auth'
 import { getMetaConfig, MetaConfigError, metaConfigurado } from '@/lib/meta/config'
 import { MetaApiException } from '@/lib/meta/client'
 import { buscarMetricas, buscarMidias } from '@/lib/meta/insights'
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 }
 
 async function handle(req: Request) {
-  const auth = await autorizarCronOuAdmin(req)
+  const auth = await autorizarCronOuPermissao(req, 'integracoes')
   if (auth instanceof NextResponse) return auth
 
   if (!metaConfigurado()) {

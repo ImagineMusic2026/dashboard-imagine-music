@@ -31,8 +31,8 @@ type AcaoEmAndamento = null | 'descobrir' | 'sincronizar'
 type ResultadoDescoberta = { casados: { slug: string; username: string }[]; contasNaoUsadas: string[] }
 
 export function MetaInstagramCard() {
-  const { role } = useAuth()
-  const isAdmin = role === 'admin'
+  const { pode } = useAuth()
+  const isAdmin = pode('integracoes')
 
   const [aberto, setAberto] = useState(false)
   const [status, setStatus] = useState<IntegracaoMetaDoc | null>(null)

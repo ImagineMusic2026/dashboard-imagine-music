@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { exigirAdmin } from '@/lib/server-auth'
+import { exigirPermissao } from '@/lib/server-auth'
 import { getMetaConfig, MetaConfigError, metaConfigurado } from '@/lib/meta/config'
 import { MetaApiException } from '@/lib/meta/client'
 import { casarContasComArtistas, listarContasIG } from '@/lib/meta/accounts'
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic'
  * que ficou pendente (para a UI orientar o vínculo). Só admin.
  */
 export async function POST(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'integracoes')
   if (auth instanceof NextResponse) return auth
 
   if (!metaConfigurado()) {

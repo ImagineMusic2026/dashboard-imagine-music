@@ -1,9 +1,11 @@
 import { DollarSign, Users2 } from 'lucide-react'
 import { ImportadorOneRpm } from '@/components/importar/importador-onerpm'
 import { ImportadorRoster } from '@/components/importar/importador-roster'
+import { PermissaoGate, SemAcesso } from '@/components/auth/permissao-gate'
 
 export default function ImportarPage() {
   return (
+    <PermissaoGate cap="importar" restrito={<SemAcesso titulo="Importar dados" />}>
     <div className="space-y-10 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold text-ink-100">Importar dados</h1>
@@ -30,5 +32,6 @@ export default function ImportarPage() {
         <ImportadorRoster />
       </section>
     </div>
+    </PermissaoGate>
   )
 }

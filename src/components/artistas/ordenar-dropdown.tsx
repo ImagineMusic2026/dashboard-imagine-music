@@ -1,7 +1,6 @@
 'use client'
 
 import { useAuth } from '@/components/auth/auth-provider'
-import { podeVerReceita } from '@/lib/permissions'
 import { FilterDropdown } from '@/components/shared/filter-dropdown'
 
 const todasOpcoes = [
@@ -15,8 +14,8 @@ const todasOpcoes = [
 
 /** Dropdown de ordenação — esconde as opções por receita para quem não pode vê-la. */
 export function OrdenarDropdown() {
-  const { role } = useAuth()
-  const options = podeVerReceita(role)
+  const { pode } = useAuth()
+  const options = pode('verReceita')
     ? todasOpcoes
     : todasOpcoes.filter((o) => !o.value.startsWith('receita'))
   return <FilterDropdown label="Health Score ↓" options={options} multi={false} />

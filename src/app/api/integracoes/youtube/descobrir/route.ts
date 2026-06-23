@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { exigirAdmin } from '@/lib/server-auth'
+import { exigirPermissao } from '@/lib/server-auth'
 import { youtubeDataConfigurado, YouTubeConfigError } from '@/lib/youtube/config'
 import { YouTubeApiException } from '@/lib/youtube/client'
 import { resolverChannelId } from '@/lib/youtube/channel'
@@ -20,7 +20,7 @@ export const maxDuration = 60
  * quota — `search` custa caro). Só admin.
  */
 export async function POST(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'integracoes')
   if (auth instanceof NextResponse) return auth
 
   if (!youtubeDataConfigurado()) {

@@ -36,6 +36,24 @@ service cloud.firestore {
         && userData().get('artistaSlug', '') == slug;
     }
 
+    // Permissão efetiva por pessoa: override em users/{uid}.permissoes[cap] se
+    // existir, senão o padrão do papel (passado como `padrao`). `isAtivo()`
+    // curto-circuita antes de tocar userData() (seguro p/ sem-doc/sem-login).
+    // Espelha `temPermissao` (@/lib/permissions) e os guards da API.
+    function podeVerReceita() {
+      return isAtivo()
+        && userData().get('permissoes', {}).get('verReceita', userData().get('role', '') == 'admin');
+    }
+    function podeImportar() {
+      return isAtivo()
+        && userData().get('permissoes', {}).get('importar', userData().get('role', '') == 'admin');
+    }
+    function podeAgenda() {
+      return isAtivo()
+        && userData().get('permissoes', {}).get('agenda',
+             userData().get('role', '') == 'admin' || userData().get('role', '') == 'marketing');
+    }
+
     function convite(token) {
       return get(/databases/$(database)/documents/convites/$(token)).data;
     }
@@ -87,14 +105,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Receita (SENSÍVEL): só admin lê. Marketing não vê. Escrita só servidor.
+    // Receita (SENSÍVEL): só quem tem a permissão `verReceita` (admin por padrão;
+    // o admin pode conceder a um membro). Escrita só servidor.
     match /receitas/{slug} {
-      allow read: if isAdmin();
+      allow read: if podeVerReceita();
       allow write: if false;
     }
 
     match /importacoes/{id} {
-      allow read: if isAdmin();
+      allow read: if podeImportar();
       allow write: if false;
     }
 
@@ -146,10 +165,11 @@ service cloud.firestore {
     }
 
     // Agenda (eventos: releases, shows, contratos, reuniões). Dado manual da
-    // equipe — staff (admin/marketing) lê e escreve direto do client (CRUD do painel).
+    // equipe — quem tem a permissão `agenda` (staff por padrão) lê e escreve
+    // direto do client (CRUD do painel). O admin pode tirar de um membro.
     match /agenda/{id} {
-      allow read: if isStaff();
-      allow create, update, delete: if isStaff();
+      allow read: if podeAgenda();
+      allow create, update, delete: if podeAgenda();
     }
 
     // Demais coleções ficam bloqueadas até serem modeladas.

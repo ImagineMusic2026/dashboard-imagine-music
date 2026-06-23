@@ -27,8 +27,8 @@ const ICONE = <PlataformaIcon tipo="tiktok" />
 const COR_ICONE = 'text-cyan-400 bg-bg-950 border border-bg-700'
 
 export function TikTokCard() {
-  const { role } = useAuth()
-  const isAdmin = role === 'admin'
+  const { pode } = useAuth()
+  const isAdmin = pode('integracoes')
 
   const [aberto, setAberto] = useState(false)
   const [status, setStatus] = useState<IntegracaoTikTokDoc | null>(null)

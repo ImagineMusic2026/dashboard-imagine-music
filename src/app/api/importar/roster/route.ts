@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { adminAuth, adminDb } from '@/lib/firebase-admin'
+import { exigirPermissao } from '@/lib/server-auth'
 import { RosterParseError, lerRoster } from '@/lib/roster/parse'
 import { listarCadastros, salvarRoster } from '@/lib/roster/firestore'
 
@@ -10,34 +10,13 @@ const TAMANHO_MAX = 25 * 1024 * 1024 // 25MB
 
 /**
  * Importação do cadastro (roster) de artistas a partir do .xlsx de redes sociais.
- *  - POST: parseia e faz upsert dos artistas (merge — preserva receita). Só admin.
- *  - GET : devolve o último cadastro importado. Só admin.
+ *  - POST: parseia e faz upsert dos artistas (merge — preserva receita).
+ *  - GET : devolve o último cadastro importado.
+ *
+ * Exige a permissão `importar` (admin por padrão; o admin pode delegar a um membro).
  */
-async function exigirAdmin(req: Request): Promise<{ uid: string; email: string } | NextResponse> {
-  const authz = req.headers.get('authorization') ?? ''
-  const token = authz.startsWith('Bearer ') ? authz.slice(7) : null
-  if (!token) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-
-  let uid: string
-  let tokenEmail: string | undefined
-  try {
-    const decoded = await adminAuth.verifyIdToken(token)
-    uid = decoded.uid
-    tokenEmail = decoded.email
-  } catch {
-    return NextResponse.json({ error: 'Sessão inválida. Entre novamente.' }, { status: 401 })
-  }
-
-  const snap = await adminDb.doc(`users/${uid}`).get()
-  const u = snap.data()
-  if (!snap.exists || u?.role !== 'admin' || u?.ativo === false) {
-    return NextResponse.json({ error: 'Apenas um admin pode importar o cadastro.' }, { status: 403 })
-  }
-  return { uid, email: (u?.email as string | undefined) ?? tokenEmail ?? '' }
-}
-
 export async function GET(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'importar')
   if (auth instanceof NextResponse) return auth
   try {
     const cadastros = await listarCadastros(20)
@@ -49,7 +28,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'importar')
   if (auth instanceof NextResponse) return auth
 
   let form: FormData

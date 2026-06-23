@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { adminAuth, adminDb } from '@/lib/firebase-admin'
+import { exigirPermissao } from '@/lib/server-auth'
 import { OneRpmParseError, parseOneRpm } from '@/lib/onerpm/parse'
 import { listarImportacoes, salvarImportacao } from '@/lib/onerpm/firestore'
 
@@ -12,39 +12,13 @@ const TAMANHO_MAX = 25 * 1024 * 1024 // 25MB
 
 /**
  * Importação de relatório de vendas da OneRPM.
- *  - POST: recebe o .xlsx (multipart), parseia e grava no Firestore. Só admin.
- *  - GET : lista as importações recentes. Só admin.
+ *  - POST: recebe o .xlsx (multipart), parseia e grava no Firestore.
+ *  - GET : lista as importações recentes.
  *
- * Auth no mesmo padrão de /api/membros: Bearer ID token -> admin ATIVO.
+ * Exige a permissão `importar` (admin por padrão; o admin pode delegar a um membro).
  */
-async function exigirAdmin(req: Request): Promise<{ uid: string; email: string } | NextResponse> {
-  const authz = req.headers.get('authorization') ?? ''
-  const token = authz.startsWith('Bearer ') ? authz.slice(7) : null
-  if (!token) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-
-  let uid: string
-  let tokenEmail: string | undefined
-  try {
-    const decoded = await adminAuth.verifyIdToken(token)
-    uid = decoded.uid
-    tokenEmail = decoded.email
-  } catch {
-    return NextResponse.json({ error: 'Sessão inválida. Entre novamente.' }, { status: 401 })
-  }
-
-  const snap = await adminDb.doc(`users/${uid}`).get()
-  const u = snap.data()
-  if (!snap.exists || u?.role !== 'admin' || u?.ativo === false) {
-    return NextResponse.json(
-      { error: 'Apenas um admin pode importar ou ver dados de receita.' },
-      { status: 403 }
-    )
-  }
-  return { uid, email: (u?.email as string | undefined) ?? tokenEmail ?? '' }
-}
-
 export async function GET(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'importar')
   if (auth instanceof NextResponse) return auth
 
   try {
@@ -57,7 +31,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'importar')
   if (auth instanceof NextResponse) return auth
 
   let form: FormData

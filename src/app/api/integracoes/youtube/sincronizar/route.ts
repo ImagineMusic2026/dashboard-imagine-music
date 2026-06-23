@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { autorizarCronOuAdmin } from '@/lib/server-auth'
+import { autorizarCronOuPermissao } from '@/lib/server-auth'
 import { youtubeDataConfigurado, YouTubeConfigError } from '@/lib/youtube/config'
 import { renovarToken, YouTubeApiException } from '@/lib/youtube/client'
 import { buscarMetricasCanal, resolverChannelId } from '@/lib/youtube/channel'
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 }
 
 async function handle(req: Request) {
-  const auth = await autorizarCronOuAdmin(req)
+  const auth = await autorizarCronOuPermissao(req, 'integracoes')
   if (auth instanceof NextResponse) return auth
 
   if (!youtubeDataConfigurado()) {

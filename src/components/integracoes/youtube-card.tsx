@@ -28,8 +28,8 @@ const ICONE = <PlataformaIcon tipo="youtube" />
 const COR_ICONE = 'text-red-400 bg-red-500/15'
 
 export function YouTubeCard() {
-  const { role } = useAuth()
-  const isAdmin = role === 'admin'
+  const { pode } = useAuth()
+  const isAdmin = pode('integracoes')
 
   const [aberto, setAberto] = useState(false)
   const [status, setStatus] = useState<IntegracaoYouTubeDoc | null>(null)

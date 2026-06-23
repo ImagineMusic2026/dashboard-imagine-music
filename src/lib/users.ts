@@ -9,6 +9,13 @@ import { auth, db } from '@/lib/firebase'
  */
 export type Role = 'admin' | 'marketing' | 'artista'
 
+/**
+ * Capacidades que o admin pode conceder/restringir POR PESSOA, sobrescrevendo o
+ * padrão do papel (lógica em `@/lib/permissions`). Capacidades estruturais do
+ * papel (ex.: portal do artista, ver o próprio perfil) não entram aqui.
+ */
+export type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar'
+
 /** Perfil do usuário armazenado em Firestore na coleção `users` (id = UID do Auth). */
 export type AppUser = {
   uid: string
@@ -18,6 +25,8 @@ export type AppUser = {
   ativo: boolean
   /** Só para role 'artista': slug do artista que este login representa. */
   artistaSlug?: string
+  /** Exceções de permissão por pessoa (override do padrão do papel). */
+  permissoes?: Partial<Record<Capacidade, boolean>>
 }
 
 export const roleMeta: Record<Role, { label: string; classe: string; gradient: string }> = {
@@ -58,6 +67,14 @@ export async function listAppUsers(): Promise<AppUser[]> {
 /** Altera o papel de um membro (admin/marketing). */
 export async function updateUserRole(uid: string, role: Role): Promise<void> {
   await updateDoc(doc(db, USERS, uid), { role })
+}
+
+/** Salva o mapa de exceções de permissão de um membro (admin). */
+export async function updateUserPermissoes(
+  uid: string,
+  permissoes: Partial<Record<Capacidade, boolean>>,
+): Promise<void> {
+  await updateDoc(doc(db, USERS, uid), { permissoes })
 }
 
 /**

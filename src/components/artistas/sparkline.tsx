@@ -20,6 +20,15 @@ export function Sparkline({ data, color, width = 100, height = 24 }: SparklinePr
       ? '#F87171'
       : '#64748B')
 
+  // 1 ponto: ainda não dá linha — mostra um ponto (a série preenche com os dias).
+  if (data.length === 1) {
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
+        <circle cx={width / 2} cy={height / 2} r={2} fill={stroke} />
+      </svg>
+    )
+  }
+
   const padding = 1.5
   const usableHeight = height - padding * 2
   const stepX = data.length > 1 ? width / (data.length - 1) : 0

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, UserPlus } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -16,12 +16,12 @@ import {
   type ArtistaDoc,
   type ReceitaResumo,
 } from '@/lib/artistas/client'
-import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
+import { getHistoricoHealth, listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
 import { derivarHealthScores } from '@/lib/health/score'
 import { derivarAlertas } from '@/lib/alertas/derivar'
-import { HealthScoreBar } from '@/components/artistas/health-score-bar'
-import { cn, formatCurrency, formatNumber } from '@/lib/utils'
+import { Sparkline } from '@/components/artistas/sparkline'
+import { cn, formatCurrency, formatNumber, getHealthColor, getHealthGradient } from '@/lib/utils'
 
 const REDES: { tipo: PlataformaTipo; cor: string; get: (a: ArtistaDoc) => boolean }[] = [
   { tipo: 'spotify', cor: 'text-emerald-400', get: (a) => !!a.redes?.spotify?.url },
@@ -64,6 +64,35 @@ function TendenciaPendente() {
   )
 }
 
+/** Cor sólida do marcador de Health por faixa de score. */
+function corMarcador(score: number): string {
+  if (score >= 80) return 'bg-emerald-400'
+  if (score >= 60) return 'bg-violet-400'
+  if (score >= 40) return 'bg-amber-400'
+  return 'bg-red-400'
+}
+
+/** Health Score como linha fina + marcador (em vez de barra cheia) + número. */
+function HealthLinha({ score }: { score: number }) {
+  const v = Math.max(0, Math.min(100, Math.round(score)))
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="relative w-24 h-2.5 flex items-center shrink-0">
+        <div className="absolute inset-x-0 h-px bg-bg-700 rounded-full" />
+        <div
+          className={cn('absolute left-0 h-px rounded-full bg-gradient-to-r', getHealthGradient(v))}
+          style={{ width: `${v}%` }}
+        />
+        <div
+          className={cn('absolute w-2.5 h-2.5 rounded-full ring-2 ring-bg-900', corMarcador(v))}
+          style={{ left: `calc(${v}% - 5px)` }}
+        />
+      </div>
+      <span className={cn('num font-bold text-sm', getHealthColor(v))}>{v}</span>
+    </div>
+  )
+}
+
 export function ArtistasLista() {
   const { role, loading } = useAuth()
   const [artistas, setArtistas] = useState<ArtistaDoc[] | null>(null)
@@ -73,6 +102,8 @@ export function ArtistasLista() {
   const [busca, setBusca] = useState('')
   const [pagina, setPagina] = useState(1)
   const [dialogAberto, setDialogAberto] = useState(false)
+  const [histHealth, setHistHealth] = useState<Map<string, number[]>>(new Map())
+  const buscadosRef = useRef<Set<string>>(new Set())
 
   const ehAdmin = role === 'admin'
 
@@ -122,6 +153,38 @@ export function ArtistasLista() {
   const paginaAtual = Math.min(pagina, totalPaginas)
   const inicio = (paginaAtual - 1) * POR_PAGINA
   const paginados = filtrados.slice(inicio, inicio + POR_PAGINA)
+
+  // Série do Health Score (sparkline da Tendência) só dos artistas VISÍVEIS da
+  // página — evita ler o histórico dos 74 de uma vez. Cacheado por slug.
+  const slugsPagina = paginados.map((a) => a.slug).join(',')
+  useEffect(() => {
+    const faltam = paginados.filter((a) => !buscadosRef.current.has(a.slug))
+    if (!faltam.length) return
+    faltam.forEach((a) => buscadosRef.current.add(a.slug))
+    let vivo = true
+    ;(async () => {
+      const entradas = await Promise.all(
+        faltam.map(async (a) => {
+          try {
+            const h = await getHistoricoHealth(a.slug)
+            return [a.slug, h.map((d) => d.score)] as const
+          } catch {
+            return [a.slug, [] as number[]] as const
+          }
+        }),
+      )
+      if (!vivo) return
+      setHistHealth((m) => {
+        const n = new Map(m)
+        for (const [slug, scores] of entradas) n.set(slug, scores)
+        return n
+      })
+    })()
+    return () => {
+      vivo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slugsPagina])
 
   if (loading) {
     return (
@@ -241,23 +304,17 @@ export function ArtistasLista() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {saude ? <HealthScoreBar score={saude.score} size="sm" /> : <HealthPendente />}
+                        {saude ? <HealthLinha score={saude.score} /> : <HealthPendente />}
                       </td>
                       <td className="px-4 py-3">
-                        {saude?.crescimentoSegPct != null &&
-                        Math.abs(saude.crescimentoSegPct) >= 0.0005 ? (
-                          <span
-                            className={cn(
-                              'num text-sm',
-                              saude.crescimentoSegPct > 0 ? 'text-emerald-400' : 'text-red-400',
-                            )}
-                          >
-                            {saude.crescimentoSegPct > 0 ? '↑' : '↓'}{' '}
-                            {(Math.abs(saude.crescimentoSegPct) * 100).toFixed(1)}%
-                          </span>
-                        ) : (
-                          <TendenciaPendente />
-                        )}
+                        {(() => {
+                          const h = histHealth.get(a.slug)
+                          return h && h.length > 0 ? (
+                            <Sparkline data={h} width={58} height={16} />
+                          ) : (
+                            <TendenciaPendente />
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {saude && saude.seguidoresTotal > 0 ? (

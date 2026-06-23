@@ -25,16 +25,16 @@ export function ConfiguracoesView() {
     <div className="space-y-6 animate-fade-in">
       <h1 className="text-3xl font-bold text-ink-100">Configurações</h1>
 
-      <div className="grid grid-cols-3 gap-6">
-        <aside className="col-span-1">
-          <nav className="bg-bg-900 border border-bg-700/40 rounded-xl p-2 sticky top-24 space-y-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <aside className="lg:col-span-1">
+          <nav className="bg-bg-900 border border-bg-700/40 rounded-xl p-2 flex gap-1 overflow-x-auto lg:block lg:space-y-1 lg:sticky lg:top-24">
             {ABAS.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => setAba(item.key)}
                 className={cn(
-                  'w-full text-left block px-3 py-2 rounded-lg text-sm transition-colors border',
+                  'shrink-0 lg:w-full text-left whitespace-nowrap px-3 py-2 rounded-lg text-sm transition-colors border',
                   aba === item.key
                     ? 'bg-violet-500/10 text-violet-400 font-semibold border-violet-500/20'
                     : 'text-ink-300 hover:bg-bg-800 border-transparent',
@@ -46,7 +46,7 @@ export function ConfiguracoesView() {
           </nav>
         </aside>
 
-        <div className="col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           {aba === 'time' && (
             <>
               <MembrosTime modo="time" />

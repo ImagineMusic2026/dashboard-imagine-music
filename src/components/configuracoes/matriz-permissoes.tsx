@@ -275,7 +275,7 @@ function ReferenciaPapeis() {
               <tr key={c.cap} className="hover:bg-bg-800/30 transition-colors">
                 <td className="py-3 px-5 text-sm text-ink-200">
                   {c.label}
-                  <div className="text-[11px] text-ink-500">{c.descricao}</div>
+                  <div className="hidden sm:block text-[11px] text-ink-500">{c.descricao}</div>
                 </td>
                 {PAPEIS.map((p) => (
                   <td key={p} className="py-3 px-4 text-center">

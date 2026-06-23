@@ -110,46 +110,111 @@ export function MatrizPermissoes() {
           ) : users.length === 0 ? (
             <div className="text-ink-500 text-sm text-center py-10 px-6">Nenhum membro no time.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-bg-700/40">
-                    <th className="sticky left-0 z-10 bg-bg-900 border-r border-bg-700/40 text-left text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-5">
-                      Membro
-                    </th>
-                    {CAPACIDADES.map((c) => (
-                      <th
-                        key={c.cap}
-                        className="py-3 px-3 text-center text-[11px] tracking-wider text-ink-400 font-semibold"
-                        title={c.descricao}
-                      >
-                        {c.label}
+            <>
+              {/* Desktop: tabela pessoas × capacidades. */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-bg-700/40">
+                      <th className="sticky left-0 z-10 bg-bg-900 border-r border-bg-700/40 text-left text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-5">
+                        Membro
                       </th>
-                    ))}
-                    <th className="py-3 px-4" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-bg-700/30">
-                  {users.map((u) => {
-                    const temOverride = u.permissoes && Object.keys(u.permissoes).length > 0
-                    return (
-                      <tr key={u.uid} className="group hover:bg-bg-800/30 transition-colors">
-                        <td className="sticky left-0 z-10 bg-bg-900 group-hover:bg-bg-800 border-r border-bg-700/40 py-3 px-5">
-                          <div className="flex items-center gap-3">
-                            <AvatarFallback iniciais={iniciaisDe(u)} gradient={roleMeta[u.role].gradient} size="sm" />
-                            <div className="min-w-0">
-                              <div className="font-semibold text-sm text-ink-100 truncate capitalize">
-                                {u.nome || u.email.split('@')[0]}
+                      {CAPACIDADES.map((c) => (
+                        <th
+                          key={c.cap}
+                          className="py-3 px-3 text-center text-[11px] tracking-wider text-ink-400 font-semibold"
+                          title={c.descricao}
+                        >
+                          {c.label}
+                        </th>
+                      ))}
+                      <th className="py-3 px-4" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-bg-700/30">
+                    {users.map((u) => {
+                      const temOverride = u.permissoes && Object.keys(u.permissoes).length > 0
+                      return (
+                        <tr key={u.uid} className="group hover:bg-bg-800/30 transition-colors">
+                          <td className="sticky left-0 z-10 bg-bg-900 group-hover:bg-bg-800 border-r border-bg-700/40 py-3 px-5">
+                            <div className="flex items-center gap-3">
+                              <AvatarFallback iniciais={iniciaisDe(u)} gradient={roleMeta[u.role].gradient} size="sm" />
+                              <div className="min-w-0">
+                                <div className="font-semibold text-sm text-ink-100 truncate capitalize">
+                                  {u.nome || u.email.split('@')[0]}
+                                </div>
+                                <div className="text-[11px] text-ink-500 truncate">{roleMeta[u.role].label}</div>
                               </div>
-                              <div className="text-[11px] text-ink-500 truncate">{roleMeta[u.role].label}</div>
                             </div>
+                          </td>
+                          {CAPACIDADES.map((c) => {
+                            const ligado = temPermissao(u, c.cap)
+                            const ehOverride = u.permissoes?.[c.cap] !== undefined
+                            return (
+                              <td key={c.cap} className="py-3 px-3 text-center">
+                                <Switch
+                                  ligado={ligado}
+                                  personalizado={ehOverride}
+                                  ocupado={salvando === `${u.uid}:${c.cap}` || salvando === `${u.uid}:*`}
+                                  onClick={() => alternar(u, c.cap)}
+                                  rotulo={`${c.label} de ${u.nome || u.email}`}
+                                />
+                              </td>
+                            )
+                          })}
+                          <td className="py-3 px-4 text-right">
+                            {temOverride && (
+                              <button
+                                type="button"
+                                onClick={() => restaurar(u)}
+                                disabled={salvando === `${u.uid}:*`}
+                                title="Restaurar o padrão do papel"
+                                className="inline-flex items-center gap-1 text-[11px] text-ink-500 hover:text-ink-200 transition-colors disabled:opacity-50"
+                              >
+                                <RotateCcw className="w-3 h-3" /> padrão
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile: um card por pessoa, capacidades empilhadas — sem scroll lateral. */}
+              <div className="sm:hidden divide-y divide-bg-700/30">
+                {users.map((u) => {
+                  const temOverride = u.permissoes && Object.keys(u.permissoes).length > 0
+                  return (
+                    <div key={u.uid} className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <AvatarFallback iniciais={iniciaisDe(u)} gradient={roleMeta[u.role].gradient} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-sm text-ink-100 truncate capitalize">
+                            {u.nome || u.email.split('@')[0]}
                           </div>
-                        </td>
+                          <div className="text-[11px] text-ink-500 truncate">{roleMeta[u.role].label}</div>
+                        </div>
+                        {temOverride && (
+                          <button
+                            type="button"
+                            onClick={() => restaurar(u)}
+                            disabled={salvando === `${u.uid}:*`}
+                            title="Restaurar o padrão do papel"
+                            className="shrink-0 inline-flex items-center gap-1 text-[11px] text-ink-500 hover:text-ink-200 transition-colors disabled:opacity-50"
+                          >
+                            <RotateCcw className="w-3 h-3" /> padrão
+                          </button>
+                        )}
+                      </div>
+                      <div className="rounded-lg border border-bg-700/40 divide-y divide-bg-700/30">
                         {CAPACIDADES.map((c) => {
                           const ligado = temPermissao(u, c.cap)
                           const ehOverride = u.permissoes?.[c.cap] !== undefined
                           return (
-                            <td key={c.cap} className="py-3 px-3 text-center">
+                            <div key={c.cap} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                              <span className="text-[13px] text-ink-200">{c.label}</span>
                               <Switch
                                 ligado={ligado}
                                 personalizado={ehOverride}
@@ -157,28 +222,15 @@ export function MatrizPermissoes() {
                                 onClick={() => alternar(u, c.cap)}
                                 rotulo={`${c.label} de ${u.nome || u.email}`}
                               />
-                            </td>
+                            </div>
                           )
                         })}
-                        <td className="py-3 px-4 text-right">
-                          {temOverride && (
-                            <button
-                              type="button"
-                              onClick={() => restaurar(u)}
-                              disabled={salvando === `${u.uid}:*`}
-                              title="Restaurar o padrão do papel"
-                              className="inline-flex items-center gap-1 text-[11px] text-ink-500 hover:text-ink-200 transition-colors disabled:opacity-50"
-                            >
-                              <RotateCcw className="w-3 h-3" /> padrão
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
         </div>
       ) : (

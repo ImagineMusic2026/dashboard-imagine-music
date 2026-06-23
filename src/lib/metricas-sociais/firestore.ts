@@ -65,6 +65,21 @@ export async function salvarSnapshotInstagram(
   dia: string,
 ): Promise<void> {
   const ref = adminDb.doc(`metricas-sociais/${slug}`)
+
+  // Carimba a medição anterior de cada post (pra calcular crescimento depois).
+  const antesSnap = await ref.get()
+  const igAntes = antesSnap.exists ? (antesSnap.data() as MetricasSociaisDoc).instagram ?? null : null
+  if (igAntes?.postsRecentes?.length && snapshot.postsRecentes?.length) {
+    const porId = new Map(igAntes.postsRecentes.map((p) => [p.id, p]))
+    for (const p of snapshot.postsRecentes) {
+      const a = porId.get(p.id)
+      if (!a) continue
+      p.curtidasAntes = a.curtidas
+      p.comentariosAntes = a.comentarios
+      p.medidoAntesEm = igAntes.coletadoEm
+    }
+  }
+
   const doc: MetricasSociaisDoc = {
     slug,
     instagram: snapshot,
@@ -273,6 +288,22 @@ export async function salvarSnapshotYouTube(
   dia: string,
 ): Promise<void> {
   const ref = adminDb.doc(`metricas-sociais/${slug}`)
+
+  // Carimba a medição anterior de cada vídeo (pra calcular crescimento depois).
+  const antesSnap = await ref.get()
+  const ytAntes = antesSnap.exists ? (antesSnap.data() as MetricasSociaisDoc).youtube ?? null : null
+  if (ytAntes?.videosRecentes?.length && snapshot.videosRecentes?.length) {
+    const porId = new Map(ytAntes.videosRecentes.map((v) => [v.id, v]))
+    for (const v of snapshot.videosRecentes) {
+      const a = porId.get(v.id)
+      if (!a) continue
+      v.viewsAntes = a.views
+      v.curtidasAntes = a.curtidas
+      v.comentariosAntes = a.comentarios
+      v.medidoAntesEm = ytAntes.coletadoEm
+    }
+  }
+
   const doc: Partial<MetricasSociaisDoc> = {
     slug,
     youtube: snapshot,

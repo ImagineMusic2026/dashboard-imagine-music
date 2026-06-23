@@ -27,6 +27,10 @@ export interface InstagramPostItem {
   publicadoEm: string | null
   curtidas: number | null
   comentarios: number | null
+  /** Métricas na medição anterior + quando foram medidas — pra calcular crescimento. */
+  curtidasAntes?: number | null
+  comentariosAntes?: number | null
+  medidoAntesEm?: string | null
 }
 
 /** Snapshot do Instagram de um artista num instante. */
@@ -115,6 +119,11 @@ export interface YouTubeVideoItem {
   curtidas: number | null
   comentarios: number | null
   url: string
+  /** Métricas na medição anterior + quando foram medidas — pra calcular crescimento. */
+  viewsAntes?: number | null
+  curtidasAntes?: number | null
+  comentariosAntes?: number | null
+  medidoAntesEm?: string | null
 }
 
 /**

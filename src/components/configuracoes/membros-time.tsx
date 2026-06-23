@@ -178,7 +178,7 @@ function MembroRow({
 }) {
   const meta = roleMeta[u.role] ?? roleMeta.marketing
   return (
-    <div className="flex items-center gap-4 p-4 hover:bg-bg-800/30 transition-colors">
+    <div className="flex items-center gap-3 sm:gap-4 p-4 hover:bg-bg-800/30 transition-colors">
       <AvatarFallback iniciais={iniciaisDe(u)} gradient={meta.gradient} size="md" />
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-sm text-ink-100 truncate capitalize">

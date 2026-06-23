@@ -120,7 +120,7 @@ export function ConvitesPendentes({ modo }: { modo?: 'time' | 'artistas' }) {
             return (
               <div
                 key={c.token}
-                className="flex items-center gap-4 p-4 hover:bg-bg-800/30 transition-colors"
+                className="flex items-center gap-3 sm:gap-4 p-4 hover:bg-bg-800/30 transition-colors"
               >
                 <AvatarFallback
                   iniciais={iniciaisDe(c.nome, c.email)}
@@ -133,7 +133,7 @@ export function ConvitesPendentes({ modo }: { modo?: 'time' | 'artistas' }) {
                   </div>
                   <div className="text-[12px] text-ink-500 num truncate">{c.email}</div>
                 </div>
-                <span className="text-[10px] tracking-wider font-bold px-2 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/25">
+                <span className="hidden sm:inline-block text-[10px] tracking-wider font-bold px-2 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/25">
                   PENDENTE
                 </span>
                 <span

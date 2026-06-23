@@ -11,6 +11,15 @@ export function formatNumber(n: number): string {
   return n.toString()
 }
 
+/**
+ * Inteiro EXATO com separador de milhar pt-BR (ex.: 11.234, 1.040). Para números
+ * que o usuário compara de perto (engajamento de um post), onde o arredondamento
+ * de `formatNumber` (1k, 2k…) parece impreciso. Use `formatNumber` em resumos.
+ */
+export function formatInt(n: number): string {
+  return Math.round(n).toLocaleString('pt-BR')
+}
+
 export function formatCurrency(n: number): string {
   if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `R$ ${(n / 1_000).toFixed(1)}k`

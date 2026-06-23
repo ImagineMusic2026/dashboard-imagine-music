@@ -6,7 +6,7 @@ import { listarArtistas } from '@/lib/artistas/client'
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { KPICard } from '@/components/shared/kpi-card'
-import { cn, formatNumber } from '@/lib/utils'
+import { cn, formatNumber, formatInt } from '@/lib/utils'
 
 type Plataforma = 'youtube' | 'instagram' | 'tiktok'
 
@@ -355,8 +355,8 @@ function crescLabel(i: Item): string | null {
   if (c == null || c <= 0) return null
   const unidade = i.plataforma === 'instagram' ? 'curtidas' : 'views'
   const janela =
-    i.horas != null ? ` · ${i.horas < 1 ? `${Math.round(i.horas * 60)}min` : `${Math.round(i.horas)}h`}` : ''
-  return `+${formatNumber(c)} ${unidade}${janela}`
+    i.horas != null ? ` em ${i.horas < 1 ? `${Math.round(i.horas * 60)}min` : `${Math.round(i.horas)}h`}` : ''
+  return `+${formatInt(c)} ${unidade}${janela}`
 }
 
 /* ─── componentes ─── */
@@ -387,7 +387,7 @@ function CardConteudo({ item: i, destaque }: { item: Item; destaque?: boolean })
         <p className="text-sm text-ink-100 font-medium mt-1 line-clamp-2 min-h-[2.5rem]">{i.titulo}</p>
         <div className="flex items-center gap-3 mt-3 text-[11px] text-ink-400">
           {i.views != null && (
-            <span className="flex items-center gap-1 num"><Eye className="w-3.5 h-3.5 text-ink-500" />{formatNumber(i.views)}</span>
+            <span className="flex items-center gap-1 num"><Eye className="w-3.5 h-3.5 text-ink-500" />{formatInt(i.views)}</span>
           )}
           <span className="flex items-center gap-1 num"><Heart className="w-3.5 h-3.5 text-ink-500" />{fmt(i.curtidas)}</span>
           <span className="flex items-center gap-1 num"><MessageCircle className="w-3.5 h-3.5 text-ink-500" />{fmt(i.comentarios)}</span>
@@ -486,7 +486,7 @@ function ts(iso: string | null): number {
 }
 
 function fmt(n: number | null | undefined): string {
-  return n == null ? '—' : formatNumber(n)
+  return n == null ? '—' : formatInt(n)
 }
 
 function tempoRel(iso: string | null): string {

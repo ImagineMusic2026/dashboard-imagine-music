@@ -50,6 +50,9 @@ export interface InstagramSnapshot {
   janelaDias: number
   /** ISO timestamp da coleta. */
   coletadoEm: string
+  /** Seguidores na coleta anterior + quando — pra detectar crescimento/queda/marco. */
+  seguidoresAntes?: number | null
+  seguidoresAntesEm?: string | null
   /** Posts recentes coletados (camada de conteúdo). */
   postsRecentes?: InstagramPostItem[]
 }
@@ -162,6 +165,9 @@ export interface YouTubeSnapshot {
 
   /** ISO timestamp da coleta. */
   coletadoEm: string
+  /** Inscritos na coleta anterior + quando — pra detectar crescimento/queda/marco. */
+  inscritosAntes?: number | null
+  inscritosAntesEm?: string | null
   /** Métricas que falharam ao coletar (diagnóstico). */
   avisos?: string[]
 }

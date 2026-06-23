@@ -79,6 +79,10 @@ export async function salvarSnapshotInstagram(
       p.medidoAntesEm = igAntes.coletadoEm
     }
   }
+  if (igAntes) {
+    snapshot.seguidoresAntes = igAntes.seguidores
+    snapshot.seguidoresAntesEm = igAntes.coletadoEm
+  }
 
   const doc: MetricasSociaisDoc = {
     slug,
@@ -302,6 +306,10 @@ export async function salvarSnapshotYouTube(
       v.comentariosAntes = a.comentarios
       v.medidoAntesEm = ytAntes.coletadoEm
     }
+  }
+  if (ytAntes) {
+    snapshot.inscritosAntes = ytAntes.inscritos
+    snapshot.inscritosAntesEm = ytAntes.coletadoEm
   }
 
   const doc: Partial<MetricasSociaisDoc> = {

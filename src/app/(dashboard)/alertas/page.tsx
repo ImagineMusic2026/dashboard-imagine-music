@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Bell, Flame, MoonStar, Star } from 'lucide-react'
+import { Bell, Flame, MoonStar, Star, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { corAvatarDe, iniciaisDe, listarArtistas } from '@/lib/artistas/client'
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
@@ -21,6 +21,9 @@ const ICONE: Record<string, LucideIcon> = {
   viralizacao: Flame,
   destaque: Star,
   sem_postar: MoonStar,
+  crescimento_seguidores: TrendingUp,
+  queda_seguidores: TrendingDown,
+  marco_seguidores: Trophy,
 }
 
 const PILLS: { key: 'todos' | SeveridadeAlerta; label: string }[] = [

@@ -143,6 +143,10 @@ export function derivarAlertas(
         out.push(mk(`dest-${c.id}`, slug, nome, 'oportunidade', 'destaque', `"${corta(c.titulo)}" ${x}× acima da média do artista — ${formatNumber(c.metrica)} ${u}`, 'Ver conteúdo', c.url, c.publicadoTs))
       }
     }
+
+    // Seguidores — crescimento / queda / marco (delta vs a coleta anterior).
+    alertaSeguidores(out, slug, nome, 'instagram', doc.instagram?.seguidores ?? null, doc.instagram?.seguidoresAntes ?? null, doc.instagram?.coletadoEm ?? null, doc.instagram?.seguidoresAntesEm ?? null)
+    alertaSeguidores(out, slug, nome, 'youtube', doc.youtube?.inscritos ?? null, doc.youtube?.inscritosAntes ?? null, doc.youtube?.coletadoEm ?? null, doc.youtube?.inscritosAntesEm ?? null)
   }
 
   // crítico > atenção > oportunidade > operacional; depois mais recente.
@@ -173,4 +177,52 @@ function mediana(arr: number[]): number {
   const n = a.length
   if (!n) return 0
   return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2
+}
+
+const MARCOS = [
+  1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000, 5_000_000,
+  10_000_000,
+]
+
+function marcoCruzado(antes: number, atual: number): number | null {
+  for (const m of MARCOS) if (antes < m && atual >= m) return m
+  return null
+}
+
+function alertaSeguidores(
+  out: AlertaDerivado[],
+  slug: string,
+  nome: string,
+  plataforma: 'instagram' | 'youtube',
+  atual: number | null,
+  antes: number | null,
+  agoraEm: string | null,
+  antesEm: string | null,
+): void {
+  if (atual == null || antes == null || antes <= 0) return
+  const rede = plataforma === 'instagram' ? 'Instagram' : 'YouTube'
+  const termo = plataforma === 'instagram' ? 'seguidores' : 'inscritos'
+  const ts = agoraEm ? Date.parse(agoraEm) : Date.now()
+  const delta = atual - antes
+  const pct = delta / antes
+
+  // Marco — cruzou um número redondo desde a última coleta.
+  const marco = marcoCruzado(antes, atual)
+  if (marco) {
+    out.push(mk(`marco-${plataforma}-${slug}`, slug, nome, 'oportunidade', 'marco_seguidores', `Passou de ${formatNumber(marco)} ${termo} no ${rede} — ${formatNumber(atual)} agora!`, 'Ver artista', `/artistas/${slug}`, ts))
+  }
+
+  // Crescimento/queda só com janela mínima (evita ruído de coletas próximas).
+  const horas = antesEm && agoraEm ? (Date.parse(agoraEm) - Date.parse(antesEm)) / 3_600_000 : 0
+  if (horas < 6) return
+
+  if (delta > 0 && pct >= 0.01 && delta >= 100) {
+    out.push(mk(`cresc-${plataforma}-${slug}`, slug, nome, 'oportunidade', 'crescimento_seguidores', `Crescimento acelerado no ${rede}: +${formatNumber(delta)} ${termo} (${(pct * 100).toFixed(1)}%)`, 'Ver artista', `/artistas/${slug}`, ts))
+  } else if (delta < 0) {
+    const queda = -delta
+    if (pct <= -0.02)
+      out.push(mk(`queda-${plataforma}-${slug}`, slug, nome, 'critico', 'queda_seguidores', `Queda de ${termo} no ${rede}: −${formatNumber(queda)} (${(pct * 100).toFixed(1)}%)`, 'Ver artista', `/artistas/${slug}`, ts))
+    else if (pct <= -0.005)
+      out.push(mk(`queda-${plataforma}-${slug}`, slug, nome, 'atencao', 'queda_seguidores', `Perdeu ${formatNumber(queda)} ${termo} no ${rede}`, 'Ver artista', `/artistas/${slug}`, ts))
+  }
 }

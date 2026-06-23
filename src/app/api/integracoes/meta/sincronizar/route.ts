@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { autorizarCronOuAdmin } from '@/lib/server-auth'
 import { getMetaConfig, MetaConfigError, metaConfigurado } from '@/lib/meta/config'
 import { MetaApiException } from '@/lib/meta/client'
-import { buscarMetricas } from '@/lib/meta/insights'
+import { buscarMetricas, buscarMidias } from '@/lib/meta/insights'
 import {
   gravarStatusMeta,
   listarArtistasInstagram,
@@ -51,7 +51,10 @@ async function handle(req: Request) {
 
     const resultados = await emLotes(alvos, 4, async (a) => {
       try {
-        const m = await buscarMetricas(a.igUserId as string, a.handle ?? a.slug)
+        const [m, postsRecentes] = await Promise.all([
+          buscarMetricas(a.igUserId as string, a.handle ?? a.slug),
+          buscarMidias(a.igUserId as string, 12),
+        ])
         const snapshot: InstagramSnapshot = {
           contaId: m.contaId,
           username: m.username,
@@ -65,6 +68,7 @@ async function handle(req: Request) {
           interacoesTotais: m.interacoesTotais,
           janelaDias: m.janelaDias,
           coletadoEm: m.coletadoEm,
+          postsRecentes,
         }
         await salvarSnapshotInstagram(a.slug, snapshot, dia)
         return { slug: a.slug, ok: true as const }

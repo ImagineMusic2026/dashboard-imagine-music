@@ -1,5 +1,6 @@
 import { graphGet } from './client'
 import type { MetricasInstagram } from './types'
+import type { InstagramPostItem } from '@/lib/metricas-sociais/types'
 
 /**
  * Coleta de métricas de uma conta do Instagram Business/Creator. SERVER-ONLY.
@@ -80,6 +81,47 @@ export async function buscarMetricas(
     janelaDias,
     coletadoEm,
     avisos: avisos.length ? avisos : undefined,
+  }
+}
+
+interface MediaItemResp {
+  id?: string
+  caption?: string
+  media_type?: string
+  media_url?: string
+  thumbnail_url?: string
+  permalink?: string
+  timestamp?: string
+  like_count?: number
+  comments_count?: number
+}
+
+/**
+ * Posts recentes da conta (camada de conteúdo) — 1 request com os campos
+ * diretos. Tolerante a falha (retorna [] em erro). Para VIDEO/Reels o
+ * `thumbnail_url` é a miniatura; para imagens, usa o próprio `media_url`.
+ */
+export async function buscarMidias(contaId: string, limite = 12): Promise<InstagramPostItem[]> {
+  try {
+    const resp = await graphGet<{ data?: MediaItemResp[] }>(`/${contaId}/media`, {
+      fields:
+        'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+      limit: limite,
+    })
+    return (resp.data ?? [])
+      .filter((m) => m.id)
+      .map((m) => ({
+        id: m.id as string,
+        legenda: m.caption ?? null,
+        tipo: m.media_type ?? null,
+        thumbUrl: m.thumbnail_url ?? m.media_url ?? null,
+        permalink: m.permalink ?? null,
+        publicadoEm: m.timestamp ?? null,
+        curtidas: numOuNull(m.like_count),
+        comentarios: numOuNull(m.comments_count),
+      }))
+  } catch {
+    return []
   }
 }
 

@@ -1,5 +1,5 @@
 import { dataGet, dataGetAuth } from './client'
-import type { YouTubeSnapshot } from '@/lib/metricas-sociais/types'
+import type { YouTubeSnapshot, YouTubeVideoItem } from '@/lib/metricas-sociais/types'
 
 /**
  * Camada PÚBLICA do YouTube (Data API v3, via API key). SERVER-ONLY.
@@ -36,8 +36,18 @@ interface PlaylistItemsResp {
   items?: { contentDetails?: { videoId?: string } }[]
 }
 
+interface VideoItemResp {
+  id?: string
+  snippet?: {
+    title?: string
+    publishedAt?: string
+    thumbnails?: { default?: { url?: string }; medium?: { url?: string }; high?: { url?: string } }
+  }
+  statistics?: Record<string, string | undefined>
+}
+
 interface VideosResp {
-  items?: { id?: string; statistics?: Record<string, string | undefined> }[]
+  items?: VideoItemResp[]
 }
 
 /* ── Resolução de channelId ── */
@@ -128,6 +138,7 @@ export async function buscarMetricasCanal(channelId: string): Promise<YouTubeSna
   let curtidasRecentes: number | null = null
   let comentariosRecentes: number | null = null
   let videosConsiderados: number | null = null
+  let videosRecentes: YouTubeVideoItem[] = []
   if (uploads) {
     try {
       const pl = await dataGet<PlaylistItemsResp>('/playlistItems', {
@@ -140,7 +151,7 @@ export async function buscarMetricasCanal(channelId: string): Promise<YouTubeSna
         .filter((v): v is string => Boolean(v))
       if (ids.length) {
         const vids = await dataGet<VideosResp>('/videos', {
-          part: 'statistics',
+          part: 'snippet,statistics',
           id: ids.join(','),
         })
         const items = vids.items ?? []
@@ -148,6 +159,19 @@ export async function buscarMetricasCanal(channelId: string): Promise<YouTubeSna
         viewsRecentes = somaStat(items, 'viewCount')
         curtidasRecentes = somaStat(items, 'likeCount')
         comentariosRecentes = somaStat(items, 'commentCount')
+        videosRecentes = items
+          .filter((v) => v.id)
+          .map((v) => ({
+            id: v.id as string,
+            titulo: v.snippet?.title ?? '(sem título)',
+            thumbUrl:
+              v.snippet?.thumbnails?.medium?.url ?? v.snippet?.thumbnails?.default?.url ?? null,
+            publicadoEm: v.snippet?.publishedAt ?? null,
+            views: numStr(v.statistics?.viewCount),
+            curtidas: numStr(v.statistics?.likeCount),
+            comentarios: numStr(v.statistics?.commentCount),
+            url: `https://www.youtube.com/watch?v=${v.id}`,
+          }))
       } else {
         videosConsiderados = 0
       }
@@ -169,6 +193,7 @@ export async function buscarMetricasCanal(channelId: string): Promise<YouTubeSna
     curtidasRecentes,
     comentariosRecentes,
     videosConsiderados,
+    videosRecentes,
     coletadoEm,
     avisos: avisos.length ? avisos : undefined,
   }

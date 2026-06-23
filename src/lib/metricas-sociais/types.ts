@@ -15,6 +15,20 @@
  *   youtube-tokens/{slug}                             -> tokens OAuth do artista (SERVER-ONLY, ver YouTubeTokenDoc)
  */
 
+/** Um post recente do Instagram (camada de conteúdo). */
+export interface InstagramPostItem {
+  id: string
+  legenda: string | null
+  /** IMAGE | VIDEO | CAROUSEL_ALBUM | REELS… */
+  tipo: string | null
+  thumbUrl: string | null
+  permalink: string | null
+  /** ISO timestamp da publicação. */
+  publicadoEm: string | null
+  curtidas: number | null
+  comentarios: number | null
+}
+
 /** Snapshot do Instagram de um artista num instante. */
 export interface InstagramSnapshot {
   /** IG User ID. */
@@ -32,6 +46,8 @@ export interface InstagramSnapshot {
   janelaDias: number
   /** ISO timestamp da coleta. */
   coletadoEm: string
+  /** Posts recentes coletados (camada de conteúdo). */
+  postsRecentes?: InstagramPostItem[]
 }
 
 /** Snapshot do TikTok de um artista num instante (Display API). */
@@ -88,6 +104,19 @@ export interface YouTubeAnalytics {
   coletadoEm: string
 }
 
+/** Um vídeo recente do YouTube (camada de conteúdo). */
+export interface YouTubeVideoItem {
+  id: string
+  titulo: string
+  thumbUrl: string | null
+  /** ISO timestamp da publicação. */
+  publicadoEm: string | null
+  views: number | null
+  curtidas: number | null
+  comentarios: number | null
+  url: string
+}
+
 /**
  * Snapshot do YouTube de um artista. A base (pública) vem da Data API por API
  * key e existe para qualquer canal mapeado; `analytics` (privado) só aparece
@@ -116,6 +145,8 @@ export interface YouTubeSnapshot {
   curtidasRecentes: number | null
   comentariosRecentes: number | null
   videosConsiderados: number | null
+  /** Vídeos recentes coletados (camada de conteúdo). */
+  videosRecentes?: YouTubeVideoItem[]
 
   // Camada privada (Analytics) — presente só para canais conectados.
   analytics?: YouTubeAnalytics | null

@@ -44,11 +44,20 @@ const navDados: NavItem[] = [
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({
+  item,
+  active,
+  onNavegar,
+}: {
+  item: NavItem
+  active: boolean
+  onNavegar?: () => void
+}) {
   const Icon = item.icon
   return (
     <Link
       href={item.href}
+      onClick={onNavegar}
       className={cn(
         'flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors',
         active
@@ -74,7 +83,17 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   )
 }
 
-export function Sidebar({ colapsada }: { colapsada: boolean }) {
+export function Sidebar({
+  colapsada,
+  drawer,
+  onFechar,
+}: {
+  colapsada: boolean
+  /** Drawer aberto (mobile). */
+  drawer: boolean
+  /** Fecha o drawer (mobile) — ex.: ao navegar ou tocar fora. */
+  onFechar: () => void
+}) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, role } = useAuth()
@@ -113,8 +132,12 @@ export function Sidebar({ colapsada }: { colapsada: boolean }) {
   return (
     <aside
       className={cn(
-        'shrink-0 sticky top-0 h-screen overflow-hidden transition-[width] duration-300 ease-in-out',
-        colapsada ? 'w-0' : 'w-60'
+        // Mobile: drawer off-canvas (fixo, fora do fluxo — não rouba largura).
+        'fixed inset-y-0 left-0 z-50 h-screen w-60 overflow-hidden transition-transform duration-300 ease-in-out',
+        drawer ? 'translate-x-0' : '-translate-x-full',
+        // Desktop: no fluxo (sticky), com recolher por largura.
+        'lg:sticky lg:top-0 lg:z-auto lg:shrink-0 lg:translate-x-0 lg:transition-[width]',
+        colapsada ? 'lg:w-0' : 'lg:w-60'
       )}
     >
       <div className="w-60 h-screen bg-bg-900 border-r border-bg-700/50 flex flex-col">
@@ -133,14 +156,16 @@ export function Sidebar({ colapsada }: { colapsada: boolean }) {
           } else if (item.href === '/alertas' && qtdAlertas != null && qtdAlertas > 0) {
             it = { ...item, badge: { text: String(qtdAlertas), tone: 'danger' as const } }
           }
-          return <NavLink key={item.href} item={it} active={isActive(item.href)} />
+          return (
+            <NavLink key={item.href} item={it} active={isActive(item.href)} onNavegar={onFechar} />
+          )
         })}
 
         <div className="text-[10px] tracking-[0.15em] text-ink-500 px-3 mb-2 mt-6 font-semibold">
           DADOS
         </div>
         {navDados.map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(item.href)} />
+          <NavLink key={item.href} item={item} active={isActive(item.href)} onNavegar={onFechar} />
         ))}
       </nav>
 

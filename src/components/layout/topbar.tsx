@@ -63,7 +63,7 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
 
   return (
     <>
-    <header className="h-16 sticky top-0 z-10 bg-bg-900/40 backdrop-blur border-b border-bg-700/40 flex items-center px-8 gap-4">
+    <header className="h-16 sticky top-0 z-10 bg-bg-900/40 backdrop-blur border-b border-bg-700/40 flex items-center px-4 lg:px-8 gap-2 lg:gap-4">
       <button
         type="button"
         onClick={onToggleSidebar}
@@ -72,7 +72,7 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
       >
         <Menu className="w-5 h-5" />
       </button>
-      <div className="flex items-center gap-2 text-sm shrink-0">
+      <div className="hidden sm:flex items-center gap-2 text-sm shrink-0">
         <span className="text-ink-500">Painel</span>
         {trail.map((label, idx) => (
           <span key={idx} className="flex items-center gap-2">
@@ -93,11 +93,11 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
           type="button"
           onClick={() => setBuscaAberta(true)}
           aria-label="Buscar"
-          className="relative w-full max-w-md bg-bg-800 border border-bg-700/40 rounded-lg text-sm pl-9 pr-12 py-2 text-ink-500 hover:border-violet-500/40 hover:text-ink-300 transition-colors text-left"
+          className="relative w-full max-w-md bg-bg-800 border border-bg-700/40 rounded-lg text-sm pl-9 pr-3 sm:pr-12 py-2 text-ink-500 hover:border-violet-500/40 hover:text-ink-300 transition-colors text-left"
         >
           <Search className="w-4 h-4 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          Buscar artista, alerta, conteúdo...
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-ink-500 num bg-bg-700/50 px-1.5 py-0.5 rounded">
+          <span className="block truncate">Buscar artista, alerta, conteúdo...</span>
+          <span className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-ink-500 num bg-bg-700/50 px-1.5 py-0.5 rounded">
             ⌘K
           </span>
         </button>

@@ -220,7 +220,7 @@ export default function ConteudoPage() {
               </button>
             ))}
           </div>
-          <select value={filtroArtista} onChange={(e) => setFiltroArtista(e.target.value)} className="bg-bg-900 border border-bg-700/40 rounded-lg px-3 py-2 text-xs text-ink-200 focus:border-violet-500 focus:outline-none">
+          <select value={filtroArtista} onChange={(e) => setFiltroArtista(e.target.value)} className="w-full sm:w-auto bg-bg-900 border border-bg-700/40 rounded-lg px-3 py-2 text-xs text-ink-200 focus:border-violet-500 focus:outline-none">
             <option value="todos">Todos os artistas</option>
             {artistasComConteudo.map((a) => (
               <option key={a.slug} value={a.slug}>{a.nome}</option>

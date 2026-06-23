@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { cn } from '@/lib/utils'
 
@@ -46,9 +46,15 @@ export function GeneroCombobox({ value, onChange }: { value: string; onChange: (
   const [destaque, setDestaque] = useState(-1)
   const ref = useRef<HTMLDivElement>(null)
 
-  const filtradas = useMemo(() => {
+  // Gêneros que casam com o texto + a opção "Adicionar" quando o texto digitado
+  // não é um gênero conhecido — permite cadastrar um gênero fora da lista.
+  const itens = useMemo<{ tipo: 'genero' | 'novo'; valor: string }[]>(() => {
     const q = norm(value)
-    return q ? GENEROS.filter((g) => norm(g).includes(q)) : GENEROS
+    const gen = q ? GENEROS.filter((g) => norm(g).includes(q)) : GENEROS
+    const lista: { tipo: 'genero' | 'novo'; valor: string }[] = gen.map((g) => ({ tipo: 'genero', valor: g }))
+    const texto = value.trim()
+    if (texto && !GENEROS.some((g) => norm(g) === q)) lista.push({ tipo: 'novo', valor: texto })
+    return lista
   }, [value])
 
   useEffect(() => {
@@ -70,13 +76,13 @@ export function GeneroCombobox({ value, onChange }: { value: string; onChange: (
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       if (!aberto) setAberto(true)
-      setDestaque((d) => Math.min(d + 1, filtradas.length - 1))
+      setDestaque((d) => Math.min(d + 1, itens.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setDestaque((d) => Math.max(d - 1, 0))
-    } else if (e.key === 'Enter' && aberto && destaque >= 0 && filtradas[destaque]) {
+    } else if (e.key === 'Enter' && aberto && destaque >= 0 && itens[destaque]) {
       e.preventDefault()
-      escolher(filtradas[destaque])
+      escolher(itens[destaque].valor)
     } else if (e.key === 'Escape') {
       setAberto(false)
       setDestaque(-1)
@@ -113,31 +119,51 @@ export function GeneroCombobox({ value, onChange }: { value: string; onChange: (
       >
         <ChevronDown className={cn('w-4 h-4 transition-transform', aberto && 'rotate-180')} />
       </button>
-      {aberto && filtradas.length > 0 && (
+      {aberto && itens.length > 0 && (
         <ul
           id="genero-listbox"
           role="listbox"
           className="absolute z-10 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-bg-800 border border-bg-700/60 rounded-lg shadow-xl py-1"
         >
-          {filtradas.map((g, i) => (
-            <li
-              key={g}
-              role="option"
-              aria-selected={value === g}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                escolher(g)
-              }}
-              onMouseEnter={() => setDestaque(i)}
-              className={cn(
-                'px-3 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors',
-                i === destaque ? 'bg-violet-500/15 text-violet-200' : 'text-ink-200'
-              )}
-            >
-              {g}
-              {value === g && <Check className="w-3.5 h-3.5 text-violet-300 shrink-0" />}
-            </li>
-          ))}
+          {itens.map((item, i) =>
+            item.tipo === 'novo' ? (
+              <li
+                key="__novo__"
+                role="option"
+                aria-selected={false}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  escolher(item.valor)
+                }}
+                onMouseEnter={() => setDestaque(i)}
+                className={cn(
+                  'px-3 py-2 text-sm cursor-pointer flex items-center gap-2 border-t border-bg-700/50 transition-colors',
+                  i === destaque ? 'bg-violet-500/15 text-violet-200' : 'text-violet-300'
+                )}
+              >
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                Adicionar “{item.valor}”
+              </li>
+            ) : (
+              <li
+                key={item.valor}
+                role="option"
+                aria-selected={value === item.valor}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  escolher(item.valor)
+                }}
+                onMouseEnter={() => setDestaque(i)}
+                className={cn(
+                  'px-3 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors',
+                  i === destaque ? 'bg-violet-500/15 text-violet-200' : 'text-ink-200'
+                )}
+              >
+                {item.valor}
+                {value === item.valor && <Check className="w-3.5 h-3.5 text-violet-300 shrink-0" />}
+              </li>
+            )
+          )}
         </ul>
       )}
     </div>

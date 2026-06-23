@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/fires
 import { db } from '@/lib/firebase'
 import type {
   HistoricoDiaDoc,
+  HistoricoHealthDiaDoc,
   HistoricoTikTokDiaDoc,
   HistoricoYouTubeDiaDoc,
   IntegracaoMetaDoc,
@@ -82,6 +83,20 @@ export async function getHistoricoYouTube(
   )
   const snap = await getDocs(q)
   const arr = snap.docs.map((d) => d.data() as HistoricoYouTubeDiaDoc)
+  return arr.slice(-limite)
+}
+
+/** Série diária do Health Score (ordenada por dia asc), últimos `limite` dias. */
+export async function getHistoricoHealth(
+  slug: string,
+  limite = 90,
+): Promise<HistoricoHealthDiaDoc[]> {
+  const q = query(
+    collection(db, 'metricas-sociais', slug, 'historico-health'),
+    orderBy('dia', 'asc'),
+  )
+  const snap = await getDocs(q)
+  const arr = snap.docs.map((d) => d.data() as HistoricoHealthDiaDoc)
   return arr.slice(-limite)
 }
 

@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { HeartPulse } from 'lucide-react'
-import { getMetricasSociais } from '@/lib/metricas-sociais/client'
+import { getHistoricoHealth, getMetricasSociais } from '@/lib/metricas-sociais/client'
+import type { HistoricoHealthDiaDoc } from '@/lib/metricas-sociais/types'
 import { derivarHealthScores, type ArtistaSaude, type SaudeBreakdown } from '@/lib/health/score'
+import { MiniAreaChart } from '@/components/artistas/mini-area-chart'
 import { cn, formatNumber, getHealthColor } from '@/lib/utils'
 
 /**
@@ -31,16 +33,21 @@ const PILARES: { key: keyof SaudeBreakdown; label: string; barra: string }[] = [
 
 export function HealthScoreArtistaCard({ slug, nome }: { slug: string; nome: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
+  const [hist, setHist] = useState<HistoricoHealthDiaDoc[]>([])
 
   useEffect(() => {
     let vivo = true
     ;(async () => {
       try {
-        const doc = await getMetricasSociais(slug)
+        const [doc, historico] = await Promise.all([
+          getMetricasSociais(slug),
+          getHistoricoHealth(slug).catch(() => [] as HistoricoHealthDiaDoc[]),
+        ])
         if (!vivo) return
         const saudes = doc
           ? derivarHealthScores(new Map([[slug, doc]]), new Map([[slug, nome]]))
           : []
+        setHist(historico)
         setEstado(saudes.length ? { st: 'ok', s: saudes[0] } : { st: 'vazio' })
       } catch {
         if (vivo) setEstado({ st: 'vazio' })
@@ -139,6 +146,25 @@ export function HealthScoreArtistaCard({ slug, nome }: { slug: string; nome: str
           })}
         </div>
       </div>
+
+      {hist.length >= 2 ? (
+        <div className="border-t border-bg-700/30">
+          <div className="px-5 pt-3 text-[11px] tracking-wider text-ink-500 font-semibold uppercase">
+            Evolução do score · {hist.length} dias
+          </div>
+          <MiniAreaChart
+            data={hist}
+            dataKey="score"
+            cor="#8b5cf6"
+            label="Score"
+            gradId={`health-${slug}`}
+          />
+        </div>
+      ) : (
+        <div className="px-5 py-3 border-t border-bg-700/30 text-[12px] text-ink-500">
+          A evolução do score aparece após alguns dias de coleta diária.
+        </div>
+      )}
     </div>
   )
 }

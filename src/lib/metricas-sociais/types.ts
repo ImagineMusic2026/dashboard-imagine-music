@@ -274,6 +274,24 @@ export interface HistoricoYouTubeDiaDoc {
   coletadoEm: string
 }
 
+/**
+ * Ponto diário do Health Score: `metricas-sociais/{slug}/historico-health/{dia}`.
+ * Carimbado 1×/dia pelo job `/api/health/snapshot` (após os syncs de plataforma),
+ * para a série de tendência do score (sparkline no perfil/lista). Os pilares
+ * podem ser null quando faltam dados (ex.: crescimento sem coleta anterior).
+ */
+export interface HistoricoHealthDiaDoc {
+  /** YYYY-MM-DD. */
+  dia: string
+  score: number
+  audiencia: number | null
+  crescimento: number | null
+  engajamento: number | null
+  conteudo: number | null
+  seguidoresTotal: number
+  coletadoEm: string
+}
+
 /** Documento `integracoes/youtube` — alimenta a página de integrações. */
 export interface IntegracaoYouTubeDoc {
   status: StatusIntegracao

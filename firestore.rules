@@ -122,6 +122,10 @@ service cloud.firestore {
         allow read: if isStaff() || isArtistaDe(slug);
         allow write: if false;
       }
+      match /historico-health/{dia} {
+        allow read: if isStaff() || isArtistaDe(slug);
+        allow write: if false;
+      }
     }
 
     // Tokens OAuth (SEGREDO: access/refresh token) do TikTok e do YouTube.

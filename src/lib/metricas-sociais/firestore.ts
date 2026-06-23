@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase-admin'
 import type {
   HistoricoDiaDoc,
+  HistoricoHealthDiaDoc,
   HistoricoTikTokDiaDoc,
   HistoricoYouTubeDiaDoc,
   InstagramSnapshot,
@@ -333,4 +334,47 @@ export async function salvarSnapshotYouTube(
 /** Atualiza (merge) o status da integração em `integracoes/youtube`. */
 export async function gravarStatusYouTube(status: Partial<IntegracaoYouTubeDoc>): Promise<void> {
   await adminDb.doc('integracoes/youtube').set(status, { merge: true })
+}
+
+/* ───────────────────────────── Health Score ───────────────────────────── */
+
+/**
+ * Carrega o que o job de Health Score precisa numa tacada: o mapa de snapshots
+ * de métricas (slug -> doc) e o nome de cada artista. Tudo via Admin SDK.
+ */
+export async function carregarParaHealth(): Promise<{
+  mapa: Map<string, MetricasSociaisDoc>
+  nomePorSlug: Map<string, string>
+}> {
+  const [metricasSnap, artistasSnap] = await Promise.all([
+    adminDb.collection('metricas-sociais').get(),
+    adminDb.collection('artistas').get(),
+  ])
+  const mapa = new Map<string, MetricasSociaisDoc>()
+  metricasSnap.forEach((d) =>
+    mapa.set(d.id, { slug: d.id, ...(d.data() as object) } as MetricasSociaisDoc),
+  )
+  const nomePorSlug = new Map<string, string>()
+  artistasSnap.forEach((d) => nomePorSlug.set(d.id, (d.data() as { nome?: string }).nome ?? d.id))
+  return { mapa, nomePorSlug }
+}
+
+/**
+ * Grava o ponto diário do Health Score de cada artista em
+ * `metricas-sociais/{slug}/historico-health/{dia}` (lotes de 400 — limite do batch).
+ */
+export async function salvarHistoricoHealthLote(
+  pontos: { slug: string; doc: HistoricoHealthDiaDoc }[],
+): Promise<void> {
+  for (let i = 0; i < pontos.length; i += 400) {
+    const batch = adminDb.batch()
+    for (const p of pontos.slice(i, i + 400)) {
+      batch.set(
+        adminDb.doc(`metricas-sociais/${p.slug}`).collection('historico-health').doc(p.doc.dia),
+        p.doc,
+        { merge: true },
+      )
+    }
+    await batch.commit()
+  }
 }

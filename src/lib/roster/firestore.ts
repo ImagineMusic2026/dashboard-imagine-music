@@ -2,7 +2,7 @@ import admin from 'firebase-admin'
 import { adminDb } from '@/lib/firebase-admin'
 import { slugify } from '../onerpm/aggregate'
 import { extrairInstagram, extrairSpotify, extrairTiktok, extrairYoutube } from './extrair'
-import type { RedeSocial, RosterParseResult } from './types'
+import type { RedeSocial, RosterArtist, RosterParseResult } from './types'
 
 /**
  * Persistência do cadastro de artistas (⚠️ só servidor — Admin SDK).
@@ -35,33 +35,66 @@ export interface CadastroResumo {
   criadoPorEmail: string
 }
 
+/** Mantém o id resolvido quando a planilha traz a MESMA conta sem id. */
+function combinarRedeRoster(atual: RedeSocial | null, nova: RedeSocial): RedeSocial {
+  if (nova.id) return nova // id já veio resolvido da própria URL (ex.: Spotify /artist/<id>)
+  if (atual?.id && mesmaIdentidade(atual, nova)) {
+    return { url: nova.url, id: atual.id, handle: nova.handle } // preserva o id vinculado
+  }
+  return nova // conta nova ou trocada -> id null (o "descobrir" re-resolve)
+}
+
+/**
+ * Mescla as redes da planilha com as já gravadas, preservando os ids resolvidos
+ * (igUserId/channelId/artistId). Redes ausentes na planilha NÃO são tocadas.
+ */
+function mesclarRedesRoster(
+  atuais: Record<string, RedeSocial | null | undefined>,
+  a: RosterArtist,
+): Record<string, RedeSocial> {
+  const out: Record<string, RedeSocial> = {}
+  for (const net of ['spotify', 'youtube', 'instagram', 'tiktok'] as const) {
+    const nova = a[net]
+    if (!nova) continue
+    out[net] = combinarRedeRoster(atuais[net] ?? null, nova)
+  }
+  return out
+}
+
 export async function salvarRoster(
   res: RosterParseResult,
   meta: RosterMeta
 ): Promise<{ cadastroId: string; gravados: number }> {
   const agora = admin.firestore.FieldValue.serverTimestamp()
-  const batch = adminDb.batch()
+  const validos = res.artistas.filter((a) => a.slug)
 
+  // Lê os docs existentes pra PRESERVAR os ids já resolvidos. A planilha só traz
+  // @/URL (id null), então gravar o id da planilha apagaria o vínculo — um
+  // re-import zeraria igUserId/channelId/artistId de todo mundo.
+  const refs = validos.map((a) => adminDb.collection(ARTISTAS).doc(a.slug))
+  const snaps = refs.length ? await adminDb.getAll(...refs) : []
+  const redesExistentes = new Map<string, Record<string, RedeSocial | null | undefined>>()
+  for (const s of snaps) {
+    const redes = (s.exists ? (s.data()?.redes ?? {}) : {}) as Record<
+      string,
+      RedeSocial | null | undefined
+    >
+    redesExistentes.set(s.id, redes)
+  }
+
+  const batch = adminDb.batch()
   let gravados = 0
-  for (const a of res.artistas) {
-    if (!a.slug) continue
+  for (const a of validos) {
     const ref = adminDb.collection(ARTISTAS).doc(a.slug)
-    batch.set(
-      ref,
-      {
-        nome: a.nome,
-        slug: a.slug,
-        fonteCadastro: 'roster',
-        redes: {
-          spotify: a.spotify ?? null,
-          youtube: a.youtube ?? null,
-          instagram: a.instagram ?? null,
-          tiktok: a.tiktok ?? null,
-        },
-        cadastroAtualizadoEm: agora,
-      },
-      { merge: true }
-    )
+    const redes = mesclarRedesRoster(redesExistentes.get(a.slug) ?? {}, a)
+    const data: Record<string, unknown> = {
+      nome: a.nome,
+      slug: a.slug,
+      fonteCadastro: 'roster',
+      cadastroAtualizadoEm: agora,
+    }
+    if (Object.keys(redes).length) data.redes = redes
+    batch.set(ref, data, { merge: true })
     gravados++
   }
 

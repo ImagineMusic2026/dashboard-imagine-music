@@ -94,12 +94,12 @@ export function AgendaView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-ink-100">Agenda</h1>
           <p className="text-sm text-ink-400 mt-1">Releases, shows, contratos e reuniões do portfólio</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-bg-800 rounded-lg p-1">
             {JANELAS.map((j) => (
               <button
@@ -138,8 +138,8 @@ export function AgendaView() {
           <Loader2 className="w-4 h-4 animate-spin" /> Carregando agenda…
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2 bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-bg-700/30 flex items-center justify-between">
               <div>
                 <div className="font-bold text-ink-100">Próximos eventos</div>

@@ -16,6 +16,11 @@ import {
   type ArtistaDoc,
   type ReceitaResumo,
 } from '@/lib/artistas/client'
+import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
+import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
+import { derivarHealthScores } from '@/lib/health/score'
+import { derivarAlertas } from '@/lib/alertas/derivar'
+import { HealthScoreBar } from '@/components/artistas/health-score-bar'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 
 const REDES: { tipo: PlataformaTipo; cor: string; get: (a: ArtistaDoc) => boolean }[] = [
@@ -63,6 +68,7 @@ export function ArtistasLista() {
   const { role, loading } = useAuth()
   const [artistas, setArtistas] = useState<ArtistaDoc[] | null>(null)
   const [receitas, setReceitas] = useState<Map<string, ReceitaResumo>>(new Map())
+  const [metricas, setMetricas] = useState<Map<string, MetricasSociaisDoc>>(new Map())
   const [erro, setErro] = useState(false)
   const [busca, setBusca] = useState('')
   const [pagina, setPagina] = useState(1)
@@ -76,6 +82,11 @@ export function ArtistasLista() {
       setErro(false)
     } catch {
       setErro(true)
+    }
+    try {
+      setMetricas(await listarMetricasSociais())
+    } catch {
+      /* métricas (health/audiência/alertas) são secundárias pro render da lista */
     }
     if (ehAdmin) {
       try {
@@ -96,6 +107,16 @@ export function ArtistasLista() {
     const q = busca.trim().toLowerCase()
     return q ? artistas.filter((a) => a.nome.toLowerCase().includes(q)) : artistas
   }, [artistas, busca])
+
+  // Health Score + alertas por artista — derivados das métricas (mesma lib da home).
+  const { saudePorSlug, alertasPorSlug } = useMemo(() => {
+    const nome = new Map((artistas ?? []).map((a) => [a.slug, a.nome]))
+    const saude = new Map(derivarHealthScores(metricas, nome).map((s) => [s.slug, s]))
+    const alertas = new Map<string, number>()
+    for (const al of derivarAlertas(metricas, nome))
+      alertas.set(al.artistaSlug, (alertas.get(al.artistaSlug) ?? 0) + 1)
+    return { saudePorSlug: saude, alertasPorSlug: alertas }
+  }, [artistas, metricas])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaAtual = Math.min(pagina, totalPaginas)
@@ -194,6 +215,8 @@ export function ArtistasLista() {
               <tbody className="divide-y divide-bg-700/30">
                 {paginados.map((a) => {
                   const r = receitas.get(a.slug)
+                  const saude = saudePorSlug.get(a.slug)
+                  const nAlertas = alertasPorSlug.get(a.slug) ?? 0
                   return (
                     <tr key={a.slug} className="hover:bg-bg-800/40 transition-colors">
                       <td className="px-4 py-3">
@@ -218,13 +241,32 @@ export function ArtistasLista() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <HealthPendente />
+                        {saude ? <HealthScoreBar score={saude.score} size="sm" /> : <HealthPendente />}
                       </td>
                       <td className="px-4 py-3">
-                        <TendenciaPendente />
+                        {saude?.crescimentoSegPct != null &&
+                        Math.abs(saude.crescimentoSegPct) >= 0.0005 ? (
+                          <span
+                            className={cn(
+                              'num text-sm',
+                              saude.crescimentoSegPct > 0 ? 'text-emerald-400' : 'text-red-400',
+                            )}
+                          >
+                            {saude.crescimentoSegPct > 0 ? '↑' : '↓'}{' '}
+                            {(Math.abs(saude.crescimentoSegPct) * 100).toFixed(1)}%
+                          </span>
+                        ) : (
+                          <TendenciaPendente />
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Pendente />
+                        {saude && saude.seguidoresTotal > 0 ? (
+                          <span className="num text-sm text-ink-200">
+                            {formatNumber(saude.seguidoresTotal)}
+                          </span>
+                        ) : (
+                          <Pendente />
+                        )}
                       </td>
 
                       <td className="px-4 py-3">
@@ -260,7 +302,13 @@ export function ArtistasLista() {
                       </ReceitaGate>
 
                       <td className="px-4 py-3 text-center">
-                        <Pendente />
+                        {nAlertas > 0 ? (
+                          <span className="num text-[11px] bg-red-500/15 text-red-400 px-2 py-0.5 rounded font-semibold">
+                            {nAlertas}
+                          </span>
+                        ) : (
+                          <span className="num text-sm text-ink-600">0</span>
+                        )}
                       </td>
 
                       <td className="px-4 py-3 text-right">
@@ -344,9 +392,10 @@ export function ArtistasLista() {
       <div className="flex items-start gap-2 text-[12px] text-ink-500">
         <DollarSign className="w-3.5 h-3.5 shrink-0 mt-0.5 text-ink-600" />
         <span>
-          <b className="text-ink-400">Receita</b> (visível só pro financeiro) vem da OneRPM.{' '}
-          <b className="text-ink-400">Gênero, health, tendência, audiência e alertas</b> aparecem como “—”
-          por enquanto: chegam com as integrações das plataformas (ou cadastro manual, no caso do gênero).
+          <b className="text-ink-400">Health, audiência e alertas</b> são reais, derivados das métricas
+          de Instagram, YouTube e TikTok. <b className="text-ink-400">Tendência</b> aparece conforme os
+          syncs diários acumulam. <b className="text-ink-400">Receita</b> (só pro financeiro) vem da OneRPM
+          e <b className="text-ink-400">gênero</b> é cadastro manual.
         </span>
       </div>
 

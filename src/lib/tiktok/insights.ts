@@ -1,5 +1,5 @@
 import { displayGet, displayPost } from './client'
-import type { TikTokSnapshot } from '@/lib/metricas-sociais/types'
+import type { TikTokSnapshot, TikTokVideoItem } from '@/lib/metricas-sociais/types'
 
 /**
  * Coleta de métricas de uma conta TikTok (Display API). SERVER-ONLY.
@@ -17,7 +17,8 @@ import type { TikTokSnapshot } from '@/lib/metricas-sociais/types'
 
 const CAMPOS_PERFIL =
   'open_id,union_id,avatar_url,display_name,username,is_verified,follower_count,following_count,likes_count,video_count'
-const CAMPOS_VIDEO = 'id,view_count,like_count,comment_count,share_count'
+const CAMPOS_VIDEO =
+  'id,title,video_description,cover_image_url,share_url,create_time,view_count,like_count,comment_count,share_count'
 /** Quantos vídeos recentes entram no agregado de engajamento. */
 const VIDEOS_AGREGADO = 20
 
@@ -38,6 +39,12 @@ interface UserInfoData {
 
 interface VideoRaw {
   id?: string
+  title?: string
+  video_description?: string
+  cover_image_url?: string
+  share_url?: string
+  /** Unix em segundos. */
+  create_time?: number
   view_count?: number
   like_count?: number
   comment_count?: number
@@ -72,6 +79,7 @@ export async function buscarMetricas(
   let comentariosRecentes: number | null = null
   let compartilhamentosRecentes: number | null = null
   let videosConsiderados: number | null = null
+  let videosRecentes: TikTokVideoItem[] = []
   try {
     const data = await displayPost<VideoListData>(
       '/video/list/',
@@ -86,6 +94,19 @@ export async function buscarMetricas(
       curtidasRecentes = soma(vids, 'like_count')
       comentariosRecentes = soma(vids, 'comment_count')
       compartilhamentosRecentes = soma(vids, 'share_count')
+      videosRecentes = vids
+        .filter((v): v is VideoRaw & { id: string } => Boolean(v.id))
+        .map((v) => ({
+          id: v.id,
+          titulo: (v.title || v.video_description || '').trim() || '(sem legenda)',
+          thumbUrl: v.cover_image_url ?? null,
+          publicadoEm: v.create_time ? new Date(v.create_time * 1000).toISOString() : null,
+          url: v.share_url ?? null,
+          views: numOuNull(v.view_count),
+          curtidas: numOuNull(v.like_count),
+          comentarios: numOuNull(v.comment_count),
+          compartilhamentos: numOuNull(v.share_count),
+        }))
     }
   } catch (e) {
     avisos.push(`vídeos: ${mensagem(e)}`)
@@ -106,6 +127,7 @@ export async function buscarMetricas(
     comentariosRecentes,
     compartilhamentosRecentes,
     videosConsiderados,
+    videosRecentes: videosRecentes.length ? videosRecentes : undefined,
     coletadoEm,
     avisos: avisos.length ? avisos : undefined,
   }

@@ -57,6 +57,23 @@ export interface InstagramSnapshot {
   postsRecentes?: InstagramPostItem[]
 }
 
+/** Um vídeo recente do TikTok (camada de conteúdo). */
+export interface TikTokVideoItem {
+  id: string
+  /** Legenda do vídeo (a Display API expõe `title`/`video_description`). */
+  titulo: string
+  /** cover_image_url — URL assinada que EXPIRA; só para exibição (com fallback). */
+  thumbUrl: string | null
+  /** ISO timestamp da publicação (derivado de create_time, que vem em segundos). */
+  publicadoEm: string | null
+  /** share_url público do vídeo. */
+  url: string | null
+  views: number | null
+  curtidas: number | null
+  comentarios: number | null
+  compartilhamentos: number | null
+}
+
 /** Snapshot do TikTok de um artista num instante (Display API). */
 export interface TikTokSnapshot {
   /** open_id do TikTok (estável por app+usuário). */
@@ -85,6 +102,8 @@ export interface TikTokSnapshot {
   compartilhamentosRecentes: number | null
   /** Quantos vídeos entraram no agregado acima. */
   videosConsiderados: number | null
+  /** Vídeos recentes coletados (camada de conteúdo). */
+  videosRecentes?: TikTokVideoItem[]
 
   /** ISO timestamp da coleta. */
   coletadoEm: string

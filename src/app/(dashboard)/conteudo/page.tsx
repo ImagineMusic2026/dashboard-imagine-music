@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Eye, Film, Flame, Heart, Layers, MessageCircle, Sparkles, Users } from 'lucide-react'
+import { Eye, Film, Flame, Heart, Layers, MessageCircle, Sparkles } from 'lucide-react'
 import { listarArtistas } from '@/lib/artistas/client'
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { KPICard } from '@/components/shared/kpi-card'
 import { cn, formatNumber } from '@/lib/utils'
 
-type Plataforma = 'youtube' | 'instagram'
+type Plataforma = 'youtube' | 'instagram' | 'tiktok'
 
 interface Item {
   key: string
@@ -91,6 +91,22 @@ export default function ConteudoPage() {
               }),
             )
           }
+          const agoraTt = doc.tiktok?.coletadoEm ?? null
+          for (const v of doc.tiktok?.videosRecentes ?? []) {
+            out.push(
+              montar(slug, nome, 'tiktok', {
+                titulo: v.titulo,
+                thumbUrl: v.thumbUrl,
+                publicadoEm: v.publicadoEm,
+                url: v.url,
+                views: v.views,
+                curtidas: v.curtidas,
+                comentarios: v.comentarios,
+                agora: agoraTt,
+                id: v.id,
+              }),
+            )
+          }
         }
         setItens(out)
         setArtistas(
@@ -111,6 +127,7 @@ export default function ConteudoPage() {
   const kpis = useMemo(() => {
     const yt = itens.filter((i) => i.plataforma === 'youtube')
     const ig = itens.filter((i) => i.plataforma === 'instagram')
+    const tt = itens.filter((i) => i.plataforma === 'tiktok')
     const soma = (arr: Item[], campo: 'views' | 'curtidas') =>
       arr.reduce((s, i) => s + (i[campo] ?? 0), 0)
     return {
@@ -119,6 +136,8 @@ export default function ConteudoPage() {
       ytViews: soma(yt, 'views'),
       igCount: ig.length,
       igCurtidas: soma(ig, 'curtidas'),
+      ttCount: tt.length,
+      ttViews: soma(tt, 'views'),
       artistas: new Set(itens.map((i) => i.artistaSlug)).size,
     }
   }, [itens])
@@ -174,16 +193,16 @@ export default function ConteudoPage() {
       <div>
         <h1 className="text-3xl font-bold text-ink-100">Conteúdo</h1>
         <p className="text-sm text-ink-400 mt-1">
-          O que está bombando e os destaques dos artistas — vídeos do YouTube e posts do Instagram,
-          com dados reais.
+          O que está bombando e os destaques dos artistas — YouTube, Instagram e TikTok, com dados
+          reais.
         </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Conteúdos" value={formatNumber(kpis.total)} icon={Layers} accentColor="violet" subtitle={<span className="text-ink-500">YouTube + Instagram</span>} />
+        <KPICard label="Conteúdos" value={formatNumber(kpis.total)} icon={Layers} accentColor="violet" subtitle={<span className="text-ink-500">{formatNumber(kpis.artistas)} artistas</span>} />
         <KPICard label="Vídeos (YouTube)" value={formatNumber(kpis.ytCount)} icon={Film} accentColor="amber" subtitle={<span className="text-ink-500">{formatNumber(kpis.ytViews)} views</span>} />
         <KPICard label="Posts (Instagram)" value={formatNumber(kpis.igCount)} icon={Heart} accentColor="emerald" subtitle={<span className="text-ink-500">{formatNumber(kpis.igCurtidas)} curtidas</span>} />
-        <KPICard label="Artistas com conteúdo" value={formatNumber(kpis.artistas)} icon={Users} accentColor="violet" />
+        <KPICard label="Vídeos (TikTok)" value={formatNumber(kpis.ttCount)} icon={Film} accentColor="red" subtitle={<span className="text-ink-500">{formatNumber(kpis.ttViews)} views</span>} />
       </div>
 
       {/* Bombando agora */}
@@ -214,9 +233,9 @@ export default function ConteudoPage() {
         <h2 className="font-bold text-ink-100 mb-3">Todos os conteúdos</h2>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-900 border border-bg-700/40">
-            {(['todas', 'youtube', 'instagram'] as const).map((p) => (
+            {(['todas', 'youtube', 'instagram', 'tiktok'] as const).map((p) => (
               <button key={p} type="button" onClick={() => setFiltroPlat(p)} className={cn('px-3 py-1.5 rounded-md text-xs font-semibold transition-colors', filtroPlat === p ? 'bg-violet-500/20 text-violet-200' : 'text-ink-400 hover:text-ink-100')}>
-                {p === 'todas' ? 'Todas' : p === 'youtube' ? 'YouTube' : 'Instagram'}
+                {p === 'todas' ? 'Todas' : p === 'youtube' ? 'YouTube' : p === 'instagram' ? 'Instagram' : 'TikTok'}
               </button>
             ))}
           </div>
@@ -240,7 +259,7 @@ export default function ConteudoPage() {
           <div className="bg-bg-900 border border-dashed border-bg-700/50 rounded-xl p-8 text-center">
             <p className="text-sm text-ink-300 font-medium">Nenhum conteúdo ainda</p>
             <p className="text-[13px] text-ink-500 mt-1 max-w-md mx-auto">
-              Em <span className="text-violet-300">Integrações</span>, rode a sincronização do YouTube e do Instagram.
+              Em <span className="text-violet-300">Integrações</span>, rode a sincronização do YouTube, Instagram e TikTok.
             </p>
           </div>
         ) : (
@@ -332,9 +351,9 @@ function calcHeat(
 
 /** Badge de crescimento: views (YT) ou curtidas (IG) desde a última medição. */
 function crescLabel(i: Item): string | null {
-  const c = i.plataforma === 'youtube' ? i.crescViews : i.crescCurtidas
+  const c = i.plataforma === 'instagram' ? i.crescCurtidas : i.crescViews
   if (c == null || c <= 0) return null
-  const unidade = i.plataforma === 'youtube' ? 'views' : 'curtidas'
+  const unidade = i.plataforma === 'instagram' ? 'curtidas' : 'views'
   const janela =
     i.horas != null ? ` · ${i.horas < 1 ? `${Math.round(i.horas * 60)}min` : `${Math.round(i.horas)}h`}` : ''
   return `+${formatNumber(c)} ${unidade}${janela}`
@@ -343,7 +362,8 @@ function crescLabel(i: Item): string | null {
 /* ─── componentes ─── */
 
 function CardConteudo({ item: i, destaque }: { item: Item; destaque?: boolean }) {
-  const cor = i.plataforma === 'youtube' ? 'text-red-400' : 'text-fuchsia-400'
+  const cor =
+    i.plataforma === 'youtube' ? 'text-red-400' : i.plataforma === 'tiktok' ? 'text-cyan-400' : 'text-fuchsia-400'
   const cresc = destaque ? crescLabel(i) : null
   const conteudo = (
     <>
@@ -353,7 +373,7 @@ function CardConteudo({ item: i, destaque }: { item: Item; destaque?: boolean })
           <span className={cn('w-3.5 h-3.5 block', cor)}>
             <PlataformaIcon tipo={i.plataforma as PlataformaTipo} />
           </span>
-          {i.plataforma === 'youtube' ? 'YouTube' : 'Instagram'}
+          {i.plataforma === 'youtube' ? 'YouTube' : i.plataforma === 'tiktok' ? 'TikTok' : 'Instagram'}
         </span>
         {cresc && (
           <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/90 text-[10px] font-bold text-bg-950">
@@ -434,7 +454,12 @@ function RankBlock({
 
 function ThumbImg({ src, plataforma }: { src: string | null; plataforma: Plataforma }) {
   const [erro, setErro] = useState(false)
-  const grad = plataforma === 'youtube' ? 'from-red-500/25 to-rose-700/15' : 'from-fuchsia-500/25 to-amber-500/15'
+  const grad =
+    plataforma === 'youtube'
+      ? 'from-red-500/25 to-rose-700/15'
+      : plataforma === 'tiktok'
+        ? 'from-cyan-500/25 to-sky-700/15'
+        : 'from-fuchsia-500/25 to-amber-500/15'
   if (!src || erro) {
     return (
       <div className={cn('absolute inset-0 grid place-items-center bg-gradient-to-br', grad)}>

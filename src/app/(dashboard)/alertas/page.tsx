@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { listarArtistas } from '@/lib/artistas/client'
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import { derivarAlertas, type AlertaDerivado, type SeveridadeAlerta } from '@/lib/alertas/derivar'
+import { filtrarPorPrefs } from '@/lib/alertas/preferencias'
 import { AlertaLinha } from '@/components/alertas/alerta-linha'
 import { cn } from '@/lib/utils'
 
@@ -26,7 +27,7 @@ export default function AlertasPage() {
         const [mapa, arts] = await Promise.all([listarMetricasSociais(), listarArtistas()])
         if (!vivo) return
         const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-        setAlertas(derivarAlertas(mapa, nome))
+        setAlertas(filtrarPorPrefs(derivarAlertas(mapa, nome)))
         setEstado('ok')
       } catch {
         if (vivo) setEstado('erro')

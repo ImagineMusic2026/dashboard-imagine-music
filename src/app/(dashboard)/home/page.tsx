@@ -16,6 +16,7 @@ import { corAvatarDe, iniciaisDe, listarArtistas, type ArtistaDoc } from '@/lib/
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
 import { derivarAlertas } from '@/lib/alertas/derivar'
+import { filtrarPorPrefs } from '@/lib/alertas/preferencias'
 import { derivarHealthScores, resumirSaude, type ArtistaSaude } from '@/lib/health/score'
 import { KPICard } from '@/components/shared/kpi-card'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
@@ -54,7 +55,7 @@ export default function HomePage() {
   const dados = useMemo(() => {
     const nome = new Map(arts.map((a) => [a.slug, a.nome]))
     const genero = new Map(arts.map((a) => [a.slug, a.genero ?? '']))
-    const alertas = derivarAlertas(mapa, nome)
+    const alertas = filtrarPorPrefs(derivarAlertas(mapa, nome))
     const saudes = derivarHealthScores(mapa, nome)
     const resumo = resumirSaude(saudes)
 

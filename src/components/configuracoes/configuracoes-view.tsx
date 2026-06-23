@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
-import { Bell } from 'lucide-react'
+import { useState } from 'react'
 import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
 import { MatrizPermissoes } from '@/components/configuracoes/matriz-permissoes'
+import { NotificacoesPrefs } from '@/components/configuracoes/notificacoes-prefs'
 import { Preferencias } from '@/components/configuracoes/preferencias'
 import { cn } from '@/lib/utils'
 
@@ -60,39 +60,10 @@ export function ConfiguracoesView() {
             </>
           )}
           {aba === 'permissoes' && <MatrizPermissoes />}
-          {aba === 'notificacoes' && (
-            <EmBreve
-              icone={<Bell className="w-5 h-5" />}
-              titulo="Notificações"
-              descricao="Configurar quais eventos notificam a equipe e por qual canal. Entra junto com a feature de Alertas."
-            />
-          )}
+          {aba === 'notificacoes' && <NotificacoesPrefs />}
           {aba === 'preferencias' && <Preferencias />}
         </div>
       </div>
-    </div>
-  )
-}
-
-function EmBreve({
-  icone,
-  titulo,
-  descricao,
-}: {
-  icone: ReactNode
-  titulo: string
-  descricao: string
-}) {
-  return (
-    <div className="bg-bg-900 border border-dashed border-bg-700/50 rounded-xl p-8 text-center">
-      <div className="w-12 h-12 rounded-xl bg-bg-800 grid place-items-center mx-auto mb-3 text-ink-500">
-        {icone}
-      </div>
-      <div className="font-bold text-ink-200">{titulo}</div>
-      <p className="text-[13px] text-ink-400 mt-1 max-w-sm mx-auto">{descricao}</p>
-      <span className="inline-block mt-3 text-[10px] tracking-wider font-bold text-ink-500 bg-bg-800 border border-bg-700/50 rounded-full px-2.5 py-1 uppercase">
-        Em breve
-      </span>
     </div>
   )
 }

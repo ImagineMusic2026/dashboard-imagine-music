@@ -19,7 +19,7 @@ function iniciaisDe(nome: string, email: string): string {
     .toUpperCase()
 }
 
-export function ConvitesPendentes() {
+export function ConvitesPendentes({ modo }: { modo?: 'time' | 'artistas' }) {
   const { role, loading: authLoading } = useAuth()
   const ehAdmin = role === 'admin'
 
@@ -76,14 +76,21 @@ export function ConvitesPendentes() {
     }
   }
 
-  const total = convites?.length ?? 0
+  // Cada aba mostra só os convites do seu domínio (equipe vs portal de artista).
+  const filtrados =
+    convites === null
+      ? null
+      : convites.filter((c) =>
+          modo === 'artistas' ? c.role === 'artista' : modo === 'time' ? c.role !== 'artista' : true,
+        )
+  const total = filtrados?.length ?? 0
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
       <div className="px-5 py-4 border-b border-bg-700/30 flex items-center justify-between">
         <div>
           <div className="font-bold text-ink-100">Convites pendentes</div>
-          {convites !== null && total > 0 && (
+          {filtrados !== null && total > 0 && (
             <div className="text-[12px] text-ink-500">{total} aguardando aceite</div>
           )}
         </div>
@@ -99,7 +106,7 @@ export function ConvitesPendentes() {
         )}
       </div>
 
-      {convites === null ? (
+      {filtrados === null ? (
         <div className="flex items-center justify-center gap-2 text-ink-500 text-sm py-8">
           <RefreshCw className="w-4 h-4 animate-spin" />
           Carregando convites…
@@ -108,7 +115,7 @@ export function ConvitesPendentes() {
         <div className="text-ink-500 text-sm text-center py-8">Nenhum convite pendente</div>
       ) : (
         <div className="divide-y divide-bg-700/30">
-          {convites.map((c) => {
+          {filtrados.map((c) => {
             const meta = roleMeta[c.role] ?? roleMeta.marketing
             return (
               <div

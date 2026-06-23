@@ -19,7 +19,7 @@ function iniciaisDe(u: AppUser): string {
     .toUpperCase()
 }
 
-export function MembrosTime() {
+export function MembrosTime({ modo = 'time' }: { modo?: 'time' | 'artistas' }) {
   const { role, user } = useAuth()
   const [users, setUsers] = useState<AppUser[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -49,40 +49,36 @@ export function MembrosTime() {
 
   const ehAdmin = role === 'admin'
   const carregando = users === null
-  // O time de trabalho é admin + marketing. Artistas têm área própria (são logins
-  // de portal, não fazem parte da equipe).
-  const time = users?.filter((u) => u.role !== 'artista') ?? []
-  const artistas = users?.filter((u) => u.role === 'artista') ?? []
+  // O time de trabalho é admin + marketing; artistas são logins de portal (área
+  // própria, fora da equipe). `modo` escolhe qual recorte esta instância mostra —
+  // assim a aba "Time" e a aba "Artistas" reusam o mesmo componente e fetch.
+  const ehArtistas = modo === 'artistas'
+  const lista = ehArtistas
+    ? (users?.filter((u) => u.role === 'artista') ?? [])
+    : (users?.filter((u) => u.role !== 'artista') ?? [])
 
   return (
     <>
       <SecaoMembros
-        titulo="Membros do time"
-        descricao={`${time.length} ${time.length === 1 ? 'ativo' : 'ativos'} · admin e marketing`}
-        membros={carregando ? null : time}
+        titulo={ehArtistas ? 'Artistas' : 'Membros do time'}
+        descricao={
+          ehArtistas
+            ? `${lista.length} ${lista.length === 1 ? 'artista' : 'artistas'} · acesso só ao próprio portal`
+            : `${lista.length} ${lista.length === 1 ? 'ativo' : 'ativos'} · admin e marketing`
+        }
+        membros={carregando ? null : lista}
         erro={erro}
         ehAdmin={ehAdmin}
         currentUid={user?.uid}
         onRecarregar={recarregar}
-        onConvidar={() => setConvidar('marketing')}
-        rotuloConvidar="Convidar membro"
-        vazio="Nenhum membro no time ainda. Convide o primeiro."
+        onConvidar={() => setConvidar(ehArtistas ? 'artista' : 'marketing')}
+        rotuloConvidar={ehArtistas ? 'Convidar artista' : 'Convidar membro'}
+        vazio={
+          ehArtistas
+            ? 'Nenhum artista com acesso ao portal ainda.'
+            : 'Nenhum membro no time ainda. Convide o primeiro.'
+        }
       />
-
-      {!erro && (
-        <SecaoMembros
-          titulo="Artistas"
-          descricao={`${artistas.length} ${artistas.length === 1 ? 'artista' : 'artistas'} · acesso só ao próprio portal`}
-          membros={carregando ? null : artistas}
-          erro={null}
-          ehAdmin={ehAdmin}
-          currentUid={user?.uid}
-          onRecarregar={recarregar}
-          onConvidar={() => setConvidar('artista')}
-          rotuloConvidar="Convidar artista"
-          vazio="Nenhum artista com acesso ao portal ainda."
-        />
-      )}
 
       {convidar && (
         <ConvidarMembroDialog

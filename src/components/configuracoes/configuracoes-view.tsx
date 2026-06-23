@@ -8,10 +8,11 @@ import { MatrizPermissoes } from '@/components/configuracoes/matriz-permissoes'
 import { Preferencias } from '@/components/configuracoes/preferencias'
 import { cn } from '@/lib/utils'
 
-type Aba = 'time' | 'permissoes' | 'notificacoes' | 'preferencias'
+type Aba = 'time' | 'artistas' | 'permissoes' | 'notificacoes' | 'preferencias'
 
 const ABAS: { key: Aba; label: string }[] = [
   { key: 'time', label: 'Time' },
+  { key: 'artistas', label: 'Artistas' },
   { key: 'permissoes', label: 'Permissões' },
   { key: 'notificacoes', label: 'Notificações' },
   { key: 'preferencias', label: 'Preferências' },
@@ -48,8 +49,14 @@ export function ConfiguracoesView() {
         <div className="col-span-2 space-y-4">
           {aba === 'time' && (
             <>
-              <MembrosTime />
-              <ConvitesPendentes />
+              <MembrosTime modo="time" />
+              <ConvitesPendentes modo="time" />
+            </>
+          )}
+          {aba === 'artistas' && (
+            <>
+              <MembrosTime modo="artistas" />
+              <ConvitesPendentes modo="artistas" />
             </>
           )}
           {aba === 'permissoes' && <MatrizPermissoes />}

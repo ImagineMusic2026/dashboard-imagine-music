@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Activity, ArrowLeft, ExternalLink, Loader2, Pencil, Plug } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Loader2, Pencil, Plug } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
+import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
 import { InstagramArtistaCard } from '@/components/artistas/instagram-artista-card'
 import { TikTokArtistaCard } from '@/components/artistas/tiktok-artista-card'
 import { YouTubeArtistaCard } from '@/components/artistas/youtube-artista-card'
@@ -145,6 +146,9 @@ export function PerfilArtistaReal({
         </div>
       </div>
 
+      {/* Health Score — score real consolidado (mesma lib da home) */}
+      <HealthScoreArtistaCard slug={a.slug} nome={a.nome} />
+
       {/* Instagram — métricas reais via Meta (visíveis a todos os membros) */}
       <InstagramArtistaCard slug={a.slug} />
 
@@ -153,12 +157,6 @@ export function PerfilArtistaReal({
 
       {/* YouTube — base pública (Data API) + Analytics (OAuth) para quem conectar */}
       <YouTubeArtistaCard slug={a.slug} />
-
-      {/* Demais métricas — pendentes de integração (visíveis a todos) */}
-      <div className="grid grid-cols-2 gap-4">
-        <KpiPlaceholder label="Audiência total" nota="Spotify · YouTube · TikTok" />
-        <KpiPlaceholder label="Health score" nota="cálculo via integrações" />
-      </div>
 
       {/* Receita — só admin (lê a coleção `receitas`); o card cuida do estado vazio. */}
       <ReceitaGate>
@@ -203,8 +201,8 @@ export function PerfilArtistaReal({
         <div>
           <div className="font-semibold text-ink-200 text-sm">Demais métricas aguardando integração</div>
           <p className="text-[13px] text-ink-400 mt-0.5 max-w-2xl">
-            Instagram (via Meta), TikTok e YouTube já são coletados (cards acima). Spotify — e o
-            health score consolidado — entra conforme as próximas integrações forem conectadas. O
+            Instagram (via Meta), TikTok e YouTube já são coletados (cards acima) e alimentam o
+            Health Score. Spotify entra conforme as próximas integrações forem conectadas. O
             cadastro de redes acima é a chave pra buscar esses números.
           </p>
         </div>
@@ -217,19 +215,6 @@ export function PerfilArtistaReal({
           onSaved={() => setNonce((n) => n + 1)}
         />
       )}
-    </div>
-  )
-}
-
-function KpiPlaceholder({ label, nota }: { label: string; nota: string }) {
-  return (
-    <div className="rounded-xl p-5 border border-bg-700/40 bg-bg-900/50">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] tracking-wider text-ink-500 font-semibold uppercase">{label}</span>
-        <Activity className="w-5 h-5 text-ink-700" />
-      </div>
-      <div className="num text-2xl font-bold text-ink-600">—</div>
-      <div className="text-[11px] text-ink-600 num mt-1">{nota}</div>
     </div>
   )
 }

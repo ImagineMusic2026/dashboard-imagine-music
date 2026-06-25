@@ -11,6 +11,7 @@ import type {
   IntegracaoTikTokDoc,
   IntegracaoYouTubeDoc,
   MetricasSociaisDoc,
+  StreamingDetalheDoc,
   StreamingSnapshot,
   TikTokSnapshot,
   TikTokTokenDoc,
@@ -414,4 +415,13 @@ export async function salvarStreamingArtista(
 /** Atualiza (merge) o status da integração em `integracoes/onerpm`. */
 export async function gravarStatusOneRpm(status: Partial<IntegracaoOneRpmDoc>): Promise<void> {
   await adminDb.doc('integracoes/onerpm').set(status, { merge: true })
+}
+
+/**
+ * Salva o detalhe granular de streaming (faixas + geo) na subcoleção própria
+ * `metricas-sociais/{slug}/streaming-detalhe/atual` — separado do snapshot pra
+ * não pesar as leituras de lista. Sobrescreve a cada sync.
+ */
+export async function salvarStreamingDetalhe(slug: string, detalhe: StreamingDetalheDoc): Promise<void> {
+  await adminDb.doc(`metricas-sociais/${slug}/streaming-detalhe/atual`).set(detalhe)
 }

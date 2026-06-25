@@ -11,6 +11,7 @@ import type {
   IntegracaoTikTokDoc,
   IntegracaoYouTubeDoc,
   MetricasSociaisDoc,
+  StreamingDetalheDoc,
 } from './types'
 
 /**
@@ -126,4 +127,10 @@ export async function getHistoricoStreaming(
   const snap = await getDocs(q)
   const arr = snap.docs.map((d) => d.data() as HistoricoStreamingDiaDoc)
   return arr.slice(-limite)
+}
+
+/** Detalhe granular de streaming (faixas + geografia com skip) de um artista. */
+export async function getStreamingDetalhe(slug: string): Promise<StreamingDetalheDoc | null> {
+  const s = await getDoc(doc(db, 'metricas-sociais', slug, 'streaming-detalhe', 'atual'))
+  return s.exists() ? (s.data() as StreamingDetalheDoc) : null
 }

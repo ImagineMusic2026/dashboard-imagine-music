@@ -1,10 +1,10 @@
 import SftpClient from 'ssh2-sftp-client'
-import { salvarStreamingArtista } from '@/lib/metricas-sociais/firestore'
+import { salvarStreamingArtista, salvarStreamingDetalhe } from '@/lib/metricas-sociais/firestore'
 import type { HistoricoStreamingDiaDoc } from '@/lib/metricas-sociais/types'
 import { lerLinhasTrends } from './trends-parse'
 import { acumular, finalizar, novoAcumulador } from './trends-aggregate'
 import { resolverSlugArtista } from './trends-aliases'
-import { montarSnapshot } from './trends-snapshot'
+import { montarDetalhe, montarSnapshot } from './trends-snapshot'
 
 /**
  * Sync server-side do streaming (trends) da OneRPM — usado pelo cron diário
@@ -105,6 +105,7 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
     for (let i = 0; i < artistas.length; i += 8) {
       await Promise.all(
         artistas.slice(i, i + 8).map((a) => {
+          const slug = resolverSlugArtista(a.artistaSlug)
           const snapshot = montarSnapshot(a, coletadoEm)
           const historico: HistoricoStreamingDiaDoc[] = a.porDia.map((d) => ({
             dia: d.dia,
@@ -112,7 +113,10 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
             skips: d.skips,
             coletadoEm,
           }))
-          return salvarStreamingArtista(resolverSlugArtista(a.artistaSlug), snapshot, historico)
+          return Promise.all([
+            salvarStreamingArtista(slug, snapshot, historico),
+            salvarStreamingDetalhe(slug, montarDetalhe(a, coletadoEm)),
+          ])
         }),
       )
       gravados += Math.min(8, artistas.length - i)

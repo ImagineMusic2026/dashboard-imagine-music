@@ -273,6 +273,28 @@ export interface HistoricoStreamingDiaDoc {
   coletadoEm: string
 }
 
+/** Uma faixa (ISRC) com seu consumo na janela — base da análise de skip. */
+export interface StreamingFaixaItem {
+  isrc: string
+  streams: number
+  skips: number
+}
+
+/**
+ * Detalhe granular de streaming de um artista (faixas + geografia com skip),
+ * para a área de ANÁLISE. Fica numa subcoleção separada (`metricas-sociais/
+ * {slug}/streaming-detalhe/atual`) pra não pesar as leituras de lista (home /
+ * roster) — que carregam todos os artistas e não precisam desse detalhe.
+ */
+export interface StreamingDetalheDoc {
+  periodo: { de: string; ate: string; dias: number }
+  /** Faixas (ISRC) ordenadas por streams — top N. */
+  porFaixa: StreamingFaixaItem[]
+  /** Países com streams + skips (pra calcular skip rate por país). */
+  porPais: { pais: string; streams: number; skips: number }[]
+  coletadoEm: string
+}
+
 export type StatusIntegracao = 'conectado' | 'nao_configurado' | 'erro'
 
 /** Documento `integracoes/onerpm` — status do sync de streaming (alimenta o card). */

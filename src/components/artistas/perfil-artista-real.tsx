@@ -11,6 +11,7 @@ import { InstagramArtistaCard } from '@/components/artistas/instagram-artista-ca
 import { TikTokArtistaCard } from '@/components/artistas/tiktok-artista-card'
 import { YouTubeArtistaCard } from '@/components/artistas/youtube-artista-card'
 import { StreamingArtistaCard } from '@/components/artistas/streaming-artista-card'
+import { StreamingAnaliticoCard } from '@/components/artistas/streaming-analitico-card'
 import { ConectarPlataforma } from '@/components/artistas/conectar-plataforma'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
@@ -165,6 +166,9 @@ export function PerfilArtistaReal({
 
       {/* Streaming — plays/skips reais via OneRPM (não sensível, visível a todos). */}
       <StreamingArtistaCard slug={a.slug} />
+
+      {/* Análise de streaming (Fase 1): faixas por skip + geografia. */}
+      <StreamingAnaliticoCard slug={a.slug} />
 
       {/* Receita — só admin (lê a coleção `receitas`); o card cuida do estado vazio. */}
       <ReceitaGate>

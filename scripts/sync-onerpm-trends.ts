@@ -21,8 +21,12 @@ import { adminDb } from '../src/lib/firebase-admin'
 import { lerLinhasTrends } from '../src/lib/onerpm/trends-parse'
 import { acumular, finalizar, novoAcumulador } from '../src/lib/onerpm/trends-aggregate'
 import { resolverSlugArtista } from '../src/lib/onerpm/trends-aliases'
-import type { HistoricoStreamingDiaDoc, StreamingSnapshot } from '../src/lib/metricas-sociais/types'
-import { montarSnapshot } from '../src/lib/onerpm/trends-snapshot'
+import type {
+  HistoricoStreamingDiaDoc,
+  StreamingDetalheDoc,
+  StreamingSnapshot,
+} from '../src/lib/metricas-sociais/types'
+import { montarDetalhe, montarSnapshot } from '../src/lib/onerpm/trends-snapshot'
 
 const keyPath = process.env.ONERPM_KEY_PATH || 'C:\\Users\\User\\AppData\\Local\\Temp\\ImagineMusic'
 const passphrase = process.env.ONERPM_PASSPHRASE
@@ -39,9 +43,11 @@ async function gravarArtista(
   slug: string,
   snapshot: StreamingSnapshot,
   historico: HistoricoStreamingDiaDoc[],
+  detalhe: StreamingDetalheDoc,
 ): Promise<void> {
   const ref = adminDb.doc(`metricas-sociais/${slug}`)
   await ref.set({ slug, streaming: snapshot, atualizadoEm: snapshot.coletadoEm }, { merge: true })
+  await ref.collection('streaming-detalhe').doc('atual').set(detalhe)
   for (let i = 0; i < historico.length; i += 400) {
     const batch = adminDb.batch()
     for (const h of historico.slice(i, i + 400)) {
@@ -132,7 +138,8 @@ async function main() {
           const historico: HistoricoStreamingDiaDoc[] = a.porDia
             .slice(-HIST_MAX)
             .map((d) => ({ dia: d.dia, streams: d.streams, skips: d.skips, coletadoEm }))
-          return gravarArtista(resolverSlugArtista(a.artistaSlug), snapshot, historico)
+          const detalhe = montarDetalhe(a, coletadoEm)
+          return gravarArtista(resolverSlugArtista(a.artistaSlug), snapshot, historico, detalhe)
         }),
       )
       gravados += Math.min(8, artistas.length - i)

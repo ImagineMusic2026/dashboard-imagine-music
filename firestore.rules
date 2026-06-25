@@ -145,6 +145,14 @@ service cloud.firestore {
         allow read: if isStaff() || isArtistaDe(slug);
         allow write: if false;
       }
+      match /historico-streaming/{dia} {
+        allow read: if isStaff() || isArtistaDe(slug);
+        allow write: if false;
+      }
+      match /streaming-detalhe/{doc} {
+        allow read: if isStaff() || isArtistaDe(slug);
+        allow write: if false;
+      }
     }
 
     // Tokens OAuth (SEGREDO: access/refresh token) do TikTok e do YouTube.

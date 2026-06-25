@@ -1,5 +1,13 @@
-import type { StreamingPlataformaItem, StreamingSnapshot } from '@/lib/metricas-sociais/types'
+import type {
+  StreamingDetalheDoc,
+  StreamingPlataformaItem,
+  StreamingSnapshot,
+} from '@/lib/metricas-sociais/types'
 import type { TrendsArtistaAgg } from './trends-types'
+
+/** Quantas faixas/países guardar no detalhe granular (bound do doc). */
+const TOP_FAIXAS = 150
+const TOP_PAISES = 25
 
 /**
  * Monta o `StreamingSnapshot` persistido a partir do agregado de um artista.
@@ -52,6 +60,24 @@ export function montarSnapshot(a: TrendsArtistaAgg, coletadoEm: string): Streami
     lojas: a.porLoja.map((l) => l.loja),
     artistaNome: a.artistaNome,
     ultimoDia,
+    coletadoEm,
+  }
+}
+
+/**
+ * Detalhe granular (faixas por ISRC + países com skip) pra área de análise —
+ * gravado numa subcoleção à parte. `porFaixa`/`porPais` já vêm ordenados por
+ * streams do agregador; aqui só limitamos o tamanho e copiamos os skips.
+ */
+export function montarDetalhe(a: TrendsArtistaAgg, coletadoEm: string): StreamingDetalheDoc {
+  return {
+    periodo: a.periodo,
+    porFaixa: a.porFaixa
+      .slice(0, TOP_FAIXAS)
+      .map((f) => ({ isrc: f.isrc, streams: f.streams, skips: f.skips })),
+    porPais: a.porPais
+      .slice(0, TOP_PAISES)
+      .map((p) => ({ pais: p.pais, streams: p.streams, skips: p.skips })),
     coletadoEm,
   }
 }

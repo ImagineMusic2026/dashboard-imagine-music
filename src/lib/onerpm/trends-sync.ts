@@ -71,19 +71,31 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
       .map((e) => e.name)
       .sort()
 
-    const acc = novoAcumulador()
-    let arquivos = 0
+    // Monta a lista de arquivos (últimos `dias` por loja).
+    const caminhos: string[] = []
     for (const loja of lojas) {
       const files = (await sftp.list(`${BASE}/${loja}`))
-        .filter((e) => e.type !== 'd' && e.name.toLowerCase().endsWith('.csv'))
+        // `e.size > 0` pula arquivos vazios (ex.: pandora/uma vêm sem dados) — não
+        // têm streams, então baixá-los só gasta round-trip.
+        .filter((e) => e.type !== 'd' && e.size > 0 && e.name.toLowerCase().endsWith('.csv'))
         .map((e) => e.name)
         .sort()
-      for (const arq of files.slice(-dias)) {
-        const buf = (await sftp.get(`${BASE}/${loja}/${arq}`)) as Buffer
-        acumular(acc, lerLinhasTrends(buf))
-        arquivos++
-      }
+      for (const arq of files.slice(-dias)) caminhos.push(`${BASE}/${loja}/${arq}`)
     }
+
+    // Baixa em PARALELO (lotes) e agrega. Sequencial é lento demais para o limite
+    // do serverless (maxDuration); o SFTP multiplexa vários gets numa conexão só.
+    const acc = novoAcumulador()
+    // Concorrência do download. Acima de ~16 a vazão satura (a conexão é o gargalo).
+    // Se um dia o cron apertar o limite do serverless, baixe `ONERPM_SYNC_DIAS`.
+    const CONCORRENCIA = 16
+    for (let i = 0; i < caminhos.length; i += CONCORRENCIA) {
+      const bufs = await Promise.all(
+        caminhos.slice(i, i + CONCORRENCIA).map((p) => sftp.get(p) as Promise<Buffer>),
+      )
+      for (const buf of bufs) acumular(acc, lerLinhasTrends(buf))
+    }
+    const arquivos = caminhos.length
 
     const agg = finalizar(acc)
     const coletadoEm = new Date().toISOString()

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Globe, ListMusic } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, Globe, ListMusic } from 'lucide-react'
+import { Bandeira } from '@/components/artistas/bandeira'
 import { auth } from '@/lib/firebase'
 import { getStreamingDetalhe } from '@/lib/metricas-sociais/client'
 import type { StreamingDetalheDoc } from '@/lib/metricas-sociais/types'
@@ -25,6 +26,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
   const [ordem, setOrdem] = useState<Ordem>('skip')
   const [todas, setTodas] = useState(false)
+  const [aberto, setAberto] = useState(true)
   const [titulos, setTitulos] = useState<Record<string, { titulo: string; link: string }>>({})
 
   useEffect(() => {
@@ -115,110 +117,146 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-bg-700/30 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-500/15 grid place-items-center">
+      <div
+        className={cn(
+          'px-5 py-4 flex items-center justify-between gap-3 flex-wrap',
+          aberto && 'border-b border-bg-700/30',
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setAberto((v) => !v)}
+          aria-expanded={aberto}
+          title={aberto ? 'Recolher análise' : 'Expandir análise'}
+          className="flex items-center gap-3 min-w-0 text-left -m-1 p-1 rounded-lg hover:bg-bg-800/30 transition-colors"
+        >
+          <div className="w-9 h-9 rounded-lg bg-amber-500/15 grid place-items-center shrink-0">
             <ListMusic className="w-5 h-5 text-amber-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-bold text-ink-100">Análise de faixas</div>
             <div className="text-[12px] text-ink-500">
               {d.porFaixa.length} faixas · janela de {d.periodo.dias} dias
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-0.5 bg-bg-950 border border-bg-700/50 rounded-lg p-0.5">
-          <Aba ativa={ordem === 'skip'} onClick={() => { setOrdem('skip'); setTodas(false) }}>
-            Mais puladas
-          </Aba>
-          <Aba ativa={ordem === 'streams'} onClick={() => { setOrdem('streams'); setTodas(false) }}>
-            Mais tocadas
-          </Aba>
-        </div>
-      </div>
-
-      <div className="px-2 py-1">
-        <div className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 text-[10px] tracking-wider font-semibold uppercase text-ink-500">
-          <span>#</span>
-          <span>Faixa</span>
-          <span className="text-right">Streams</span>
-          <span className="text-right">Skips</span>
-          <span className="text-right">Skip</span>
-        </div>
-        {visiveis.length === 0 ? (
-          <div className="px-3 py-6 text-center text-[13px] text-ink-500">
-            Nenhuma faixa com volume suficiente nesta janela.
-          </div>
-        ) : (
-          visiveis.map((f, i) => {
-            const info = titulos[f.isrc]
-            return (
-              <div
-                key={f.isrc}
-                className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 rounded-lg hover:bg-bg-800/30 items-center text-[13px]"
-              >
-                <span className="text-ink-600 num text-center">{i + 1}</span>
-                {info ? (
-                  <a
-                    href={info.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-violet-400 hover:text-violet-300 hover:underline transition-colors flex items-center gap-1 min-w-0"
-                    title={info.titulo}
-                  >
-                    <span className="truncate">{info.titulo}</span>
-                    <ExternalLink className="w-3 h-3 shrink-0 text-ink-600" />
-                  </a>
-                ) : (
-                  <span className="num text-ink-400 truncate" title={f.isrc}>
-                    {f.isrc}
-                  </span>
-                )}
-                <span className="num text-ink-300 text-right">{formatNumber(f.streams)}</span>
-                <span className="num text-ink-400 text-right">{formatNumber(f.skips)}</span>
-                <span className={cn('num font-semibold text-right', corSkip(f.rate))}>
-                  {(f.rate * 100).toFixed(0)}%
-                </span>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {faixas.length > 12 && (
-        <button
-          type="button"
-          onClick={() => setTodas((v) => !v)}
-          className="w-full px-5 py-2.5 border-t border-bg-700/30 text-[12px] text-violet-400 hover:text-violet-300 transition-colors"
-        >
-          {todas ? 'Ver menos' : `Ver todas (${faixas.length})`}
         </button>
-      )}
+        <div className="flex items-center gap-2">
+          {aberto && (
+            <div className="flex items-center gap-0.5 bg-bg-950 border border-bg-700/50 rounded-lg p-0.5">
+              <Aba ativa={ordem === 'skip'} onClick={() => { setOrdem('skip'); setTodas(false) }}>
+                Mais puladas
+              </Aba>
+              <Aba ativa={ordem === 'streams'} onClick={() => { setOrdem('streams'); setTodas(false) }}>
+                Mais tocadas
+              </Aba>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setAberto((v) => !v)}
+            aria-expanded={aberto}
+            aria-label={aberto ? 'Recolher análise' : 'Expandir análise'}
+            className="grid place-items-center w-7 h-7 rounded-md text-ink-400 hover:text-ink-100 hover:bg-bg-700/40 transition-colors shrink-0"
+          >
+            {aberto ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
 
-      {paises.length > 0 && (
-        <div className="border-t border-bg-700/30 px-5 py-4">
-          <div className="flex items-center gap-1.5 text-[10px] tracking-wider font-semibold uppercase text-ink-500 mb-2.5">
-            <Globe className="w-3.5 h-3.5" /> Por país · streams e skip
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {paises.map((p) => (
-              <div key={p.pais} className="bg-bg-950/50 rounded-lg px-3 py-2 border border-bg-700/40">
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-semibold text-ink-200">{p.pais}</span>
-                  <span className={cn('text-[11px] num font-semibold', corSkip(p.rate))}>
-                    {(p.rate * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="text-[11px] num text-ink-500 mt-0.5">{formatNumber(p.streams)} streams</div>
+      <div
+        className={cn(
+          'grid transition-all duration-300 ease-out',
+          aberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+        )}
+      >
+        <div className="overflow-hidden min-h-0">
+          <div className="px-2 py-1">
+            <div className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 text-[10px] tracking-wider font-semibold uppercase text-ink-500">
+              <span>#</span>
+              <span>Faixa</span>
+              <span className="text-right">Streams</span>
+              <span className="text-right">Skips</span>
+              <span className="text-right">Skip</span>
+            </div>
+            {visiveis.length === 0 ? (
+              <div className="px-3 py-6 text-center text-[13px] text-ink-500">
+                Nenhuma faixa com volume suficiente nesta janela.
               </div>
-            ))}
+            ) : (
+              visiveis.map((f, i) => {
+                const info = titulos[f.isrc]
+                return (
+                  <div
+                    key={f.isrc}
+                    className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 rounded-lg hover:bg-bg-800/30 items-center text-[13px]"
+                  >
+                    <span className="text-ink-600 num text-center">{i + 1}</span>
+                    {info ? (
+                      <a
+                        href={info.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-violet-400 hover:text-violet-300 hover:underline transition-colors flex items-center gap-1 min-w-0"
+                        title={info.titulo}
+                      >
+                        <span className="truncate">{info.titulo}</span>
+                        <ExternalLink className="w-3 h-3 shrink-0 text-ink-600" />
+                      </a>
+                    ) : (
+                      <span className="num text-ink-400 truncate" title={f.isrc}>
+                        {f.isrc}
+                      </span>
+                    )}
+                    <span className="num text-ink-300 text-right">{formatNumber(f.streams)}</span>
+                    <span className="num text-ink-400 text-right">{formatNumber(f.skips)}</span>
+                    <span className={cn('num font-semibold text-right', corSkip(f.rate))}>
+                      {(f.rate * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {faixas.length > 12 && (
+            <button
+              type="button"
+              onClick={() => setTodas((v) => !v)}
+              className="w-full px-5 py-2.5 border-t border-bg-700/30 text-[12px] text-violet-400 hover:text-violet-300 transition-colors"
+            >
+              {todas ? 'Ver menos' : `Ver todas (${faixas.length})`}
+            </button>
+          )}
+
+          {paises.length > 0 && (
+            <div className="border-t border-bg-700/30 px-5 py-4">
+              <div className="flex items-center gap-1.5 text-[10px] tracking-wider font-semibold uppercase text-ink-500 mb-2.5">
+                <Globe className="w-3.5 h-3.5" /> Por país · streams e skip
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {paises.map((p) => (
+                  <div key={p.pais} className="bg-bg-950/50 rounded-lg px-3 py-2 border border-bg-700/40">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <Bandeira pais={p.pais} />
+                        <span className="text-[12px] font-semibold text-ink-200">{p.pais}</span>
+                      </span>
+                      <span className={cn('text-[11px] num font-semibold', corSkip(p.rate))}>
+                        {(p.rate * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="text-[11px] num text-ink-500 mt-0.5">{formatNumber(p.streams)} streams</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-bg-700/30 px-5 py-2.5 text-[11px] text-ink-500">
+            Títulos resolvidos pelo <span className="text-ink-400">Deezer</span> (clique pra abrir a faixa). O
+            que não estiver lá aparece por ISRC; o catálogo da OneRPM substitui depois.
           </div>
         </div>
-      )}
-
-      <div className="border-t border-bg-700/30 px-5 py-2.5 text-[11px] text-ink-500">
-        Títulos resolvidos pelo <span className="text-ink-400">Deezer</span> (clique pra abrir a faixa). O
-        que não estiver lá aparece por ISRC; o catálogo da OneRPM substitui depois.
       </div>
     </div>
   )

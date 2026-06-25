@@ -386,6 +386,7 @@ export interface HistoricoHealthDiaDoc {
   crescimento: number | null
   engajamento: number | null
   conteudo: number | null
+  streaming: number | null
   seguidoresTotal: number
   coletadoEm: string
 }

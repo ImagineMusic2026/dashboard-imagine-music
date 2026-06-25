@@ -14,6 +14,7 @@ const PILARES: { key: keyof SaudeBreakdown; label: string; barra: string }[] = [
   { key: 'crescimento', label: 'Crescimento', barra: 'bg-emerald-500' },
   { key: 'engajamento', label: 'Engajamento', barra: 'bg-fuchsia-500' },
   { key: 'conteudo', label: 'Conteúdo', barra: 'bg-amber-500' },
+  { key: 'streaming', label: 'Streaming', barra: 'bg-cyan-500' },
 ]
 
 export function PortfolioSaude({ resumo }: { resumo: ResumoSaude }) {

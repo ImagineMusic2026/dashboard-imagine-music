@@ -44,6 +44,16 @@ const META: Record<CategoriaAlerta, { label: string; descricao: string; sev: Sev
     descricao: 'Perda relevante de seguidores ou inscritos.',
     sev: 'critico',
   },
+  viralizacao_streaming: {
+    label: 'Streaming disparando',
+    descricao: 'Salto de streams na última semana (OneRPM).',
+    sev: 'oportunidade',
+  },
+  queda_streaming: {
+    label: 'Queda de streaming',
+    descricao: 'Queda relevante de streams na última semana.',
+    sev: 'atencao',
+  },
 }
 
 /** Aba "Notificações" das Configurações. Controla quais tipos de alerta notificam. */

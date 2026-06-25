@@ -9,6 +9,7 @@ import {
   HeartPulse,
   Loader2,
   PlayCircle,
+  TrendingUp,
   Trophy,
   Users,
 } from 'lucide-react'
@@ -23,11 +24,18 @@ import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { AlertaLinha, tempoRelativo } from '@/components/alertas/alerta-linha'
 import { PortfolioSaude } from '@/components/home/portfolio-saude'
 import { Saudacao } from '@/components/home/saudacao'
-import { cn, getHealthColor } from '@/lib/utils'
-
-const DIA = 86_400_000
+import { cn, formatNumber, getHealthColor } from '@/lib/utils'
 
 type Estado = 'load' | 'erro' | 'ok'
+
+/** Linha de "Em alta no streaming" / "Maiores movimentações". */
+interface StreamingResumo {
+  slug: string
+  nome: string
+  streams28d: number
+  /** Momentum: última semana vs média das 3 semanas anteriores (null sem base). */
+  crescPct: number | null
+}
 
 export default function HomePage() {
   const [estado, setEstado] = useState<Estado>('load')
@@ -54,7 +62,6 @@ export default function HomePage() {
 
   const dados = useMemo(() => {
     const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-    const genero = new Map(arts.map((a) => [a.slug, a.genero ?? '']))
     const alertas = filtrarPorPrefs(derivarAlertas(mapa, nome))
     const saudes = derivarHealthScores(mapa, nome)
     const resumo = resumirSaude(saudes)
@@ -67,15 +74,44 @@ export default function HomePage() {
       .filter((s) => s.score < 50 || (s.crescimentoSegPct != null && s.crescimentoSegPct < 0))
       .sort((a, b) => a.score - b.score)
 
+    // Streaming do portfólio (OneRPM): total da janela + momentum por artista.
+    let streams28dTotal = 0
+    let streams7dTotal = 0
+    const streamingArtistas: StreamingResumo[] = []
+    for (const [slug, doc] of Array.from(mapa)) {
+      const st = doc.streaming
+      if (!st) continue
+      const s28 = st.streams28d ?? 0
+      const s7 = st.streams7d ?? 0
+      streams28dTotal += s28
+      streams7dTotal += s7
+      const priorSemana = (s28 - s7) / 3 // média semanal das 3 semanas anteriores
+      const crescPct = priorSemana > 0 ? (s7 - priorSemana) / priorSemana : null
+      if (s28 > 0) streamingArtistas.push({ slug, nome: nome.get(slug) ?? slug, streams28d: s28, crescPct })
+    }
+    const priorPort = (streams28dTotal - streams7dTotal) / 3
+    const streamingTrendPct = priorPort > 0 ? (streams7dTotal - priorPort) / priorPort : null
+    const topStreaming = [...streamingArtistas].sort((a, b) => b.streams28d - a.streams28d).slice(0, 5)
+    const streams28dPorSlug = new Map(streamingArtistas.map((p) => [p.slug, p.streams28d]))
+    // Maiores movimentações: quem mais acelerou/caiu (filtra ruído de volume baixo).
+    const movers = streamingArtistas
+      .filter((p) => p.streams28d >= 5000 && p.crescPct != null && Math.abs(p.crescPct) >= 0.01)
+      .sort((a, b) => Math.abs(b.crescPct ?? 0) - Math.abs(a.crescPct ?? 0))
+      .slice(0, 6)
+
     return {
       alertas,
       counts,
       topSaude: saudes.slice(0, 5),
       risco,
       resumo,
-      genero,
       comMetricas: arts.filter((a) => mapa.has(a.slug)).length,
-      conteudos30d: contarConteudos(mapa),
+      streams28dTotal,
+      streamingTrendPct,
+      topStreaming,
+      streamsMax: topStreaming[0]?.streams28d ?? 0,
+      movers,
+      streams28dPorSlug,
       atualizadoEm: ultimaColeta(mapa),
     }
   }, [arts, mapa])
@@ -100,8 +136,21 @@ export default function HomePage() {
     )
   }
 
-  const { alertas, counts, topSaude, risco, resumo, genero, comMetricas, conteudos30d, atualizadoEm } =
-    dados
+  const {
+    alertas,
+    counts,
+    topSaude,
+    risco,
+    resumo,
+    comMetricas,
+    streams28dTotal,
+    streamingTrendPct,
+    topStreaming,
+    streamsMax,
+    movers,
+    streams28dPorSlug,
+    atualizadoEm,
+  } = dados
   const nCriticos = counts.critico + counts.atencao
 
   return (
@@ -182,12 +231,84 @@ export default function HomePage() {
           accentColor="red"
         />
         <KPICard
-          label="Conteúdos · 30 dias"
-          value={String(conteudos30d)}
-          subtitle={<span className="text-ink-500">YouTube + Instagram</span>}
+          label="Streams · 28 dias"
+          value={streams28dTotal > 0 ? formatNumber(streams28dTotal) : '—'}
+          subtitle={
+            <span>
+              {streamingTrendPct != null && Math.abs(streamingTrendPct) >= 0.005 && (
+                <>
+                  <span
+                    className={cn(
+                      'num font-medium',
+                      streamingTrendPct > 0 ? 'text-emerald-400' : 'text-red-400',
+                    )}
+                  >
+                    {streamingTrendPct > 0 ? '↑' : '↓'} {(Math.abs(streamingTrendPct) * 100).toFixed(0)}%
+                  </span>
+                  <span className="text-ink-500"> · </span>
+                </>
+              )}
+              <span className="text-ink-500">via OneRPM</span>
+            </span>
+          }
           icon={PlayCircle}
           accentColor="amber"
         />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Em alta no streaming */}
+        <div className="lg:col-span-2 bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-bg-700/30 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-500/15 grid place-items-center">
+                <PlayCircle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <div className="font-bold text-ink-100">Em alta no streaming</div>
+                <div className="text-[12px] text-ink-500">Mais tocados nos últimos 28 dias · via OneRPM</div>
+              </div>
+            </div>
+            <Link
+              href="/artistas"
+              className="text-violet-400 hover:text-violet-300 text-sm font-semibold transition-colors"
+            >
+              Ver todos →
+            </Link>
+          </div>
+          {topStreaming.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm text-ink-300 font-medium">Sem dados de streaming ainda</p>
+              <p className="text-[13px] text-ink-500 mt-1 max-w-sm mx-auto">
+                Conforme o sync da OneRPM roda, os artistas mais tocados aparecem aqui.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-bg-700/30">
+              {topStreaming.map((s, idx) => (
+                <StreamingItem key={s.slug} s={s} idx={idx} max={streamsMax} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Maiores movimentações */}
+        <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-bg-700/30">
+            <div className="font-bold text-ink-100 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-violet-400" />
+              Maiores movimentações
+            </div>
+            <div className="text-[12px] text-ink-500 mt-0.5">Quem mais acelerou ou caiu (28d)</div>
+          </div>
+          <div className="px-5 py-3 space-y-2.5 flex-1">
+            {movers.length === 0 ? (
+              <p className="text-[13px] text-ink-500 py-4">Sem variação relevante ainda.</p>
+            ) : (
+              movers.map((m) => <MoverItem key={m.slug} m={m} />)
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -243,7 +364,7 @@ export default function HomePage() {
               <p className="text-[13px] text-ink-500 py-4">Sem scores ainda.</p>
             ) : (
               topSaude.map((s, idx) => (
-                <RankItem key={s.slug} s={s} idx={idx} genero={genero.get(s.slug) ?? ''} />
+                <RankItem key={s.slug} s={s} idx={idx} streams={streams28dPorSlug.get(s.slug) ?? 0} />
               ))
             )}
           </div>
@@ -301,7 +422,48 @@ export default function HomePage() {
 
 /* ── linhas dos rankings ─────────────────────────────────────────────────── */
 
-function RankItem({ s, idx, genero }: { s: ArtistaSaude; idx: number; genero: string }) {
+function StreamingItem({ s, idx, max }: { s: StreamingResumo; idx: number; max: number }) {
+  const pct = max > 0 ? Math.max(3, Math.round((s.streams28d / max) * 100)) : 0
+  return (
+    <Link
+      href={`/artistas/${s.slug}`}
+      className="flex items-center gap-3 px-5 py-3 hover:bg-bg-800/30 transition-colors group"
+    >
+      <span className="w-4 text-ink-500 text-sm num text-center shrink-0">{idx + 1}</span>
+      <AvatarFallback iniciais={iniciaisDe(s.nome)} gradient={corAvatarDe(s.slug)} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-sm text-ink-100 truncate group-hover:text-violet-300 transition-colors">
+          {s.nome}
+        </div>
+        <div className="h-1.5 rounded-full bg-bg-800 overflow-hidden mt-1.5 max-w-[200px]">
+          <div className="h-full rounded-full bg-amber-500/70" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="num font-bold text-sm text-ink-100">{formatNumber(s.streams28d)}</div>
+        <CrescimentoChip pct={s.crescPct} />
+      </div>
+    </Link>
+  )
+}
+
+function MoverItem({ m }: { m: StreamingResumo }) {
+  const up = (m.crescPct ?? 0) > 0
+  return (
+    <Link href={`/artistas/${m.slug}`} className="flex items-center justify-between gap-2 group">
+      <span className="text-sm text-ink-200 truncate group-hover:text-violet-300 transition-colors">
+        {m.nome}
+      </span>
+      <span
+        className={cn('text-[13px] num font-semibold shrink-0', up ? 'text-emerald-400' : 'text-red-400')}
+      >
+        {up ? '↑' : '↓'} {(Math.abs(m.crescPct ?? 0) * 100).toFixed(0)}%
+      </span>
+    </Link>
+  )
+}
+
+function RankItem({ s, idx, streams }: { s: ArtistaSaude; idx: number; streams: number }) {
   return (
     <Link href={`/artistas/${s.slug}`} className="flex items-center gap-3 group">
       <span className="w-4 text-ink-500 text-sm num text-center shrink-0">{idx + 1}</span>
@@ -310,7 +472,9 @@ function RankItem({ s, idx, genero }: { s: ArtistaSaude; idx: number; genero: st
         <div className="font-semibold text-sm text-ink-100 truncate group-hover:text-violet-300 transition-colors">
           {s.nome}
         </div>
-        <div className="text-[11px] text-ink-500 truncate">{genero || 'Sem gênero'}</div>
+        <div className="text-[11px] text-ink-500 truncate num">
+          {streams > 0 ? `${formatNumber(streams)} streams · 28d` : 'sem streaming'}
+        </div>
       </div>
       <div className="text-right shrink-0">
         <div className={cn('font-bold text-base num', getHealthColor(s.score))}>{s.score}</div>
@@ -346,19 +510,6 @@ function CrescimentoChip({ pct }: { pct: number | null }) {
 }
 
 /* ── derivados simples do mapa de métricas ───────────────────────────────── */
-
-/** Conteúdos (posts IG + vídeos YT) publicados nos últimos 30 dias. */
-function contarConteudos(mapa: Map<string, MetricasSociaisDoc>): number {
-  const agora = Date.now()
-  let n = 0
-  for (const doc of Array.from(mapa.values())) {
-    for (const p of doc.instagram?.postsRecentes ?? [])
-      if (p.publicadoEm && agora - Date.parse(p.publicadoEm) <= 30 * DIA) n += 1
-    for (const v of doc.youtube?.videosRecentes ?? [])
-      if (v.publicadoEm && agora - Date.parse(v.publicadoEm) <= 30 * DIA) n += 1
-  }
-  return n
-}
 
 /** Timestamp (ms) da coleta mais recente em todo o portfólio. */
 function ultimaColeta(mapa: Map<string, MetricasSociaisDoc>): number {

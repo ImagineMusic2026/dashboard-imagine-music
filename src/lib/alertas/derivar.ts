@@ -1,4 +1,4 @@
-import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
+import type { MetricasSociaisDoc, StreamingSnapshot } from '@/lib/metricas-sociais/types'
 import { formatNumber } from '@/lib/utils'
 
 /**
@@ -7,9 +7,9 @@ import { formatNumber } from '@/lib/utils'
  *  - viralizacao: conteúdo com alta velocidade (crescimento/dia) — precisa de 2+
  *    sincronizações pra ter base de comparação;
  *  - destaque: conteúdo muito acima da mediana do próprio artista;
- *  - sem_postar: o conteúdo mais recente do artista está velho.
- * Crescimento/queda de seguidores e marcos virão depois (precisam da série de
- * histórico por artista).
+ *  - sem_postar: o conteúdo mais recente do artista está velho;
+ *  - crescimento/queda/marco de seguidores (delta vs a coleta anterior);
+ *  - viralizacao/queda de streaming: momentum de streams da OneRPM (semana vs média).
  */
 
 export type SeveridadeAlerta = 'critico' | 'atencao' | 'oportunidade' | 'operacional'
@@ -101,6 +101,10 @@ export function derivarAlertas(
 
   for (const [slug, doc] of Array.from(mapa)) {
     const nome = nomePorSlug.get(slug) ?? slug
+
+    // Streaming (OneRPM) — momentum de streams; vale mesmo sem conteúdo social.
+    if (doc.streaming) alertaStreaming(out, slug, nome, doc.streaming)
+
     const conteudos = normalizar(doc)
     if (!conteudos.length) continue
     const flag = new Set<string>()
@@ -224,5 +228,26 @@ function alertaSeguidores(
       out.push(mk(`queda-${plataforma}-${slug}`, slug, nome, 'critico', 'queda_seguidores', `Queda de ${termo} no ${rede}: −${formatNumber(queda)} (${(pct * 100).toFixed(1)}%)`, 'Ver artista', `/artistas/${slug}`, ts))
     else if (pct <= -0.005)
       out.push(mk(`queda-${plataforma}-${slug}`, slug, nome, 'atencao', 'queda_seguidores', `Perdeu ${formatNumber(queda)} ${termo} no ${rede}`, 'Ver artista', `/artistas/${slug}`, ts))
+  }
+}
+
+/**
+ * Alertas de STREAMING (OneRPM): compara os streams da última semana (`streams7d`)
+ * com a média semanal das 3 semanas anteriores. Pico forte vira oportunidade;
+ * queda forte vira atenção/crítico. Piso de volume evita ruído de artista pequeno.
+ */
+function alertaStreaming(out: AlertaDerivado[], slug: string, nome: string, st: StreamingSnapshot): void {
+  const s28 = st.streams28d ?? 0
+  const s7 = st.streams7d ?? 0
+  const priorSemana = (s28 - s7) / 3 // média semanal das 3 semanas anteriores
+  if (priorSemana < 1000) return // volume baixo demais pra ser sinal confiável
+  const pct = (s7 - priorSemana) / priorSemana
+  const ts = st.coletadoEm ? Date.parse(st.coletadoEm) : Date.now()
+
+  if (pct >= 0.5) {
+    out.push(mk(`str-vir-${slug}`, slug, nome, 'oportunidade', 'viralizacao_streaming', `Streaming disparando: ${formatNumber(s7)} streams na semana (+${(pct * 100).toFixed(0)}% vs média recente)`, 'Ver artista', `/artistas/${slug}`, ts))
+  } else if (pct <= -0.4) {
+    const sev: SeveridadeAlerta = pct <= -0.6 ? 'critico' : 'atencao'
+    out.push(mk(`str-queda-${slug}`, slug, nome, sev, 'queda_streaming', `Streaming em queda: ${(pct * 100).toFixed(0)}% na semana (${formatNumber(s7)} streams)`, 'Ver artista', `/artistas/${slug}`, ts))
   }
 }

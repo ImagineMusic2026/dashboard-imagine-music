@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell, Flame, MoonStar, Star, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
+import { Bell, Flame, MoonStar, PlayCircle, Star, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { corAvatarDe, iniciaisDe } from '@/lib/artistas/client'
@@ -23,6 +23,8 @@ export const ICONE_ALERTA: Record<string, LucideIcon> = {
   crescimento_seguidores: TrendingUp,
   queda_seguidores: TrendingDown,
   marco_seguidores: Trophy,
+  viralizacao_streaming: PlayCircle,
+  queda_streaming: TrendingDown,
 }
 
 /** "há 2h", "há 14min", "agora" — recência relativa a partir de um ms. */

@@ -44,6 +44,7 @@ async function handle(req: Request) {
         crescimento: s.breakdown.crescimento,
         engajamento: s.breakdown.engajamento,
         conteudo: s.breakdown.conteudo,
+        streaming: s.breakdown.streaming,
         seguidoresTotal: s.seguidoresTotal,
         coletadoEm,
       },

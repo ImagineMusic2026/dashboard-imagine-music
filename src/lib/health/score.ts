@@ -6,14 +6,15 @@ import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
  * a `derivarAlertas`): entra o mapa slug -> snapshot, sai um score 0-100 por
  * artista, com a composição (breakdown) e os sinais que o explicam.
  *
- * Quatro pilares, cada um 0-100, combinados por média ponderada SÓ sobre os
+ * Cinco pilares, cada um 0-100, combinados por média ponderada SÓ sobre os
  * pilares com dado (renormaliza o peso quando algum falta — artista com só uma
- * rede não é penalizado por não ter as outras):
+ * fonte não é penalizado por não ter as outras):
  *
- *   audiência   (25%)  tamanho da base — log dos seguidores somados (IG+YT+TikTok)
- *   crescimento (25%)  momentum — variação de seguidores desde a coleta anterior
- *   engajamento (30%)  curtidas+comentários/seguidores (IG) e views/inscritos (YT)
- *   conteúdo    (20%)  cadência — recência do último post + volume nos últimos 30d
+ *   audiência   (20%)  tamanho da base — log dos seguidores somados (IG+YT+TikTok)
+ *   crescimento (15%)  momentum — variação de seguidores desde a coleta anterior
+ *   engajamento (25%)  curtidas+comentários/seguidores (IG) e views/inscritos (YT)
+ *   conteúdo    (15%)  cadência — recência do último post + volume nos últimos 30d
+ *   streaming   (25%)  consumo real — volume (28d, log) + momentum (OneRPM)
  *
  * Honestidade: quem não tem NENHUM sinal (sem snapshot ou tudo nulo) fica de
  * fora — não recebe score falso. Crescimento só conta quando há medição anterior
@@ -32,6 +33,8 @@ export interface SaudeBreakdown {
   crescimento: number | null
   engajamento: number | null
   conteudo: number | null
+  /** Streaming (OneRPM): volume da janela + momentum recente. */
+  streaming: number | null
 }
 
 export type FaixaSaude = 'excelente' | 'saudavel' | 'atencao' | 'critico'
@@ -54,10 +57,11 @@ export interface ArtistaSaude {
 const DIA = 86_400_000
 
 const PESOS: Record<keyof SaudeBreakdown, number> = {
-  audiencia: 0.25,
-  crescimento: 0.25,
-  engajamento: 0.3,
-  conteudo: 0.2,
+  audiencia: 0.2,
+  crescimento: 0.15,
+  engajamento: 0.25,
+  conteudo: 0.15,
+  streaming: 0.25, // streaming (consumo real) entra com o maior peso, junto do engajamento
 }
 
 const clamp = (n: number, lo = 0, hi = 100): number => Math.max(lo, Math.min(hi, n))
@@ -108,6 +112,19 @@ function pontosConteudo(diasUltimo: number | null, posts30d: number): number | n
   return Math.round(0.6 * recencia + 0.4 * volume)
 }
 
+/**
+ * Streaming (OneRPM): volume da janela (28d, escala log) + momentum recente
+ * (última semana vs média das 3 anteriores). 70% volume / 30% momentum, pra o
+ * score refletir o tamanho do consumo sem ficar volátil com um pico isolado.
+ */
+function pontosStreaming(streams28d: number, streams7d: number): number | null {
+  if (streams28d <= 0) return null
+  const volume = logBanda(streams28d, 500, 800_000) // 500 → 0, ~20k → 50, 800k+ → 100
+  const prior = (streams28d - streams7d) / 3 // média semanal das 3 semanas anteriores
+  const momentum = prior > 0 ? clamp(50 + ((streams7d - prior) / prior / 0.5) * 50) : 50
+  return Math.round(0.7 * volume + 0.3 * momentum)
+}
+
 /** Média ponderada só sobre os pilares presentes (renormaliza os pesos). */
 function compor(b: SaudeBreakdown): number {
   let soma = 0
@@ -135,6 +152,7 @@ function motivoDominante(b: SaudeBreakdown): string | null {
     ['Engajamento baixo', b.engajamento],
     ['Postando pouco', b.conteudo],
     ['Audiência pequena', b.audiencia],
+    ['Streaming baixo', b.streaming],
   ]
   let pior: string | null = null
   let min = Infinity
@@ -215,15 +233,22 @@ export function derivarHealthScores(
       posts30d = datas.filter((t) => agora - t <= 30 * DIA).length
     }
 
+    const st = doc.streaming
     const breakdown: SaudeBreakdown = {
       audiencia: pontosAudiencia(seguidoresTotal),
       crescimento: pontosCrescimento(crescimentoSegPct),
       engajamento: pontosEngajamento(igRate, ytRate),
       conteudo: pontosConteudo(diasUltimo, posts30d),
+      streaming: st ? pontosStreaming(st.streams28d ?? 0, st.streams7d ?? 0) : null,
     }
 
-    // Sem nenhum dos pilares "de base" não há score honesto a dar.
-    if (breakdown.audiencia == null && breakdown.engajamento == null && breakdown.conteudo == null) {
+    // Sem nenhum dos pilares "de base" (social OU streaming) não há score honesto.
+    if (
+      breakdown.audiencia == null &&
+      breakdown.engajamento == null &&
+      breakdown.conteudo == null &&
+      breakdown.streaming == null
+    ) {
       continue
     }
 
@@ -268,6 +293,7 @@ export function resumirSaude(saudes: ArtistaSaude[]): ResumoSaude {
     crescimento: { soma: 0, n: 0 },
     engajamento: { soma: 0, n: 0 },
     conteudo: { soma: 0, n: 0 },
+    streaming: { soma: 0, n: 0 },
   }
   let somaScore = 0
   for (const s of saudes) {
@@ -291,6 +317,7 @@ export function resumirSaude(saudes: ArtistaSaude[]): ResumoSaude {
       crescimento: mediaDe('crescimento'),
       engajamento: mediaDe('engajamento'),
       conteudo: mediaDe('conteudo'),
+      streaming: mediaDe('streaming'),
     },
   }
 }

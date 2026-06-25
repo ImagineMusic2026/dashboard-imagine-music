@@ -16,6 +16,8 @@ export const CATEGORIAS_ALERTA = [
   'marco_seguidores',
   'sem_postar',
   'queda_seguidores',
+  'viralizacao_streaming',
+  'queda_streaming',
 ] as const
 
 export type CategoriaAlerta = (typeof CATEGORIAS_ALERTA)[number]

@@ -10,6 +10,7 @@ import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
 import { InstagramArtistaCard } from '@/components/artistas/instagram-artista-card'
 import { TikTokArtistaCard } from '@/components/artistas/tiktok-artista-card'
 import { YouTubeArtistaCard } from '@/components/artistas/youtube-artista-card'
+import { StreamingArtistaCard } from '@/components/artistas/streaming-artista-card'
 import { ConectarPlataforma } from '@/components/artistas/conectar-plataforma'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
@@ -161,6 +162,9 @@ export function PerfilArtistaReal({
 
       {/* YouTube — base pública (Data API) + Analytics (OAuth) para quem conectar */}
       <YouTubeArtistaCard slug={a.slug} />
+
+      {/* Streaming — plays/skips reais via OneRPM (não sensível, visível a todos). */}
+      <StreamingArtistaCard slug={a.slug} />
 
       {/* Receita — só admin (lê a coleção `receitas`); o card cuida do estado vazio. */}
       <ReceitaGate>

@@ -8,12 +8,15 @@
  *   metricas-sociais/{slug}/historico/{dia}          -> 1 ponto/dia do Instagram (tendência)
  *   metricas-sociais/{slug}/historico-tiktok/{dia}   -> 1 ponto/dia do TikTok (tendência)
  *   metricas-sociais/{slug}/historico-youtube/{dia}  -> 1 ponto/dia do YouTube (tendência)
+ *   metricas-sociais/{slug}/historico-streaming/{dia}-> 1 ponto/dia de streaming OneRPM (plays/skips)
  *   integracoes/meta                                  -> status da integração Meta
  *   integracoes/tiktok                                -> status da integração TikTok
  *   integracoes/youtube                               -> status da integração YouTube
  *   tiktok-tokens/{slug}                              -> tokens OAuth do artista (SERVER-ONLY, ver TikTokTokenDoc)
  *   youtube-tokens/{slug}                             -> tokens OAuth do artista (SERVER-ONLY, ver YouTubeTokenDoc)
  */
+
+import type { PlataformaTipo } from '@/components/artistas/plataforma-icon'
 
 /** Um post recente do Instagram (camada de conteúdo). */
 export interface InstagramPostItem {
@@ -197,6 +200,7 @@ export interface MetricasSociaisDoc {
   instagram?: InstagramSnapshot | null
   tiktok?: TikTokSnapshot | null
   youtube?: YouTubeSnapshot | null
+  streaming?: StreamingSnapshot | null
   /** ISO timestamp da última atualização (qualquer rede). */
   atualizadoEm: string
 }
@@ -212,7 +216,82 @@ export interface HistoricoDiaDoc {
   coletadoEm: string
 }
 
+/* ───────────────────────────── Streaming (OneRPM) ───────────────────────────── */
+
+/** Streams/skips de uma plataforma de streaming na janela do snapshot. */
+export interface StreamingPlataformaItem {
+  plataforma: string
+  corKey: string
+  iconeTipo: PlataformaTipo
+  streams: number
+  skips: number
+}
+
+/** Streams de um país na janela do snapshot. */
+export interface StreamingPaisItem {
+  pais: string
+  streams: number
+}
+
+/**
+ * Snapshot de streaming de um artista (feed "trends" da OneRPM via SFTP).
+ * Diferente das redes sociais e da receita, é só CONSUMO: plays/skips por
+ * dia/país/plataforma. NÃO tem receita (essa continua na coleção `receitas`).
+ */
+export interface StreamingSnapshot {
+  /** Janela coberta pelo snapshot (último backfill sincronizado). */
+  periodo: { de: string; ate: string; dias: number }
+  /** Totais na janela. */
+  streams: number
+  skips: number
+  /** skips / streams (0..1). */
+  skipRate: number
+  /** Soma dos últimos 7 / 28 dias com dado (destaque recente). */
+  streams7d: number | null
+  streams28d: number | null
+  /** Quebra por plataforma e por país (ordenadas por streams desc). */
+  porPlataforma: StreamingPlataformaItem[]
+  porPais: StreamingPaisItem[]
+  /** Nº de faixas distintas (ISRCs). */
+  faixas: number
+  /** Lojas presentes na janela. */
+  lojas: string[]
+  /** Nome do artista como veio no feed (sem o prefixo da conta). */
+  artistaNome?: string | null
+  /** Data do dado mais recente disponível (YYYY-MM-DD). */
+  ultimoDia: string | null
+  /** ISO timestamp da sincronização. */
+  coletadoEm: string
+}
+
+/** Ponto diário de streaming: `metricas-sociais/{slug}/historico-streaming/{dia}`. */
+export interface HistoricoStreamingDiaDoc {
+  /** YYYY-MM-DD. */
+  dia: string
+  streams: number
+  skips: number
+  coletadoEm: string
+}
+
 export type StatusIntegracao = 'conectado' | 'nao_configurado' | 'erro'
+
+/** Documento `integracoes/onerpm` — status do sync de streaming (alimenta o card). */
+export interface IntegracaoOneRpmDoc {
+  status: StatusIntegracao
+  /** Artistas que receberam streaming na última sincronização. */
+  artistasSincronizados: number
+  /** Arquivos baixados na última execução. */
+  arquivos: number
+  /** Streams agregados na janela da última execução. */
+  streamsJanela: number
+  /** Janela (dias) usada na última execução. */
+  janelaDias: number
+  /** ISO timestamp da última sincronização. */
+  ultimaSincronizacao: string | null
+  /** Dia mais recente com dado no feed (YYYY-MM-DD). */
+  ultimoDia: string | null
+  erro?: string | null
+}
 
 /** Documento `integracoes/meta` — alimenta a página de integrações. */
 export interface IntegracaoMetaDoc {

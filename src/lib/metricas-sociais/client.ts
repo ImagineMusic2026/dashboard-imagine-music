@@ -3,9 +3,11 @@ import { db } from '@/lib/firebase'
 import type {
   HistoricoDiaDoc,
   HistoricoHealthDiaDoc,
+  HistoricoStreamingDiaDoc,
   HistoricoTikTokDiaDoc,
   HistoricoYouTubeDiaDoc,
   IntegracaoMetaDoc,
+  IntegracaoOneRpmDoc,
   IntegracaoTikTokDoc,
   IntegracaoYouTubeDoc,
   MetricasSociaisDoc,
@@ -104,4 +106,24 @@ export async function getHistoricoHealth(
 export async function getStatusYouTube(): Promise<IntegracaoYouTubeDoc | null> {
   const s = await getDoc(doc(db, 'integracoes', 'youtube'))
   return s.exists() ? (s.data() as IntegracaoYouTubeDoc) : null
+}
+
+/** Status da integração OneRPM (doc `integracoes/onerpm`). */
+export async function getStatusOneRpm(): Promise<IntegracaoOneRpmDoc | null> {
+  const s = await getDoc(doc(db, 'integracoes', 'onerpm'))
+  return s.exists() ? (s.data() as IntegracaoOneRpmDoc) : null
+}
+
+/** Histórico diário de streaming (ordenado por dia asc), últimos `limite` dias. */
+export async function getHistoricoStreaming(
+  slug: string,
+  limite = 90,
+): Promise<HistoricoStreamingDiaDoc[]> {
+  const q = query(
+    collection(db, 'metricas-sociais', slug, 'historico-streaming'),
+    orderBy('dia', 'asc'),
+  )
+  const snap = await getDocs(q)
+  const arr = snap.docs.map((d) => d.data() as HistoricoStreamingDiaDoc)
+  return arr.slice(-limite)
 }

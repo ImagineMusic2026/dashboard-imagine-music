@@ -1,4 +1,5 @@
 import { adminDb } from '@/lib/firebase-admin'
+import type { CatalogoFaixaDoc } from '@/lib/onerpm/deezer'
 import type {
   HistoricoDiaDoc,
   HistoricoHealthDiaDoc,
@@ -424,4 +425,25 @@ export async function gravarStatusOneRpm(status: Partial<IntegracaoOneRpmDoc>): 
  */
 export async function salvarStreamingDetalhe(slug: string, detalhe: StreamingDetalheDoc): Promise<void> {
   await adminDb.doc(`metricas-sociais/${slug}/streaming-detalhe/atual`).set(detalhe)
+}
+
+/* ── Catálogo de faixas (ISRC → título, cache do Deezer) ──────────────────── */
+
+/** Lê o cache de títulos por ISRC (batch). Só os ISRCs que já têm doc. */
+export async function getCatalogoFaixas(isrcs: string[]): Promise<Map<string, CatalogoFaixaDoc>> {
+  const out = new Map<string, CatalogoFaixaDoc>()
+  if (!isrcs.length) return out
+  const refs = isrcs.map((i) => adminDb.doc(`catalogo-faixas/${i}`))
+  const snaps = await adminDb.getAll(...refs)
+  for (const s of snaps) if (s.exists) out.set(s.id, s.data() as CatalogoFaixaDoc)
+  return out
+}
+
+/** Grava (set) um lote de entradas do catálogo de faixas (lotes de 400). */
+export async function salvarCatalogoFaixasLote(docs: CatalogoFaixaDoc[]): Promise<void> {
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = adminDb.batch()
+    for (const d of docs.slice(i, i + 400)) batch.set(adminDb.doc(`catalogo-faixas/${d.isrc}`), d)
+    await batch.commit()
+  }
 }

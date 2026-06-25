@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Globe, ListMusic, Search } from 'lucide-react'
+import { ExternalLink, Globe, ListMusic } from 'lucide-react'
+import { auth } from '@/lib/firebase'
 import { getStreamingDetalhe } from '@/lib/metricas-sociais/client'
 import type { StreamingDetalheDoc } from '@/lib/metricas-sociais/types'
 import { cn, formatNumber } from '@/lib/utils'
@@ -24,6 +25,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
   const [ordem, setOrdem] = useState<Ordem>('skip')
   const [todas, setTodas] = useState(false)
+  const [titulos, setTitulos] = useState<Record<string, { titulo: string; link: string }>>({})
 
   useEffect(() => {
     let vivo = true
@@ -49,6 +51,37 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
     }
     return base.sort((a, b) => b.streams - a.streams)
   }, [estado, ordem])
+
+  const visiveis = useMemo(() => (todas ? faixas : faixas.slice(0, 12)), [faixas, todas])
+
+  // Resolve os títulos (via Deezer, pela rota) das faixas visíveis ainda sem nome.
+  useEffect(() => {
+    const pendentes = visiveis.map((f) => f.isrc).filter((isrc) => !(isrc in titulos))
+    if (!pendentes.length) return
+    let vivo = true
+    ;(async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken()
+        if (!token) return
+        const res = await fetch('/api/faixas/titulos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ isrcs: pendentes }),
+        })
+        const data = (await res.json().catch(() => null)) as {
+          titulos?: Record<string, { titulo: string; link: string }>
+        } | null
+        if (vivo && data?.titulos) setTitulos((prev) => ({ ...prev, ...data.titulos }))
+      } catch {
+        /* sem título: mantém o ISRC */
+      }
+    })()
+    return () => {
+      vivo = false
+    }
+    // titulos só filtra os pendentes — fora das deps de propósito (evita loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visiveis])
 
   if (estado.st === 'load') {
     return (
@@ -76,7 +109,6 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
   }
 
   const { d } = estado
-  const visiveis = todas ? faixas : faixas.slice(0, 12)
   const paises = d.porPais
     .map((p) => ({ ...p, rate: p.streams > 0 ? p.skips / p.streams : 0 }))
     .slice(0, 8)
@@ -108,7 +140,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
       <div className="px-2 py-1">
         <div className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 text-[10px] tracking-wider font-semibold uppercase text-ink-500">
           <span>#</span>
-          <span>Faixa (ISRC)</span>
+          <span>Faixa</span>
           <span className="text-right">Streams</span>
           <span className="text-right">Skips</span>
           <span className="text-right">Skip</span>
@@ -118,29 +150,38 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
             Nenhuma faixa com volume suficiente nesta janela.
           </div>
         ) : (
-          visiveis.map((f, i) => (
-            <div
-              key={f.isrc}
-              className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 rounded-lg hover:bg-bg-800/30 items-center text-[13px]"
-            >
-              <span className="text-ink-600 num text-center">{i + 1}</span>
-              <a
-                href={`https://www.google.com/search?q=ISRC+${encodeURIComponent(f.isrc)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="num text-violet-400 hover:text-violet-300 hover:underline transition-colors flex items-center gap-1 min-w-0"
-                title={`Buscar a faixa ${f.isrc}`}
+          visiveis.map((f, i) => {
+            const info = titulos[f.isrc]
+            return (
+              <div
+                key={f.isrc}
+                className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 rounded-lg hover:bg-bg-800/30 items-center text-[13px]"
               >
-                <span className="truncate">{f.isrc}</span>
-                <Search className="w-3 h-3 shrink-0 text-ink-600" />
-              </a>
-              <span className="num text-ink-300 text-right">{formatNumber(f.streams)}</span>
-              <span className="num text-ink-400 text-right">{formatNumber(f.skips)}</span>
-              <span className={cn('num font-semibold text-right', corSkip(f.rate))}>
-                {(f.rate * 100).toFixed(0)}%
-              </span>
-            </div>
-          ))
+                <span className="text-ink-600 num text-center">{i + 1}</span>
+                {info ? (
+                  <a
+                    href={info.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-violet-400 hover:text-violet-300 hover:underline transition-colors flex items-center gap-1 min-w-0"
+                    title={info.titulo}
+                  >
+                    <span className="truncate">{info.titulo}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0 text-ink-600" />
+                  </a>
+                ) : (
+                  <span className="num text-ink-400 truncate" title={f.isrc}>
+                    {f.isrc}
+                  </span>
+                )}
+                <span className="num text-ink-300 text-right">{formatNumber(f.streams)}</span>
+                <span className="num text-ink-400 text-right">{formatNumber(f.skips)}</span>
+                <span className={cn('num font-semibold text-right', corSkip(f.rate))}>
+                  {(f.rate * 100).toFixed(0)}%
+                </span>
+              </div>
+            )
+          })
         )}
       </div>
 
@@ -176,8 +217,8 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
       )}
 
       <div className="border-t border-bg-700/30 px-5 py-2.5 text-[11px] text-ink-500">
-        Clique no <span className="text-ink-400">ISRC</span> pra buscar a faixa. O título entra automático
-        quando a OneRPM enviar o catálogo.
+        Títulos resolvidos pelo <span className="text-ink-400">Deezer</span> (clique pra abrir a faixa). O
+        que não estiver lá aparece por ISRC; o catálogo da OneRPM substitui depois.
       </div>
     </div>
   )

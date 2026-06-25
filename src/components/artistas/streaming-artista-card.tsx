@@ -183,6 +183,7 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
                     key={p.pais}
                     className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-bg-800 border border-bg-700/50 text-[12px]"
                   >
+                    <Bandeira pais={p.pais} />
                     <span className="text-ink-200 font-semibold">{p.pais}</span>
                     <span className="num text-ink-400">{fmt(p.streams)}</span>
                   </span>
@@ -193,6 +194,28 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Bandeira (imagem) a partir do código ISO-2 do país. Emoji de bandeira não
+ * renderiza no Windows (vira as letras), então usamos o flagcdn — PNG leve e
+ * cacheado, que funciona em qualquer SO.
+ */
+function Bandeira({ pais }: { pais: string }) {
+  const cc = (pais || '').trim().toLowerCase()
+  if (!/^[a-z]{2}$/.test(cc)) return null
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`https://flagcdn.com/20x15/${cc}.png`}
+      srcSet={`https://flagcdn.com/40x30/${cc}.png 2x`}
+      width={16}
+      height={12}
+      alt=""
+      loading="lazy"
+      className="rounded-[2px] shrink-0"
+    />
   )
 }
 

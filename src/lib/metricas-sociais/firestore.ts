@@ -2,13 +2,16 @@ import { adminDb } from '@/lib/firebase-admin'
 import type {
   HistoricoDiaDoc,
   HistoricoHealthDiaDoc,
+  HistoricoStreamingDiaDoc,
   HistoricoTikTokDiaDoc,
   HistoricoYouTubeDiaDoc,
   InstagramSnapshot,
   IntegracaoMetaDoc,
+  IntegracaoOneRpmDoc,
   IntegracaoTikTokDoc,
   IntegracaoYouTubeDoc,
   MetricasSociaisDoc,
+  StreamingSnapshot,
   TikTokSnapshot,
   TikTokTokenDoc,
   YouTubeSnapshot,
@@ -377,4 +380,38 @@ export async function salvarHistoricoHealthLote(
     }
     await batch.commit()
   }
+}
+
+/* ───────────────────────────── Streaming (OneRPM) ───────────────────────────── */
+
+/**
+ * Salva o snapshot de streaming do artista em `metricas-sociais/{slug}.streaming`
+ * + os pontos diários em `historico-streaming/{dia}` (lotes de 400). Mesmo doc
+ * das redes sociais — não é sensível, logo legível por qualquer membro ativo.
+ */
+export async function salvarStreamingArtista(
+  slug: string,
+  snapshot: StreamingSnapshot,
+  historico: HistoricoStreamingDiaDoc[],
+): Promise<void> {
+  const ref = adminDb.doc(`metricas-sociais/${slug}`)
+  const doc: Partial<MetricasSociaisDoc> = {
+    slug,
+    streaming: snapshot,
+    atualizadoEm: snapshot.coletadoEm,
+  }
+  await ref.set(doc, { merge: true })
+
+  for (let i = 0; i < historico.length; i += 400) {
+    const batch = adminDb.batch()
+    for (const h of historico.slice(i, i + 400)) {
+      batch.set(ref.collection('historico-streaming').doc(h.dia), h, { merge: true })
+    }
+    await batch.commit()
+  }
+}
+
+/** Atualiza (merge) o status da integração em `integracoes/onerpm`. */
+export async function gravarStatusOneRpm(status: Partial<IntegracaoOneRpmDoc>): Promise<void> {
+  await adminDb.doc('integracoes/onerpm').set(status, { merge: true })
 }

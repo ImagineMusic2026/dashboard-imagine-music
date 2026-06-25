@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Globe, ListMusic } from 'lucide-react'
+import { Globe, ListMusic, Search } from 'lucide-react'
 import { getStreamingDetalhe } from '@/lib/metricas-sociais/client'
 import type { StreamingDetalheDoc } from '@/lib/metricas-sociais/types'
 import { cn, formatNumber } from '@/lib/utils'
@@ -124,7 +124,16 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
               className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 rounded-lg hover:bg-bg-800/30 items-center text-[13px]"
             >
               <span className="text-ink-600 num text-center">{i + 1}</span>
-              <span className="num text-ink-200 truncate" title={f.isrc}>{f.isrc}</span>
+              <a
+                href={`https://www.google.com/search?q=ISRC+${encodeURIComponent(f.isrc)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="num text-violet-400 hover:text-violet-300 hover:underline transition-colors flex items-center gap-1 min-w-0"
+                title={`Buscar a faixa ${f.isrc}`}
+              >
+                <span className="truncate">{f.isrc}</span>
+                <Search className="w-3 h-3 shrink-0 text-ink-600" />
+              </a>
               <span className="num text-ink-300 text-right">{formatNumber(f.streams)}</span>
               <span className="num text-ink-400 text-right">{formatNumber(f.skips)}</span>
               <span className={cn('num font-semibold text-right', corSkip(f.rate))}>
@@ -167,8 +176,8 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
       )}
 
       <div className="border-t border-bg-700/30 px-5 py-2.5 text-[11px] text-ink-500">
-        As faixas aparecem por <span className="text-ink-400">ISRC</span>; o título entra quando a OneRPM
-        enviar o catálogo.
+        Clique no <span className="text-ink-400">ISRC</span> pra buscar a faixa. O título entra automático
+        quando a OneRPM enviar o catálogo.
       </div>
     </div>
   )

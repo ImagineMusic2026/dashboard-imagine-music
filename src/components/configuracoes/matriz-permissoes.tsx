@@ -163,17 +163,22 @@ export function MatrizPermissoes() {
                             )
                           })}
                           <td className="py-3 px-4 text-right">
-                            {temOverride && (
-                              <button
-                                type="button"
-                                onClick={() => restaurar(u)}
-                                disabled={salvando === `${u.uid}:*`}
-                                title="Restaurar o padrão do papel"
-                                className="inline-flex items-center gap-1 text-[11px] text-ink-500 hover:text-ink-200 transition-colors disabled:opacity-50"
-                              >
-                                <RotateCcw className="w-3 h-3" /> padrão
-                              </button>
-                            )}
+                            {/* Sempre renderizado (invisível sem override) pra reservar a largura
+                                da coluna — senão o botão aparecendo refluía a tabela inteira. */}
+                            <button
+                              type="button"
+                              onClick={() => restaurar(u)}
+                              disabled={salvando === `${u.uid}:*`}
+                              title="Restaurar o padrão do papel"
+                              aria-hidden={!temOverride}
+                              tabIndex={temOverride ? 0 : -1}
+                              className={cn(
+                                'inline-flex items-center gap-1 text-[11px] text-ink-500 hover:text-ink-200 transition-colors disabled:opacity-50 whitespace-nowrap',
+                                !temOverride && 'invisible',
+                              )}
+                            >
+                              <RotateCcw className="w-3 h-3" /> padrão
+                            </button>
                           </td>
                         </tr>
                       )

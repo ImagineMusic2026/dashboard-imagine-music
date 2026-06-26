@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Eye, Film, Flame, Heart, Layers, MessageCircle, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, Eye, Film, Flame, Heart, Layers, MessageCircle, Sparkles } from 'lucide-react'
 import { listarArtistas } from '@/lib/artistas/client'
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
@@ -41,6 +41,8 @@ export default function ConteudoPage() {
   const [filtroPlat, setFiltroPlat] = useState<'todas' | Plataforma>('todas')
   const [filtroArtista, setFiltroArtista] = useState('todos')
   const [ordem, setOrdem] = useState<'recentes' | 'destaque'>('destaque')
+  const [pagina, setPagina] = useState(1)
+  const feedRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     let vivo = true
@@ -143,7 +145,7 @@ export default function ConteudoPage() {
   }, [itens])
 
   const bombando = useMemo(
-    () => [...itens].sort((a, b) => b.heat - a.heat).slice(0, 6),
+    () => [...itens].sort((a, b) => b.heat - a.heat).slice(0, 10),
     [itens],
   )
   const maisVistos = useMemo(
@@ -167,6 +169,22 @@ export default function ConteudoPage() {
       ordem === 'recentes' ? ts(b.publicadoEm) - ts(a.publicadoEm) : b.heat - a.heat,
     )
   }, [itens, filtroPlat, filtroArtista, ordem])
+
+  // Paginação do feed: 10 por página, pra não despejar centenas de cards de uma vez.
+  const POR_PAGINA = 10
+  const totalPaginas = Math.max(1, Math.ceil(feed.length / POR_PAGINA))
+  const paginaAtual = Math.min(pagina, totalPaginas)
+  const feedVisivel = feed.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA)
+
+  // Volta pra 1ª página sempre que muda filtro ou ordenação.
+  useEffect(() => {
+    setPagina(1)
+  }, [filtroPlat, filtroArtista, ordem])
+
+  const irParaPagina = (p: number) => {
+    setPagina(Math.max(1, Math.min(p, totalPaginas)))
+    feedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   if (estado === 'load') {
     return (
@@ -213,11 +231,7 @@ export default function ConteudoPage() {
             <h2 className="font-bold text-ink-100">Bombando agora</h2>
             <span className="text-[11px] text-ink-500">melhor desempenho recente</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {bombando.map((i) => (
-              <CardConteudo key={i.key} item={i} destaque />
-            ))}
-          </div>
+          <CarrosselDestaques itens={bombando} />
         </section>
       )}
 
@@ -229,7 +243,7 @@ export default function ConteudoPage() {
       </div>
 
       {/* Feed completo */}
-      <section>
+      <section ref={feedRef} className="scroll-mt-24">
         <h2 className="font-bold text-ink-100 mb-3">Todos os conteúdos</h2>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-900 border border-bg-700/40">
@@ -263,11 +277,38 @@ export default function ConteudoPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {feed.map((i) => (
-              <CardConteudo key={i.key} item={i} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {feedVisivel.map((i) => (
+                <CardConteudo key={i.key} item={i} />
+              ))}
+            </div>
+
+            {totalPaginas > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => irParaPagina(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-bg-900 border border-bg-700/40 text-ink-200 hover:bg-bg-800 hover:text-ink-100 disabled:opacity-40 disabled:hover:bg-bg-900 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Anterior
+                </button>
+                <span className="text-xs text-ink-400 num px-2 text-center">
+                  Página {paginaAtual} de {totalPaginas}
+                  <span className="hidden sm:inline text-ink-600"> · {formatInt(feed.length)} conteúdos</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => irParaPagina(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-bg-900 border border-bg-700/40 text-ink-200 hover:bg-bg-800 hover:text-ink-100 disabled:opacity-40 disabled:hover:bg-bg-900 transition-colors"
+                >
+                  Próxima <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>
@@ -360,6 +401,147 @@ function crescLabel(i: Item): string | null {
 }
 
 /* ─── componentes ─── */
+
+/**
+ * Carrossel horizontal dos destaques ("Bombando agora"): rolagem lateral fluida —
+ * arrastar-pra-rolar com inércia no mouse, momentum nativo no trackpad/touch, sem
+ * snap "grudento". Setas no desktop, só pro lado que ainda dá pra rolar.
+ */
+function CarrosselDestaques({ itens }: { itens: Item[] }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pode, setPode] = useState({ esq: false, dir: false })
+  const drag = useRef({ ativo: false, x0: 0, s0: 0, ultimoX: 0, ultimoT: 0, vel: 0, movido: false })
+  const raf = useRef(0)
+
+  const aferir = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    setPode((p) => {
+      const esq = el.scrollLeft > 8
+      const dir = Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 1
+      return p.esq === esq && p.dir === dir ? p : { esq, dir }
+    })
+  }, [])
+
+  useEffect(() => {
+    aferir()
+    const el = ref.current
+    if (!el) return
+    el.addEventListener('scroll', aferir, { passive: true })
+    window.addEventListener('resize', aferir)
+    return () => {
+      el.removeEventListener('scroll', aferir)
+      window.removeEventListener('resize', aferir)
+      cancelAnimationFrame(raf.current)
+    }
+  }, [aferir, itens.length])
+
+  const rolar = (dir: 1 | -1) => {
+    const el = ref.current
+    if (el) el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.85), behavior: 'smooth' })
+  }
+
+  // Arrastar-pra-rolar com inércia — só no mouse (trackpad/touch já deslizam nativo).
+  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return
+    const el = ref.current
+    if (!el) return
+    cancelAnimationFrame(raf.current)
+    const d = drag.current
+    d.ativo = true
+    d.movido = false
+    d.x0 = e.clientX
+    d.s0 = el.scrollLeft
+    d.ultimoX = e.clientX
+    d.ultimoT = performance.now()
+    d.vel = 0
+    try {
+      el.setPointerCapture(e.pointerId)
+    } catch {
+      /* captura é best-effort */
+    }
+  }
+  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current
+    const el = ref.current
+    if (!d.ativo || !el) return
+    const dx = e.clientX - d.x0
+    if (Math.abs(dx) > 3) d.movido = true
+    el.scrollLeft = d.s0 - dx
+    const t = performance.now()
+    const dt = t - d.ultimoT
+    if (dt > 0) d.vel = (e.clientX - d.ultimoX) / dt
+    d.ultimoX = e.clientX
+    d.ultimoT = t
+  }
+  const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current
+    const el = ref.current
+    if (!d.ativo || !el) return
+    d.ativo = false
+    try {
+      el.releasePointerCapture(e.pointerId)
+    } catch {
+      /* ponteiro já solto */
+    }
+    // inércia: continua deslizando com a velocidade final, desacelerando.
+    let v = Math.max(-42, Math.min(42, d.vel * 16))
+    const deslizar = () => {
+      const atual = ref.current
+      if (!atual || Math.abs(v) < 0.3) return
+      atual.scrollLeft -= v
+      v *= 0.95
+      raf.current = requestAnimationFrame(deslizar)
+    }
+    if (Math.abs(v) >= 0.3) raf.current = requestAnimationFrame(deslizar)
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onClickCapture={(e) => {
+          if (drag.current.movido) {
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }}
+        onDragStart={(e) => e.preventDefault()}
+        className="flex gap-4 overflow-x-auto overscroll-x-contain pb-2 cursor-grab active:cursor-grabbing select-none"
+      >
+        {itens.map((i) => (
+          <div key={i.key} className="shrink-0 w-[270px] sm:w-[300px]">
+            <CardConteudo item={i} destaque />
+          </div>
+        ))}
+      </div>
+      {pode.esq && (
+        <button
+          type="button"
+          aria-label="Ver anteriores"
+          onClick={() => rolar(-1)}
+          className="hidden sm:grid place-items-center absolute left-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-bg-950/85 backdrop-blur border border-bg-700/60 text-ink-200 hover:bg-bg-800 hover:text-ink-100 transition-colors shadow-lg"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      )}
+      {pode.dir && (
+        <button
+          type="button"
+          aria-label="Ver próximos"
+          onClick={() => rolar(1)}
+          className="hidden sm:grid place-items-center absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-bg-950/85 backdrop-blur border border-bg-700/60 text-ink-200 hover:bg-bg-800 hover:text-ink-100 transition-colors shadow-lg"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  )
+}
 
 function CardConteudo({ item: i, destaque }: { item: Item; destaque?: boolean }) {
   const cor =

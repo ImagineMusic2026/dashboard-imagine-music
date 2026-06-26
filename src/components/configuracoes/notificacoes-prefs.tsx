@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, Mail } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { SEV, ICONE_ALERTA } from '@/components/alertas/alerta-linha'
 import type { SeveridadeAlerta } from '@/lib/alertas/derivar'
 import {
@@ -138,62 +137,7 @@ export function NotificacoesPrefs() {
         </div>
       </div>
 
-      {/* Canais — por ora só o painel; e-mail entra depois. */}
-      <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-bg-700/30">
-          <div className="font-bold text-ink-100">Canais de entrega</div>
-          <p className="text-[12px] text-ink-400 mt-0.5">Por onde os alertas chegam.</p>
-        </div>
-        <div className="divide-y divide-bg-700/30">
-          <Canal
-            Icon={Bell}
-            titulo="Painel (sino)"
-            descricao="Aparecem no sino e no menu lateral, em tempo real."
-            estado="ativo"
-          />
-          <Canal
-            Icon={Mail}
-            titulo="E-mail"
-            descricao="Resumo dos alertas críticos por e-mail."
-            estado="breve"
-          />
-        </div>
-      </div>
-
       <p className="px-1 text-[11px] text-ink-500">Preferências salvas neste navegador.</p>
-    </div>
-  )
-}
-
-function Canal({
-  Icon,
-  titulo,
-  descricao,
-  estado,
-}: {
-  Icon: LucideIcon
-  titulo: string
-  descricao: string
-  estado: 'ativo' | 'breve'
-}) {
-  return (
-    <div className="flex items-center gap-3 sm:gap-4 p-4">
-      <div className="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-bg-800 text-ink-400">
-        <Icon className="w-4 h-4" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold text-sm text-ink-100">{titulo}</div>
-        <p className="text-[12px] text-ink-500 mt-0.5">{descricao}</p>
-      </div>
-      {estado === 'ativo' ? (
-        <span className="shrink-0 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded border bg-emerald-500/10 text-emerald-400 border-emerald-500/25">
-          ATIVO
-        </span>
-      ) : (
-        <span className="shrink-0 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded border bg-bg-800 text-ink-500 border-bg-700/50">
-          EM BREVE
-        </span>
-      )}
     </div>
   )
 }

@@ -6,13 +6,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   DollarSign,
-  Edit3,
   FileSpreadsheet,
   Globe,
   Loader2,
   Lock,
   Music2,
-  Upload,
   UploadCloud,
   Users,
   X,
@@ -188,63 +186,31 @@ export function ImportadorOneRpm() {
         }}
       />
 
-      {/* Cards de fonte */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button
-          type="button"
-          onClick={abrirSeletor}
-          disabled={enviando}
-          className="text-left bg-gradient-to-br from-amber-500/10 to-bg-900 border border-amber-500/30 rounded-xl p-6 flex flex-col hover:border-amber-500/60 transition-colors disabled:opacity-60"
-        >
-          <div className="w-12 h-12 rounded-xl bg-amber-500/20 grid place-items-center mb-4">
-            <FileSpreadsheet className="w-6 h-6 text-amber-400" />
-          </div>
-          <span className="text-[10px] tracking-wider font-bold text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 inline-block w-fit mb-3">
-            RECOMENDADO
-          </span>
+      {/* Fonte: relatório OneRPM (.xlsx) — único importador de receita hoje */}
+      <button
+        type="button"
+        onClick={abrirSeletor}
+        disabled={enviando}
+        className="w-full text-left bg-gradient-to-br from-amber-500/10 to-bg-900 border border-amber-500/30 rounded-xl p-6 flex flex-col sm:flex-row sm:items-center gap-5 hover:border-amber-500/60 transition-colors disabled:opacity-60"
+      >
+        <div className="w-12 h-12 rounded-xl bg-amber-500/20 grid place-items-center shrink-0">
+          <FileSpreadsheet className="w-6 h-6 text-amber-400" />
+        </div>
+        <div className="flex-1 min-w-0">
           <h3 className="font-bold text-lg text-ink-100">Relatório OneRPM (.xlsx)</h3>
           <p className="text-sm text-ink-400 mt-1 leading-snug">
             A planilha de vendas exportada da OneRPM — streams e receita por faixa, loja e país.
           </p>
-          <ul className="text-[11px] text-ink-500 mt-3 space-y-1">
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-500 mt-3">
             <li>✓ Lê a aba “Sales” automaticamente</li>
             <li>✓ Agrupa lojas (Spotify, Apple, Meta…)</li>
             <li>✓ Bruto e líquido por moeda</li>
           </ul>
-          <span className="mt-4 w-full bg-amber-500 hover:bg-amber-600 text-bg-950 font-semibold py-2 rounded-lg text-sm transition-colors text-center">
-            Selecionar arquivo
-          </span>
-        </button>
-
-        <div className="bg-bg-900 border border-bg-700/40 rounded-xl p-6 flex flex-col opacity-90">
-          <div className="w-12 h-12 rounded-xl bg-violet-500/15 grid place-items-center mb-4">
-            <Upload className="w-6 h-6 text-violet-400" />
-          </div>
-          <span className="text-[10px] tracking-wider font-bold text-ink-500 px-2 py-0.5 rounded-full bg-bg-800 border border-bg-700/40 inline-block w-fit mb-3">
-            EM BREVE
-          </span>
-          <h3 className="font-bold text-lg text-ink-100">Planilha customizada</h3>
-          <p className="text-sm text-ink-400 mt-1 leading-snug">
-            Métricas fora das plataformas (rádio, eventos, fanclubes).
-          </p>
-          <ul className="text-[11px] text-ink-500 mt-3 space-y-1">
-            <li>✓ .csv · .xlsx · .xls</li>
-          </ul>
         </div>
-
-        <div className="bg-bg-900 border border-bg-700/40 rounded-xl p-6 flex flex-col opacity-90">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/15 grid place-items-center mb-4">
-            <Edit3 className="w-6 h-6 text-emerald-400" />
-          </div>
-          <span className="text-[10px] tracking-wider font-bold text-ink-500 px-2 py-0.5 rounded-full bg-bg-800 border border-bg-700/40 inline-block w-fit mb-3">
-            EM BREVE
-          </span>
-          <h3 className="font-bold text-lg text-ink-100">Entrada manual</h3>
-          <p className="text-sm text-ink-400 mt-1 leading-snug">
-            Adicione qualquer métrica de qualquer artista em segundos.
-          </p>
-        </div>
-      </div>
+        <span className="shrink-0 w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-bg-950 font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors text-center">
+          Selecionar arquivo
+        </span>
+      </button>
 
       {/* Dropzone */}
       <div

@@ -33,6 +33,11 @@ import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plata
 
 const INTERVALO_MS = 7000
 
+// No mobile o mock é desenhado nesta "tela" fixa (landscape) e escalado pra
+// caber na largura — assim mostra tudo, sem scroll lateral nem corte.
+const DESIGN_W = 820
+const DESIGN_H = 460
+
 type Tab = {
   id: string
   rotulo: string
@@ -100,6 +105,19 @@ export function FeatureShowcase() {
   const [pausado, setPausado] = useState(false)
   const [reduzMov, setReduzMov] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mobileRef = useRef<HTMLDivElement>(null)
+  const [escalaMobile, setEscalaMobile] = useState(0.42)
+
+  // Mede a largura disponível no mobile e calcula a escala pra o mock caber.
+  useEffect(() => {
+    const el = mobileRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const calcular = () => setEscalaMobile(el.clientWidth / DESIGN_W)
+    calcular()
+    const ro = new ResizeObserver(calcular)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Detecta prefers-reduced-motion (sem auto-avanço nem barra animada).
   useEffect(() => {
@@ -136,7 +154,7 @@ export function FeatureShowcase() {
       <div
         role="tablist"
         aria-label="Recursos do painel"
-        className="flex gap-1 overflow-x-auto border-b border-bg-700/40 pb-px [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden"
+        className="flex flex-wrap gap-x-1 gap-y-1 border-b border-bg-700/40 pb-px sm:gap-x-2"
       >
         {TABS.map((t, i) => {
           const sel = i === ativo
@@ -176,11 +194,20 @@ export function FeatureShowcase() {
       </div>
 
       {/* ── Painéis ── */}
-      {/* Mobile: só o mock ativo, largura cheia. */}
+      {/* Mobile: o mock inteiro escalado pra caber na largura (sem corte/scroll lateral). */}
       <div className="mt-6 sm:hidden">
-        <div className="aspect-[4/5] w-full overflow-hidden rounded-2xl border border-bg-700/40 bg-bg-950">
-          <div key={ativo} className="h-full w-full animate-showcase-in">
-            <tabAtiva.Mock />
+        <div
+          ref={mobileRef}
+          className="relative w-full overflow-hidden rounded-2xl border border-bg-700/40 bg-bg-950"
+          style={{ aspectRatio: `${DESIGN_W} / ${DESIGN_H}` }}
+        >
+          <div
+            className="absolute left-0 top-0 origin-top-left"
+            style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${escalaMobile})` }}
+          >
+            <div key={ativo} className="h-full w-full animate-showcase-in">
+              <tabAtiva.Mock />
+            </div>
           </div>
         </div>
       </div>
@@ -214,14 +241,6 @@ export function FeatureShowcase() {
                     t.grad,
                   )}
                 >
-                  <span
-                    className={cn(
-                      'absolute inset-x-0 bottom-5 flex justify-center text-[11px] font-medium tracking-wide [writing-mode:vertical-rl] [text-orientation:mixed] rotate-180',
-                      t.texto,
-                    )}
-                  >
-                    {t.rotulo}
-                  </span>
                   <span
                     aria-hidden
                     className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"

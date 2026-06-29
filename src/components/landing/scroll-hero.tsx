@@ -96,7 +96,7 @@ const ACENTOS: Record<
   },
 }
 
-export function ScrollHero({ children }: { children: ReactNode }) {
+export function ScrollHero({ visuais }: { visuais: ReactNode[] }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [ativo, setAtivo] = useState(0)
   const [isDesktop, setIsDesktop] = useState(false)
@@ -243,8 +243,20 @@ export function ScrollHero({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          {/* Visual do produto (fixo em todos os slides) */}
-          <div aria-hidden>{children}</div>
+          {/* Visual do produto — um gráfico por slide, em crossfade */}
+          <div aria-hidden className="relative h-[440px] lg:h-[500px]">
+            {visuais.map((v, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-out lg:justify-end',
+                  i === ativo ? 'opacity-100' : 'pointer-events-none opacity-0',
+                )}
+              >
+                {v}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Dica de scroll (só desktop, some depois do 1º slide) */}

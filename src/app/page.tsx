@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { TrendingUp } from 'lucide-react'
+import { Sparkles, Target, TrendingUp } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/logo'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { cn } from '@/lib/utils'
@@ -100,10 +100,17 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* ── HERO: slides com scroll preso no desktop (estilo OneRPM) ── */}
-        <ScrollHero>
-          <HeroVisual />
-        </ScrollHero>
+        {/* ── HERO: slides com scroll preso no desktop (estilo OneRPM) ──
+            Um gráfico por slide (na mesma ordem dos SLIDES do ScrollHero):
+            plataforma · tempo real · crescimento · decisão. */}
+        <ScrollHero
+          visuais={[
+            <HeroVisual key="plataforma" />,
+            <HeroAudiencia key="audiencia" />,
+            <HeroCrescimento key="crescimento" />,
+            <HeroDecisao key="decisao" />,
+          ]}
+        />
 
         {/* ── Recursos: showcase em abas (estilo Viberate) ── */}
         <section id="recursos" className="mx-auto w-full max-w-6xl px-6 pb-20 pt-20">
@@ -270,6 +277,284 @@ function HeroVisual() {
           <span className="num text-lg font-bold text-ink-100">63,8M</span>
           <span className="mb-0.5 text-[11px] font-medium text-emerald-400">+4,2%</span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* Slide 2 — "Em tempo real": audiência consolidada (pizza + legenda + engajamento). */
+function HeroAudiencia() {
+  return (
+    <div className="relative mx-auto w-full max-w-md">
+      <div className="absolute -inset-6 -z-20 rounded-[2.5rem] bg-gradient-to-br from-fuchsia-600/20 via-violet-500/10 to-transparent blur-2xl" />
+      <div className="absolute inset-x-4 top-5 -z-10 h-full rounded-2xl border border-bg-700/30 bg-bg-900/40" />
+
+      <div className="overflow-hidden rounded-2xl border border-bg-700/50 bg-bg-900/70 shadow-2xl shadow-fuchsia-950/40 ring-1 ring-inset ring-white/5 backdrop-blur-xl">
+        <div className="flex items-center gap-2 border-b border-bg-700/40 bg-bg-950/40 px-4 py-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="ml-3 truncate rounded-md bg-bg-800/60 px-2.5 py-1 text-[11px] text-ink-500">painel.imagine / audiência</span>
+        </div>
+
+        <div className="p-5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-ink-100">Audiência total</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              ao vivo
+            </span>
+          </div>
+
+          <div className="mt-4 flex items-center gap-5">
+            <DonutAudiencia />
+            <div className="flex-1 space-y-2.5">
+              <LegendaPlat cor="bg-emerald-400" nome="Spotify" valor="63,8M" delta="+4%" />
+              <LegendaPlat cor="bg-red-500" nome="YouTube" valor="9,1M" delta="+12%" />
+              <LegendaPlat cor="bg-fuchsia-500" nome="Instagram" valor="5,2M" delta="+6%" />
+              <LegendaPlat cor="bg-cyan-400" nome="TikTok" valor="2,8M" delta="+21%" />
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between rounded-xl border border-bg-700/40 bg-bg-950/50 px-4 py-2.5">
+            <span className="text-[11px] text-ink-400">Engajamento médio</span>
+            <span className="flex items-center gap-2">
+              <span className="num text-sm font-semibold text-ink-100">8,4%</span>
+              <span className="text-[11px] font-medium text-emerald-400">+1,2pp</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute -right-4 -top-4 flex items-center gap-2 rounded-xl border border-bg-700/60 bg-bg-800/80 px-3 py-2 text-xs font-medium text-ink-100 shadow-xl ring-1 ring-inset ring-white/5 backdrop-blur-md">
+        <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-400" />
+        +12,4 mil no mês
+      </div>
+    </div>
+  )
+}
+
+/* Slide 3 — "Crescimento": gráfico de streams com eixo, pontos e marco. */
+function HeroCrescimento() {
+  return (
+    <div className="relative mx-auto w-full max-w-md">
+      <div className="absolute -inset-6 -z-20 rounded-[2.5rem] bg-gradient-to-br from-sky-600/20 via-cyan-500/10 to-transparent blur-2xl" />
+      <div className="absolute inset-x-4 top-5 -z-10 h-full rounded-2xl border border-bg-700/30 bg-bg-900/40" />
+
+      <div className="overflow-hidden rounded-2xl border border-bg-700/50 bg-bg-900/70 shadow-2xl shadow-sky-950/40 ring-1 ring-inset ring-white/5 backdrop-blur-xl">
+        <div className="flex items-center gap-2 border-b border-bg-700/40 bg-bg-950/40 px-4 py-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="ml-3 truncate rounded-md bg-bg-800/60 px-2.5 py-1 text-[11px] text-ink-500">painel.imagine / crescimento</span>
+        </div>
+
+        <div className="p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs text-ink-400">Streams · últimos 12 meses</div>
+              <div className="num mt-0.5 text-3xl font-bold text-ink-100">1,24M</div>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+              <TrendingUp className="h-3.5 w-3.5" />
+              +184%
+            </span>
+          </div>
+
+          <div className="mt-3">
+            <AreaChart />
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <KpiMini nome="Ouvintes" valor="63,8M" delta="+4,2%" />
+            <KpiMini nome="Salvos" valor="1,9M" delta="+9%" />
+            <KpiMini nome="Playlists" valor="3,4k" delta="+12%" />
+          </div>
+
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2.5">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sky-500/15 text-sky-300">
+              <Target className="h-4 w-4" />
+            </span>
+            <div className="text-xs leading-tight">
+              <div className="font-semibold text-ink-100">Marco atingido</div>
+              <div className="text-ink-400">1 milhão de streams</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute -left-4 -top-4 flex items-center gap-2 rounded-xl border border-bg-700/60 bg-bg-800/80 px-3 py-2 text-xs font-medium text-ink-100 shadow-xl ring-1 ring-inset ring-white/5 backdrop-blur-md">
+        <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+        melhor mês do ano
+      </div>
+    </div>
+  )
+}
+
+/* Slide 4 — "Decisão": Health Score (5 pilares) + receita detalhada. */
+function HeroDecisao() {
+  return (
+    <div className="relative mx-auto w-full max-w-md">
+      <div className="absolute -inset-6 -z-20 rounded-[2.5rem] bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-transparent blur-2xl" />
+      <div className="absolute inset-x-4 top-5 -z-10 h-full rounded-2xl border border-bg-700/30 bg-bg-900/40" />
+
+      <div className="overflow-hidden rounded-2xl border border-bg-700/50 bg-bg-900/70 shadow-2xl shadow-amber-950/40 ring-1 ring-inset ring-white/5 backdrop-blur-xl">
+        <div className="flex items-center gap-2 border-b border-bg-700/40 bg-bg-950/40 px-4 py-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="ml-3 truncate rounded-md bg-bg-800/60 px-2.5 py-1 text-[11px] text-ink-500">painel.imagine / saúde</span>
+        </div>
+
+        <div className="p-5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-ink-100">Health Score</span>
+            <span className="text-[11px] text-ink-500">últimos 30 dias</span>
+          </div>
+
+          <div className="mt-4 flex items-center gap-5">
+            <div className="flex shrink-0 flex-col items-center">
+              <HealthRing />
+              <span className="mt-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">Saudável</span>
+            </div>
+            <div className="flex-1 space-y-2">
+              <Pilar nome="Engajamento" pct={95} />
+              <Pilar nome="Crescimento" pct={88} />
+              <Pilar nome="Consistência" pct={90} />
+              <Pilar nome="Audiência" pct={93} />
+              <Pilar nome="Receita" pct={84} />
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-bg-700/40 bg-bg-950/50 p-4">
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-[11px] text-ink-400">Receita do mês</div>
+                <div className="num mt-0.5 text-xl font-bold text-ink-100">R$ 24,5k</div>
+              </div>
+              <span className="text-xs font-medium text-emerald-400">+18,7%</span>
+            </div>
+            <div className="mt-3">
+              <BarrasReceita />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute -right-4 -top-4 flex items-center gap-2 rounded-xl border border-bg-700/60 bg-bg-800/80 px-3 py-2 text-xs font-medium text-ink-100 shadow-xl ring-1 ring-inset ring-white/5 backdrop-blur-md">
+        <span className="grid h-4 w-4 place-items-center text-amber-300">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        2 oportunidades
+      </div>
+    </div>
+  )
+}
+
+function AreaChart() {
+  const linha =
+    'M12,116 C44,110 60,104 84,96 C112,86 120,82 150,68 C182,52 192,46 224,34 C258,22 270,18 308,10'
+  const dots: [number, number][] = [
+    [12, 116], [84, 96], [150, 68], [224, 34], [270, 18], [308, 10],
+  ]
+  const meses = ['Jul', 'Set', 'Nov', 'Jan', 'Mar', 'Mai']
+  return (
+    <svg viewBox="0 0 320 150" className="h-auto w-full" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id="ac-stroke" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#34d399" />
+        </linearGradient>
+        <linearGradient id="ac-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[40, 76, 112].map((y) => (
+        <line key={y} x1="8" y1={y} x2="312" y2={y} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 4" />
+      ))}
+      <path d={`${linha} L308,130 L12,130 Z`} fill="url(#ac-fill)" />
+      <path d={linha} stroke="url(#ac-stroke)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {dots.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="2.6" fill="#0F0B1F" stroke="#38bdf8" strokeWidth="2" />
+      ))}
+      <circle cx="308" cy="10" r="4.5" fill="#34d399" />
+      {meses.map((m, i) => (
+        <text key={m} x={12 + (i * 296) / 5} y="145" fontSize="9" fill="#64748B" textAnchor="middle">
+          {m}
+        </text>
+      ))}
+    </svg>
+  )
+}
+
+function KpiMini({ nome, valor, delta }: { nome: string; valor: string; delta: string }) {
+  return (
+    <div className="rounded-lg border border-bg-700/40 bg-bg-950/50 px-2.5 py-2">
+      <div className="text-[10px] text-ink-500">{nome}</div>
+      <div className="num mt-0.5 text-sm font-semibold text-ink-100">{valor}</div>
+      <div className="text-[10px] font-medium text-emerald-400">{delta}</div>
+    </div>
+  )
+}
+
+function LegendaPlat({ cor, nome, valor, delta }: { cor: string; nome: string; valor: string; delta: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={cn('h-2 w-2 shrink-0 rounded-full', cor)} />
+      <span className="text-xs text-ink-300">{nome}</span>
+      <span className="num ml-auto text-xs font-semibold text-ink-100">{valor}</span>
+      <span className="w-10 text-right text-[10px] font-medium text-emerald-400">{delta}</span>
+    </div>
+  )
+}
+
+function Pilar({ nome, pct }: { nome: string; pct: number }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-ink-400">{nome}</span>
+        <span className="num text-ink-300">{pct}</span>
+      </div>
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-bg-700/60">
+        <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function BarrasReceita() {
+  const alturas = [34, 44, 40, 56, 50, 68, 80, 100]
+  return (
+    <div className="flex h-12 items-end gap-1.5" aria-hidden>
+      {alturas.map((h, i) => (
+        <span key={i} className="flex-1 rounded-t bg-gradient-to-t from-amber-500/40 to-amber-300" style={{ height: `${h}%` }} />
+      ))}
+    </div>
+  )
+}
+
+function HealthRing() {
+  const r = 30
+  const c = 2 * Math.PI * r
+  const pct = 0.92
+  return (
+    <div className="relative h-20 w-20">
+      <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
+        <circle
+          cx="40"
+          cy="40"
+          r={r}
+          fill="none"
+          stroke="#34d399"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={`${c * pct} ${c}`}
+        />
+      </svg>
+      <div className="absolute inset-0 grid place-items-center">
+        <span className="num text-xl font-bold text-ink-100">92</span>
       </div>
     </div>
   )

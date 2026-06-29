@@ -19,6 +19,54 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Eyebrow mono/uppercase — registro B2B. Sem cor: definida por text-* no uso. */
+  .mono-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem; /* 11px */
+    line-height: 1;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* Título do hero — escala grande e confiante (estilo Viberate) com tracking apertado. */
+  .hero-title {
+    font-size: clamp(2.75rem, 6.5vw, 5rem);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+  }
+
+  /* Acento vibrante (energia Viberate) num clip de gradiente fuchsia→violet→cyan→amber. */
+  .accent-vibe {
+    background-image: linear-gradient(100deg, #f0abfc 0%, #c084fc 28%, #818cf8 52%, #38bdf8 76%, #fcd34d 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Carrossel infinito de logos: a faixa anda da direita pra esquerda sem emenda
+     (o conteúdo é duplicado no JSX, então -50% volta ao ponto de partida). */
+  .animate-marquee {
+    animation: marquee 48s linear infinite;
+  }
+
+  /* Máscara que esfuma as bordas do carrossel (entra/sai suave). */
+  .marquee-mask {
+    -webkit-mask-image: linear-gradient(to right, transparent, black 7%, black 93%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 7%, black 93%, transparent);
+  }
+
+  /* Showcase de features: barra de progresso sob a aba ativa (0→100%).
+     Remontada via key={ativo} no JSX, então reinicia a cada troca de aba. */
+  .animate-showcase-progress {
+    animation: showcase-progress 7s linear forwards;
+  }
+
+  /* Entrada do painel ativo do showcase ao trocar de aba (fade + leve subida).
+     Remontado via key={ativo} no JSX, então reinicia a cada troca. */
+  .animate-showcase-in {
+    animation: showcase-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
   }
@@ -125,6 +173,37 @@
   }
 }
 
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Barra de progresso do showcase: enche da esquerda pra direita (scaleX 0→1). */
+@keyframes showcase-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Painel ativo do showcase entra com fade + leve subida ao trocar de aba. */
+@keyframes showcase-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* ── Mini-gráficos dos cards da landing: animam no hover do card (.group) ── */
 @property --fx-saude {
   syntax: '<integer>';
@@ -204,6 +283,9 @@
   .animate-aurora,
   .animate-floaty,
   .animate-gradient-text,
+  .animate-marquee,
+  .animate-showcase-progress,
+  .animate-showcase-in,
   .group:hover .fx-bar,
   .group:hover .fx-ring-prog,
   .group:hover .fx-count,

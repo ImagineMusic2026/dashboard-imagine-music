@@ -1,22 +1,23 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Activity, BarChart3, Wallet } from 'lucide-react'
+import { ArrowRight, TrendingUp } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/logo'
+import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { cn } from '@/lib/utils'
+import { FeatureShowcase } from '@/components/landing/feature-showcase'
 
 /**
  * Landing pública do painel (rota `/`).
  *
- * Antes esta rota redirecionava direto para `/login` — o que deixava o domínio
- * raiz como uma "parede de login". Revisores de App Review (ex.: TikTok) batem
- * no Website URL e precisam ver o que o produto é, além de links para as
- * políticas. Por isso `/` é uma página pública (server component, sem auth) que
- * descreve o painel e leva ao login. As rotas privadas continuam protegidas
- * pelo `AuthGuard`.
+ * `/` é uma página pública (server component, sem auth): descreve o produto e
+ * leva ao login. Revisores de App Review (ex.: TikTok) batem no Website URL e
+ * precisam ver o que o produto é + links para as políticas. As rotas privadas
+ * seguem protegidas pelo `AuthGuard`.
  *
- * Visual: mesma linguagem da tela de login — fundo aurora + grade de pontos,
- * entradas escalonadas (`animate-rise`) e título com `animate-gradient-text`.
- * Tudo em CSS (sem JS) para renderizar instantâneo ao revisor e respeitar
+ * Direção visual: tema escuro premium da Imagine + energia/estrutura do Viberate
+ * — hero com cluster de cards flutuantes, carrossel infinito de logos das
+ * plataformas, banda de números e um showcase de recursos em abas
+ * (`FeatureShowcase`, client component). Animações em CSS respeitam
  * `prefers-reduced-motion` (tratado em globals.css).
  */
 
@@ -26,75 +27,52 @@ export const metadata: Metadata = {
     'Plataforma da Imagine e dos seus artistas para acompanhar métricas e receita, consolidando dados de YouTube, Instagram, TikTok e OneRPM mediante autorização do titular de cada conta.',
 }
 
-type Accent = 'violet' | 'emerald' | 'amber'
-
-const RECURSOS: {
-  icon: typeof BarChart3
-  titulo: string
-  texto: string
-  accent: Accent
-  visual: 'bars' | 'ring' | 'area'
-}[] = [
-  {
-    icon: BarChart3,
-    titulo: 'Métricas consolidadas',
-    texto:
-      'Seguidores, visualizações, engajamento e crescimento de YouTube, Instagram e TikTok, lado a lado, por artista.',
-    accent: 'violet',
-    visual: 'bars',
-  },
-  {
-    icon: Activity,
-    titulo: 'Saúde do artista',
-    texto:
-      'Um índice que resume a evolução e o engajamento de cada artista em todas as plataformas conectadas.',
-    accent: 'emerald',
-    visual: 'ring',
-  },
-  {
-    icon: Wallet,
-    titulo: 'Receita',
-    texto: 'Royalties e streaming importados da OneRPM, detalhados por artista, faixa e plataforma.',
-    accent: 'amber',
-    visual: 'area',
-  },
+/* Plataformas do carrossel infinito (as que o painel consome + OneRPM).
+   Logos brancos servidos de /public/logos; OneRPM usa o selo próprio (OneRpmMark). */
+const PLATAFORMAS: { nome: string; logo?: string; tam?: string; inv?: boolean }[] = [
+  { nome: 'YouTube', logo: '/logos/youtube.svg' },
+  { nome: 'Instagram', logo: '/logos/instagram.svg' },
+  { nome: 'Meta', logo: '/logos/meta.svg' },
+  { nome: 'TikTok', logo: '/logos/tiktok.svg', tam: 'h-9 w-9' },
+  { nome: 'Spotify', logo: '/logos/spotify.svg' },
+  { nome: 'Apple Music', logo: '/logos/applemusic.svg' },
+  { nome: 'Deezer', logo: '/logos/deezer.svg' },
+  // OneRPM tem logo escura (feita p/ fundo claro) → renderiza em branco no escuro.
+  { nome: 'OneRPM', logo: '/logos/onerpm.svg', tam: 'h-9 w-9', inv: true },
 ]
 
-// Classes estáticas por acento (Tailwind não enxerga nomes dinâmicos).
-const ACCENTS: Record<Accent, { chip: string; ring: string; line: string }> = {
-  violet: {
-    chip: 'border-violet-500/20 from-violet-500/20 to-violet-400/5 text-violet-300',
-    ring: 'hover:border-violet-500/40 hover:shadow-violet-500/10',
-    line: 'via-violet-500/70',
-  },
-  emerald: {
-    chip: 'border-emerald-500/20 from-emerald-500/20 to-emerald-400/5 text-emerald-300',
-    ring: 'hover:border-emerald-500/40 hover:shadow-emerald-500/10',
-    line: 'via-emerald-500/70',
-  },
-  amber: {
-    chip: 'border-amber-500/20 from-amber-500/20 to-amber-400/5 text-amber-300',
-    ring: 'hover:border-amber-500/40 hover:shadow-amber-500/10',
-    line: 'via-amber-500/70',
-  },
-}
+// Repetimos a lista o suficiente pra UMA metade da faixa já ser mais larga que
+// a tela — assim o carrossel nunca mostra espaço vazio ao "virar". O JSX
+// renderiza duas metades idênticas e a animação anda -50% (volta exatamente ao
+// ponto de partida, sem emenda).
+const FILA_LOGOS = Array.from({ length: 4 }, () => PLATAFORMAS).flat()
+
+/* ⚠️  EDITE AQUI: números da banda de estatísticas (ajuste ao roster real). */
+const ESTATISTICAS = [
+  { valor: '100+', rotulo: 'Artistas no roster' },
+  { valor: '8', rotulo: 'Plataformas conectadas' },
+  { valor: '24h', rotulo: 'Dados atualizados' },
+  { valor: '100%', rotulo: 'Sob autorização' },
+]
 
 const ANO = new Date().getFullYear()
 
 export default function LandingPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-bg-950 text-ink-300">
-      {/* ── Atmosfera de fundo: aurora animada + grade de pontos com máscara ── */}
-      <div aria-hidden className="absolute inset-0 overflow-hidden pointer-events-none">
+    <main className="relative min-h-screen overflow-hidden bg-bg-950 text-ink-300 antialiased">
+      {/* ── Atmosfera de fundo: aurora colorida (energia Viberate) sobre o escuro ── */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-violet-950/30 via-bg-950 to-bg-950" />
-        <div className="absolute -top-40 -left-32 w-[36rem] h-[36rem] bg-violet-600/20 rounded-full blur-3xl animate-aurora" />
-        <div className="absolute top-1/4 -right-32 w-[32rem] h-[32rem] bg-amber-500/12 rounded-full blur-3xl animate-aurora [animation-delay:-7s]" />
-        <div className="absolute -bottom-32 left-1/4 w-[28rem] h-[28rem] bg-fuchsia-500/12 rounded-full blur-3xl animate-aurora [animation-delay:-14s]" />
+        <div className="absolute -top-44 -left-40 h-[34rem] w-[34rem] rounded-full bg-violet-600/20 blur-3xl animate-aurora" />
+        <div className="absolute -top-32 right-0 h-[30rem] w-[30rem] rounded-full bg-fuchsia-500/15 blur-3xl animate-aurora [animation-delay:-6s]" />
+        <div className="absolute top-1/3 -right-32 h-[28rem] w-[28rem] rounded-full bg-sky-500/12 blur-3xl animate-aurora [animation-delay:-11s]" />
+        <div className="absolute bottom-0 left-1/4 h-[26rem] w-[26rem] rounded-full bg-amber-500/[0.08] blur-3xl animate-aurora [animation-delay:-16s]" />
         <div
-          className="absolute inset-0 opacity-[0.35]"
+          className="absolute inset-0 opacity-[0.3]"
           style={{
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
+            backgroundImage:
+              'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+            backgroundSize: '26px 26px',
             maskImage: 'radial-gradient(ellipse at 50% 0%, black 0%, transparent 72%)',
             WebkitMaskImage: 'radial-gradient(ellipse at 50% 0%, black 0%, transparent 72%)',
           }}
@@ -103,104 +81,103 @@ export default function LandingPage() {
 
       {/* ── Conteúdo ── */}
       <div className="relative z-10 flex min-h-screen flex-col">
-        <header className="sticky top-0 z-20 border-b border-bg-700/30 bg-bg-950/70 backdrop-blur-xl">
-          <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <Link
-              href="/"
-              aria-label="Página inicial"
-              className="transition-opacity hover:opacity-80"
-            >
+        <header className="sticky top-0 z-30 border-b border-bg-700/30 bg-bg-950/70 backdrop-blur-xl">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-400/30 to-transparent"
+          />
+          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+            <Link href="/" aria-label="Página inicial" className="transition-opacity hover:opacity-80">
               <BrandLogo className="h-7" priority />
             </Link>
             <Link
               href="/login"
-              className="text-sm font-medium text-ink-200 hover:text-ink-100 px-4 py-2 rounded-lg border border-bg-700/60 bg-bg-900/40 hover:bg-bg-800/70 hover:border-violet-500/50 transition-all"
+              className="rounded-lg border border-bg-700/60 bg-bg-900/40 px-4 py-2 text-sm font-medium text-ink-200 transition-all hover:border-violet-500/50 hover:bg-bg-800/70 hover:text-ink-100"
             >
               Entrar
             </Link>
           </div>
         </header>
 
-        <section className="flex-1">
-          <div className="max-w-6xl mx-auto px-6 pt-16 sm:pt-24 pb-20">
-            <div className="grid lg:grid-cols-2 gap-14 lg:gap-8 items-center">
-              {/* Texto */}
-              <div className="max-w-xl">
-                <h1 className="text-4xl sm:text-5xl font-bold leading-[1.1] tracking-tight text-ink-100 animate-rise">
-                  Acompanhe a carreira dos artistas{' '}
-                  <span className="animate-gradient-text">num só painel.</span>
-                </h1>
-                <p className="mt-6 text-lg leading-relaxed text-ink-300 animate-rise [animation-delay:120ms]">
-                  Plataforma da Imagine e dos artistas do selo, reunindo as métricas e a receita de
-                  YouTube, Instagram, TikTok e OneRPM, sempre com a autorização do titular de cada
-                  conta.
-                </p>
-                <div className="mt-9 flex flex-wrap items-center gap-4 animate-rise [animation-delay:240ms]">
-                  <Link
-                    href="/login"
-                    className="bg-violet-500 hover:bg-violet-600 text-white font-semibold px-6 py-3 rounded-xl text-sm transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/25"
-                  >
-                    Entrar no painel
-                  </Link>
-                </div>
-              </div>
+        {/* ── HERO ── */}
+        <section className="relative">
+          <div className="mx-auto grid max-w-6xl items-center gap-16 px-6 pb-16 pt-16 sm:pt-24 lg:grid-cols-[1.02fr_0.98fr] lg:gap-8">
+            <div className="max-w-xl">
+              <h1 className="hero-title font-bold text-ink-100 animate-rise">
+                Toda a carreira dos seus artistas{' '}
+                <span className="accent-vibe">num só painel</span>
+              </h1>
 
-              {/* Visual: prévia do painel (decorativo, só em telas grandes) */}
-              <div className="hidden lg:block animate-rise [animation-delay:200ms]" aria-hidden>
-                <DashboardPreview />
+              <p className="mt-7 max-w-lg text-lg leading-relaxed text-ink-300 animate-rise [animation-delay:160ms]">
+                A Imagine reúne as métricas e a receita dos seus artistas em uma só
+                visão atualizada todo dia e sempre com a autorização do titular de
+                cada conta
+              </p>
+
+              <div className="mt-9 flex flex-wrap items-center gap-4 animate-rise [animation-delay:240ms]">
+                <Link
+                  href="/login"
+                  className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-violet-500 px-6 py-3.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-violet-600 hover:shadow-lg hover:shadow-violet-500/30"
+                >
+                  <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-white/40" />
+                  Entrar no painel
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
               </div>
             </div>
 
-            {/* Recursos */}
-            <div className="mt-24 grid gap-5 sm:grid-cols-3">
-              {RECURSOS.map(({ icon: Icon, titulo, texto, accent, visual }, i) => {
-                const a = ACCENTS[accent]
-                return (
-                  <div key={titulo} className="animate-rise" style={{ animationDelay: `${360 + i * 100}ms` }}>
-                    <div
-                      className={cn(
-                        'group relative h-full overflow-hidden rounded-2xl border border-bg-700/40 bg-gradient-to-b from-bg-900/70 to-bg-900/20 p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl',
-                        a.ring
-                      )}
-                    >
-                      {/* fio de luz no topo (aparece no hover) */}
-                      <span
-                        className={cn(
-                          'pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100',
-                          a.line
-                        )}
-                      />
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={cn(
-                            'grid h-10 w-10 place-items-center rounded-xl border bg-gradient-to-br transition-transform duration-300 group-hover:scale-110',
-                            a.chip
-                          )}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <h2 className="text-base font-semibold text-ink-100">{titulo}</h2>
-                      </div>
-                      <p className="mt-3 text-sm leading-relaxed text-ink-400">{texto}</p>
-                      <div className="mt-5 border-t border-bg-700/30 pt-4">
-                        <CardVisual tipo={visual} />
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+            {/* Cluster de cards flutuantes (decorativo) */}
+            <div className="animate-rise [animation-delay:200ms]" aria-hidden>
+              <HeroVisual />
             </div>
           </div>
         </section>
 
+        {/* ── Recursos: showcase em abas (estilo Viberate) ── */}
+        <section id="recursos" className="mx-auto w-full max-w-6xl px-6 pb-20 pt-20">
+          <div className="mb-8 flex items-baseline justify-between border-b border-bg-700/40 pb-5">
+            <h2 className="text-sm font-semibold tracking-tight text-ink-200">O que você acompanha</h2>
+            <span className="mono-eyebrow text-ink-600">Visão por artista</span>
+          </div>
+          <FeatureShowcase />
+        </section>
+
+        {/* ── Banda de números ── */}
+        <section className="relative border-t border-bg-700/30">
+          <div className="mx-auto max-w-6xl px-6 pb-12 pt-16 text-center">
+            <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-tight text-ink-100 sm:text-4xl">
+              Todas as suas plataformas{' '}
+              <span className="accent-vibe">num só lugar</span>
+            </h2>
+
+            <div className="mt-14 grid grid-cols-2 gap-6 sm:grid-cols-4">
+              {ESTATISTICAS.map(({ valor, rotulo }) => (
+                <div key={rotulo}>
+                  <div className="num text-4xl font-bold text-ink-100 sm:text-5xl">{valor}</div>
+                  <div className="mt-1.5 text-sm text-ink-400">{rotulo}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Carrossel infinito de plataformas (faixa antes do rodapé) ── */}
+        <section className="relative marquee-mask overflow-hidden border-t border-bg-700/30 py-8">
+          <div className="flex w-max animate-marquee">
+            {[...FILA_LOGOS, ...FILA_LOGOS].map((p, i) => (
+              <LogoTile key={`${p.nome}-${i}`} {...p} />
+            ))}
+          </div>
+        </section>
+
         <footer className="border-t border-bg-700/30">
-          <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-ink-500">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-6 text-sm text-ink-500 sm:flex-row">
             <span>© {ANO} Imagine Group</span>
             <nav className="flex items-center gap-5">
-              <Link href="/privacidade" className="hover:text-ink-300 transition-colors">
+              <Link href="/privacidade" className="transition-colors hover:text-ink-300">
                 Política de Privacidade
               </Link>
-              <Link href="/termos" className="hover:text-ink-300 transition-colors">
+              <Link href="/termos" className="transition-colors hover:text-ink-300">
                 Termos de Uso
               </Link>
             </nav>
@@ -211,65 +188,160 @@ export default function LandingPage() {
   )
 }
 
-/* ── Prévia do painel (mockup decorativo, flutuante) ───────────────────────── */
+/* ── Carrossel: tile de logo de plataforma ─────────────────────────────────── */
 
-function DashboardPreview() {
+function LogoTile({ nome, logo, tam, inv }: { nome: string; logo?: string; tam?: string; inv?: boolean }) {
   return (
-    <div className="relative ml-auto w-full max-w-md animate-floaty">
-      {/* halo atrás do card */}
-      <div className="absolute -inset-5 -z-10 rounded-[2.5rem] bg-gradient-to-br from-violet-600/25 to-amber-500/10 blur-2xl" />
+    <div className="mx-3 flex shrink-0 flex-col items-center gap-2.5">
+      <div className="grid h-16 w-16 place-items-center rounded-2xl border border-bg-700/50 bg-bg-900/60 shadow-lg shadow-black/20 ring-1 ring-inset ring-white/5 transition-colors hover:border-bg-700">
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} alt={nome} className={cn('object-contain opacity-90', tam || 'h-7 w-7', inv && 'brightness-0 invert')} loading="lazy" />
+        ) : (
+          <span className="h-7 w-7 text-amber-400">
+            <OneRpmMark className="h-full w-full" />
+          </span>
+        )}
+      </div>
+      <span className="text-xs font-medium text-ink-400">{nome}</span>
+    </div>
+  )
+}
 
-      <div className="rounded-2xl border border-bg-700/50 bg-bg-900/70 p-5 shadow-2xl shadow-violet-950/50 backdrop-blur-xl">
-        {/* Artista + health */}
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-amber-400 font-bold text-bg-950">
-            A
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-ink-100">MC Aurora</div>
-            <div className="text-xs text-ink-500">@mcaurora</div>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Saúde 92
-          </div>
+function OneRpmMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path d="M10.6 7.4h2.4v9.2h-2.2V9.6l-1.7.5-.4-1.7z" fill="#0F0B1F" />
+    </svg>
+  )
+}
+
+/* ── Hero: cluster de cards flutuantes (decorativo) ────────────────────────── */
+
+function HeroVisual() {
+  return (
+    <div className="relative mx-auto w-full max-w-md lg:ml-auto lg:mr-0">
+      {/* halo colorido atrás do cluster */}
+      <div className="absolute -inset-8 -z-20 rounded-[3rem] bg-gradient-to-br from-violet-600/25 via-fuchsia-500/10 to-sky-500/10 blur-3xl" />
+      {/* card-base atrás — profundidade empilhada */}
+      <div className="absolute inset-x-4 top-6 -z-10 h-full rounded-2xl border border-bg-700/30 bg-bg-900/40" />
+
+      {/* Card principal — moldura de app */}
+      <div className="overflow-hidden rounded-2xl border border-bg-700/50 bg-bg-900/70 shadow-2xl shadow-violet-950/50 ring-1 ring-inset ring-white/5 backdrop-blur-xl">
+        <div className="flex items-center gap-2 border-b border-bg-700/40 bg-bg-950/40 px-4 py-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-bg-700" />
+          <span className="ml-3 truncate rounded-md bg-bg-800/60 px-2.5 py-1 text-[11px] text-ink-500">
+            painel.imagine / artistas
+          </span>
         </div>
 
-        {/* Streams + sparkline */}
-        <div className="mt-5 rounded-xl border border-bg-700/40 bg-bg-950/50 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-400">Streams · últimos 30 dias</span>
-            <span className="text-xs font-medium text-emerald-400">+18%</span>
+        <div className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-amber-400 font-bold text-bg-950">
+              A
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-ink-100">MC Aurora</div>
+              <div className="text-xs text-ink-500">@mcaurora</div>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Saúde 92
+            </div>
           </div>
-          <div className="mt-2 flex items-end justify-between gap-3">
-            <span className="num text-2xl font-bold text-ink-100">1,24M</span>
-            <Sparkline />
+
+          <div className="mt-5 rounded-xl border border-bg-700/40 bg-bg-950/50 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-ink-400">Streams · últimos 30 dias</span>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+                <TrendingUp className="h-3.5 w-3.5" />
+                +18%
+              </span>
+            </div>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <span className="num text-2xl font-bold text-ink-100">1,24M</span>
+              <Sparkline />
+            </div>
           </div>
-        </div>
 
-        {/* Plataformas */}
-        <div className="mt-4 grid grid-cols-3 gap-2.5">
-          <Plataforma cor="bg-red-500" nome="YouTube" valor="1,2M" />
-          <Plataforma cor="bg-pink-500" nome="Instagram" valor="340k" />
-          <Plataforma cor="bg-cyan-400" nome="TikTok" valor="890k" />
-        </div>
-
-        {/* Receita */}
-        <div className="mt-4 flex items-center justify-between rounded-xl border border-bg-700/40 bg-bg-950/50 px-4 py-3">
-          <span className="text-xs text-ink-400">Receita do mês</span>
-          <div className="flex items-center gap-2">
-            <span className="num text-lg font-bold text-ink-100">R$ 24,5k</span>
-            <span className="text-xs font-medium text-emerald-400">+9%</span>
+          <div className="mt-4 grid grid-cols-3 gap-2.5">
+            <Plataforma cor="bg-red-500" nome="YouTube" valor="1,2M" delta="+12%" />
+            <Plataforma cor="bg-pink-500" nome="Instagram" valor="340k" delta="+6%" />
+            <Plataforma cor="bg-cyan-400" nome="TikTok" valor="890k" delta="+21%" />
           </div>
         </div>
       </div>
 
-      {/* chip satélite flutuante */}
-      <div className="absolute -top-4 -left-6 flex items-center gap-2 rounded-xl border border-bg-700/60 bg-bg-800/80 px-3 py-2 text-xs font-medium text-ink-100 shadow-xl backdrop-blur-md animate-floaty [animation-delay:-4s]">
+      {/* chip flutuante: seguidores hoje */}
+      <div className="absolute -left-4 -top-4 flex items-center gap-2 rounded-xl border border-bg-700/60 bg-bg-800/80 px-3 py-2 text-xs font-medium text-ink-100 shadow-xl ring-1 ring-inset ring-white/5 backdrop-blur-md animate-floaty [animation-delay:-3s]">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
         +1.240 seguidores hoje
       </div>
+
+      {/* card flutuante: pizza de audiência por plataforma (estilo Viberate) */}
+      <div className="absolute -bottom-14 -left-12 hidden animate-floaty rounded-2xl border border-bg-700/50 bg-bg-900/85 p-6 shadow-2xl ring-1 ring-inset ring-white/5 backdrop-blur-md [animation-delay:-6s] sm:block">
+        <DonutAudiencia />
+      </div>
+
+      {/* card flutuante: ouvintes Spotify */}
+      <div className="absolute -bottom-9 -right-6 hidden animate-floaty rounded-xl border border-bg-700/50 bg-bg-900/85 px-4 py-3 shadow-2xl ring-1 ring-inset ring-white/5 backdrop-blur-md [animation-delay:-5s] sm:block">
+        <div className="flex items-center gap-2">
+          <span className="h-4 w-4 text-emerald-400">
+            <PlataformaIcon tipo="spotify" />
+          </span>
+          <span className="text-[11px] text-ink-400">Ouvintes mensais</span>
+        </div>
+        <div className="mt-1 flex items-end gap-2">
+          <span className="num text-lg font-bold text-ink-100">63,8M</span>
+          <span className="mb-0.5 text-[11px] font-medium text-emerald-400">+4,2%</span>
+        </div>
+      </div>
     </div>
+  )
+}
+
+// Pizza de audiência estilo Viberate: anel com os ícones das plataformas em
+// "bolhas" ao redor (N/L/S/O) e o total no centro.
+function DonutAudiencia() {
+  return (
+    <div className="relative h-32 w-32">
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{
+          background:
+            'conic-gradient(#ef4444 0 30%, #d946ef 30% 55%, #22d3ee 55% 78%, #34d399 78% 100%)',
+        }}
+      >
+        <div className="absolute inset-[11px] grid place-items-center rounded-full bg-bg-900 text-center">
+          <div>
+            <div className="num text-lg font-bold text-ink-100">80,9M</div>
+            <div className="text-[9px] text-ink-500">audiência total</div>
+          </div>
+        </div>
+      </div>
+      <IconeBolha tipo="youtube" cor="text-red-500" className="left-1/2 top-0 -translate-x-1/2 -translate-y-1/2" />
+      <IconeBolha tipo="instagram" cor="text-fuchsia-500" className="right-0 top-1/2 -translate-y-1/2 translate-x-1/2" />
+      <IconeBolha tipo="tiktok" cor="text-cyan-400" className="bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" />
+      <IconeBolha tipo="spotify" cor="text-emerald-400" className="left-0 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+    </div>
+  )
+}
+
+function IconeBolha({ tipo, cor, className }: { tipo: PlataformaTipo; cor: string; className: string }) {
+  return (
+    <span
+      className={cn(
+        'absolute grid h-8 w-8 place-items-center rounded-full border border-bg-700/60 bg-bg-800 shadow-lg ring-1 ring-inset ring-white/10',
+        className,
+      )}
+    >
+      <span className={cn('h-4 w-4', cor)}>
+        <PlataformaIcon tipo={tipo} />
+      </span>
+    </span>
   )
 }
 
@@ -300,7 +372,17 @@ function Sparkline() {
   )
 }
 
-function Plataforma({ cor, nome, valor }: { cor: string; nome: string; valor: string }) {
+function Plataforma({
+  cor,
+  nome,
+  valor,
+  delta,
+}: {
+  cor: string
+  nome: string
+  valor: string
+  delta: string
+}) {
   return (
     <div className="rounded-xl border border-bg-700/40 bg-bg-950/50 px-3 py-2.5">
       <div className="flex items-center gap-1.5">
@@ -308,102 +390,7 @@ function Plataforma({ cor, nome, valor }: { cor: string; nome: string; valor: st
         <span className="truncate text-[11px] text-ink-500">{nome}</span>
       </div>
       <div className="num mt-1 text-sm font-semibold text-ink-100">{valor}</div>
+      <div className="mt-0.5 text-[10px] font-medium text-emerald-400">{delta}</div>
     </div>
-  )
-}
-
-/* ── Mini-visuais dos cards de recurso ──────────────────────────────────────── */
-
-function CardVisual({ tipo }: { tipo: 'bars' | 'ring' | 'area' }) {
-  if (tipo === 'ring') return <VisualRing />
-  if (tipo === 'area') return <VisualArea />
-  return <VisualBars />
-}
-
-function VisualBars() {
-  const alturas = [38, 55, 46, 70, 58, 84, 72, 100]
-  return (
-    <div className="flex h-16 items-end gap-1.5" aria-hidden>
-      {alturas.map((h, i) => (
-        <span
-          key={i}
-          className="fx-bar flex-1 rounded-t bg-gradient-to-t from-violet-600/40 to-violet-400"
-          style={{ height: `${h}%`, animationDelay: `${i * 70}ms` }}
-        />
-      ))}
-    </div>
-  )
-}
-
-function VisualRing() {
-  // Medidor de 270° (abertura centralizada embaixo). Os valores de dasharray
-  // batem com os keyframes `fx-ring-fill` em globals.css: circ≈113.097,
-  // arco 270°=84.823, 92% do arco=78.037.
-  return (
-    <div className="flex items-center justify-center gap-3.5">
-      <div className="relative h-16 w-16 shrink-0">
-        <svg viewBox="0 0 48 48" className="h-full w-full" fill="none" aria-hidden>
-          <circle
-            cx="24"
-            cy="24"
-            r="18"
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeDasharray="84.823 113.097"
-            transform="rotate(135 24 24)"
-          />
-          <circle
-            className="fx-ring-prog"
-            cx="24"
-            cy="24"
-            r="18"
-            stroke="#34d399"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeDasharray="78.037 113.097"
-            transform="rotate(135 24 24)"
-          />
-        </svg>
-        <div className="absolute inset-0 grid place-items-center">
-          <span className="num fx-count text-base font-bold text-ink-100" />
-        </div>
-      </div>
-      <div className="text-xs leading-tight">
-        <div className="font-semibold text-emerald-400">Saudável</div>
-        <div className="text-ink-500">índice de saúde</div>
-      </div>
-    </div>
-  )
-}
-
-function VisualArea() {
-  // Curva exponencial: quase plana à esquerda e subindo cada vez mais forte até
-  // o topo à direita ("hockey stick"). Ocupa a largura toda e NÃO usa dasharray
-  // (que, com o stretch + non-scaling-stroke, cortava a linha no meio). A
-  // animação de hover (fx-rise) faz o gráfico inteiro "sair do chão".
-  const d = 'M0,48 C30,48 55,47 78,44 C100,41 114,33 128,23 C138,16 145,9 150,4'
-  return (
-    <svg viewBox="0 0 150 52" className="fx-rise h-16 w-full" preserveAspectRatio="none" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="cv-area-stroke" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#f59e0b" />
-          <stop offset="100%" stopColor="#fde047" />
-        </linearGradient>
-        <linearGradient id="cv-area-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${d} L150,52 L0,52 Z`} fill="url(#cv-area-fill)" />
-      <path
-        d={d}
-        stroke="url(#cv-area-stroke)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
   )
 }

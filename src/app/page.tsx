@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, TrendingUp } from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/logo'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { cn } from '@/lib/utils'
 import { FeatureShowcase } from '@/components/landing/feature-showcase'
+import { ScrollHero } from '@/components/landing/scroll-hero'
 
 /**
  * Landing pública do painel (rota `/`).
@@ -59,7 +60,7 @@ const ANO = new Date().getFullYear()
 
 export default function LandingPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-bg-950 text-ink-300 antialiased">
+    <main className="relative min-h-screen overflow-x-clip bg-bg-950 text-ink-300 antialiased">
       {/* ── Atmosfera de fundo: aurora colorida (energia Viberate) sobre o escuro ── */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-violet-950/30 via-bg-950 to-bg-950" />
@@ -99,39 +100,10 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* ── HERO ── */}
-        <section className="relative">
-          <div className="mx-auto grid max-w-6xl items-center gap-16 px-6 pb-16 pt-16 sm:pt-24 lg:grid-cols-[1.02fr_0.98fr] lg:gap-8">
-            <div className="max-w-xl">
-              <h1 className="hero-title font-bold text-ink-100 animate-rise">
-                Toda a carreira dos seus artistas{' '}
-                <span className="accent-vibe">num só painel</span>
-              </h1>
-
-              <p className="mt-7 max-w-lg text-lg leading-relaxed text-ink-300 animate-rise [animation-delay:160ms]">
-                A Imagine reúne as métricas e a receita dos seus artistas em uma só
-                visão atualizada todo dia e sempre com a autorização do titular de
-                cada conta
-              </p>
-
-              <div className="mt-9 flex flex-wrap items-center gap-4 animate-rise [animation-delay:240ms]">
-                <Link
-                  href="/login"
-                  className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-violet-500 px-6 py-3.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-violet-600 hover:shadow-lg hover:shadow-violet-500/30"
-                >
-                  <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-white/40" />
-                  Entrar no painel
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Cluster de cards flutuantes (decorativo) */}
-            <div className="animate-rise [animation-delay:200ms]" aria-hidden>
-              <HeroVisual />
-            </div>
-          </div>
-        </section>
+        {/* ── HERO: slides com scroll preso no desktop (estilo OneRPM) ── */}
+        <ScrollHero>
+          <HeroVisual />
+        </ScrollHero>
 
         {/* ── Recursos: showcase em abas (estilo Viberate) ── */}
         <section id="recursos" className="mx-auto w-full max-w-6xl px-6 pb-20 pt-20">

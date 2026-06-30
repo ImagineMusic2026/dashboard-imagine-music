@@ -29,7 +29,8 @@ const PILARES: { key: keyof SaudeBreakdown; label: string; barra: string }[] = [
   { key: 'crescimento', label: 'Crescimento', barra: 'bg-emerald-500' },
   { key: 'engajamento', label: 'Engajamento', barra: 'bg-fuchsia-500' },
   { key: 'conteudo', label: 'Conteúdo', barra: 'bg-amber-500' },
-  { key: 'streaming', label: 'Streaming', barra: 'bg-cyan-500' },
+  // "Carreira & Negócio" no contrato; medido hoje pelo streaming/consumo real (OneRPM).
+  { key: 'streaming', label: 'Carreira & Negócio', barra: 'bg-cyan-500' },
 ]
 
 export function HealthScoreArtistaCard({ slug, nome }: { slug: string; nome: string }) {
@@ -133,7 +134,7 @@ export function HealthScoreArtistaCard({ slug, nome }: { slug: string; nome: str
             const v = s.breakdown[p.key]
             return (
               <div key={p.key} className="flex items-center gap-3">
-                <span className="text-[12px] text-ink-300 w-24 shrink-0">{p.label}</span>
+                <span className="text-[12px] text-ink-300 w-32 shrink-0">{p.label}</span>
                 <div className="flex-1 h-1.5 rounded-full bg-bg-800 overflow-hidden">
                   {v != null && (
                     <div className={cn('h-full rounded-full', p.barra)} style={{ width: `${v}%` }} />

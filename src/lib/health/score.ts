@@ -33,7 +33,10 @@ export interface SaudeBreakdown {
   crescimento: number | null
   engajamento: number | null
   conteudo: number | null
-  /** Streaming (OneRPM): volume da janela + momentum recente. */
+  /**
+   * Streaming (OneRPM): volume da janela + momentum recente. Exibido na UI e no
+   * contrato como o pilar "Carreira & Negócio" (a chave interna segue `streaming`).
+   */
   streaming: number | null
 }
 

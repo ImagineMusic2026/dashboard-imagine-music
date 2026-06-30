@@ -5,6 +5,7 @@
 > os números juntos para que o score reflita a estratégia da Imagine.
 >
 > Versão da metodologia: calibrada em 23/06/2026 sobre o roster real.
+> Nomenclatura dos pilares alinhada ao contrato em 30/06/2026.
 
 ---
 
@@ -60,11 +61,18 @@ gestão pode opinar.
 | **Crescimento** | **15%** | Momentum — variação de seguidores desde a última coleta | Instagram + YouTube |
 | **Engajamento** | **25%** | Interação real por publicação, relativa ao tamanho da base | Instagram + YouTube |
 | **Conteúdo** | **15%** | Cadência — há quanto tempo não posta + volume no último mês | Instagram + YouTube |
-| **Streaming** | **25%** | Consumo real — volume de streams (28 dias) + momentum recente | OneRPM |
+| **Carreira & Negócio** | **25%** | Consumo real — volume de streams (28 dias) + momentum recente | OneRPM |
 
-**Engajamento e Streaming são os pilares de maior peso (25% cada)** — a leitura é
-de que "as pessoas estão de fato consumindo e interagindo" importa mais do que
-puramente o tamanho da base. Esse é um ponto explícito de validação.
+**Engajamento e Carreira & Negócio são os pilares de maior peso (25% cada)** — a
+leitura é de que "as pessoas estão de fato consumindo e interagindo" importa mais
+do que puramente o tamanho da base. Esse é um ponto explícito de validação.
+
+> **Alinhamento com o contrato.** O contrato lista quatro pilares — Audiência,
+> Engajamento, Conteúdo e **Carreira & Negócio**. Os três primeiros são idênticos;
+> **Carreira & Negócio** é medido hoje pelo **streaming / consumo real** (OneRPM) e
+> será reforçado pela **receita** assim que a OneRPM liberar as rotas. O painel
+> ainda traz um pilar **extra** — **Crescimento** (momentum de seguidores) — como
+> refinamento além do escopo contratado.
 
 ### 3.1. Audiência (20%)
 
@@ -125,9 +133,9 @@ Mede **cadência de publicação**, combinando duas coisas:
 - **Volume** (peso 40%): quantos posts nos últimos 30 dias.
   **12 posts/mês (~3 por semana) → 100**.
 
-### 3.5. Streaming (25%)
+### 3.5. Carreira & Negócio (25%)
 
-Consumo real na OneRPM, combinando:
+Consumo real na OneRPM (streaming), combinando:
 
 - **Volume** (peso 70%): total de streams nos últimos 28 dias, em escala log.
   500 → 0; ~20 mil → 50; 800 mil+ → 100.
@@ -145,7 +153,7 @@ O score é a **média ponderada dos pilares que têm dado**, com os pesos
 **reequilibrados** quando algum pilar falta.
 
 **Exemplo:** um artista com Instagram e YouTube, mas **sem** streaming. O pilar
-Streaming (25%) simplesmente sai da conta, e os 25% restantes são redistribuídos
+Carreira & Negócio (25%) simplesmente sai da conta, e os 25% restantes são redistribuídos
 proporcionalmente entre Audiência, Crescimento, Engajamento e Conteúdo. O artista
 não é punido por não estar (ainda) na OneRPM.
 
@@ -221,9 +229,9 @@ Esta é a seção para a gestão da Imagine opinar. Cada item abaixo é uma esco
 **deliberada** que pode ser ajustada para alinhar à estratégia artística.
 
 **A) Pesos dos pilares** — hoje: Audiência 20% · Crescimento 15% · Engajamento
-25% · Conteúdo 15% · Streaming 25%.
-→ *Engajamento e streaming pesam mais. Faz sentido para a Imagine, ou algum pilar
-deveria pesar mais/menos?*
+25% · Conteúdo 15% · Carreira & Negócio 25%.
+→ *Engajamento e Carreira & Negócio pesam mais. Faz sentido para a Imagine, ou
+algum pilar deveria pesar mais/menos?*
 
 **B) Faixas de classificação** — hoje: Excelente ≥80, Saudável 60–79, Atenção
 40–59, Crítico <40.
@@ -244,8 +252,8 @@ posts/mês satura o volume; mistura 60% recência + 40% volume.
 → *"45 dias = ruim" e "3 posts/semana = ideal" são as metas certas? O peso pende
 para recência — concordam?*
 
-**G) Streaming** — hoje: 500 a 800 mil streams/28d na escala de volume; ±50%
-semana a semana no momentum; mistura 70% volume + 30% momentum.
+**G) Carreira & Negócio (streaming)** — hoje: 500 a 800 mil streams/28d na escala
+de volume; ±50% semana a semana no momentum; mistura 70% volume + 30% momentum.
 → *Os limites de volume e a sensibilidade de momentum fazem sentido para o
 catálogo?*
 
@@ -260,7 +268,7 @@ penaliza).
 
 | Parâmetro | Valor atual |
 |---|---|
-| Peso Audiência / Crescimento / Engajamento / Conteúdo / Streaming | 20 / 15 / 25 / 15 / 25 % |
+| Peso Audiência / Crescimento / Engajamento / Conteúdo / Carreira & Negócio | 20 / 15 / 25 / 15 / 25 % |
 | Faixas (Excelente / Saudável / Atenção / Crítico) | ≥80 / 60–79 / 40–59 / <40 |
 | Audiência: nota 100 em | 1.000.000 seguidores |
 | Crescimento: nota 0 / 50 / 100 | −1% / 0% / +1% por coleta |

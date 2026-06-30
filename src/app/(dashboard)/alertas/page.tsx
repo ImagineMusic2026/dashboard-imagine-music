@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { listarArtistas } from '@/lib/artistas/client'
-import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
-import { derivarAlertas, type AlertaDerivado, type SeveridadeAlerta } from '@/lib/alertas/derivar'
+import { carregarAlertas } from '@/lib/alertas/client'
+import { type AlertaDerivado, type SeveridadeAlerta } from '@/lib/alertas/derivar'
 import { filtrarPorPrefs } from '@/lib/alertas/preferencias'
 import { AlertaLinha } from '@/components/alertas/alerta-linha'
 import { cn } from '@/lib/utils'
@@ -13,6 +12,7 @@ const PILLS: { key: 'todos' | SeveridadeAlerta; label: string }[] = [
   { key: 'critico', label: 'Críticos' },
   { key: 'atencao', label: 'Atenção' },
   { key: 'oportunidade', label: 'Oportunidades' },
+  { key: 'operacional', label: 'Operacional' },
 ]
 
 export default function AlertasPage() {
@@ -24,10 +24,9 @@ export default function AlertasPage() {
     let vivo = true
     ;(async () => {
       try {
-        const [mapa, arts] = await Promise.all([listarMetricasSociais(), listarArtistas()])
+        const todos = await carregarAlertas()
         if (!vivo) return
-        const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-        setAlertas(filtrarPorPrefs(derivarAlertas(mapa, nome)))
+        setAlertas(filtrarPorPrefs(todos))
         setEstado('ok')
       } catch {
         if (vivo) setEstado('erro')
@@ -76,9 +75,10 @@ export default function AlertasPage() {
           {counts.critico > 0 && <> · <span className="num text-red-400">{counts.critico} críticos</span></>}
           {counts.atencao > 0 && <> · <span className="num text-amber-400">{counts.atencao} atenção</span></>}
           {counts.oportunidade > 0 && <> · <span className="num text-emerald-400">{counts.oportunidade} oportunidades</span></>}
+          {counts.operacional > 0 && <> · <span className="num text-blue-400">{counts.operacional} operacional</span></>}
         </p>
         <p className="text-[12px] text-ink-500 mt-0.5">
-          Gerados automaticamente a partir dos dados de YouTube e Instagram.
+          Gerados automaticamente dos dados das redes, do streaming e da saúde das integrações.
         </p>
       </div>
 

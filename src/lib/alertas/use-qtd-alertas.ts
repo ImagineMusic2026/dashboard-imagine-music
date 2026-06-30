@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
-import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
-import { listarArtistas } from '@/lib/artistas/client'
-import { derivarAlertas, type AlertaDerivado } from '@/lib/alertas/derivar'
+import { carregarAlertas } from '@/lib/alertas/client'
+import { type AlertaDerivado } from '@/lib/alertas/derivar'
 import { filtrarPorPrefs, NOTIF_PREFS_EVENT } from '@/lib/alertas/preferencias'
 
 /**
@@ -27,10 +26,9 @@ export function useQtdAlertas(): number | null {
     let vivo = true
     ;(async () => {
       try {
-        const [mapa, arts] = await Promise.all([listarMetricasSociais(), listarArtistas()])
+        const todos = await carregarAlertas()
         if (!vivo) return
-        const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-        setTodos(derivarAlertas(mapa, nome))
+        setTodos(todos)
       } catch {
         if (vivo) {
           setTodos(null)

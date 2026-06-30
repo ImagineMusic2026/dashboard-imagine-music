@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell, Flame, MoonStar, PlayCircle, Star, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
+import { Bell, CloudOff, Flame, MoonStar, PlayCircle, PlugZap, Star, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { corAvatarDe, iniciaisDe } from '@/lib/artistas/client'
@@ -25,6 +25,8 @@ export const ICONE_ALERTA: Record<string, LucideIcon> = {
   marco_seguidores: Trophy,
   viralizacao_streaming: PlayCircle,
   queda_streaming: TrendingDown,
+  sync_falhou: PlugZap,
+  sync_parado: CloudOff,
 }
 
 /** "há 2h", "há 14min", "agora" — recência relativa a partir de um ms. */
@@ -70,7 +72,13 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
   return (
     <div className="relative flex items-start gap-3 p-4 hover:bg-bg-800/30 transition-colors">
       <div className={cn('absolute left-0 top-0 bottom-0 w-1', sev.borderL)} />
-      <AvatarFallback iniciais={iniciaisDe(a.artistaNome)} gradient={corAvatarDe(a.artistaSlug)} size="sm" />
+      {a.severidade === 'operacional' ? (
+        <div className="w-7 h-7 rounded-lg bg-blue-500/15 grid place-items-center shrink-0">
+          <Icone className="w-4 h-4 text-blue-400" />
+        </div>
+      ) : (
+        <AvatarFallback iniciais={iniciaisDe(a.artistaNome)} gradient={corAvatarDe(a.artistaSlug)} size="sm" />
+      )}
       <div className="flex-1 min-w-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -81,7 +89,9 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
           </div>
           <div className="font-semibold text-sm text-ink-100">{a.artistaNome}</div>
           <div className="text-[13px] text-ink-300 mt-0.5 flex items-start gap-1.5">
-            <Icone className={cn('w-3.5 h-3.5 mt-0.5 shrink-0', sev.badgeText)} />
+            {a.severidade !== 'operacional' && (
+              <Icone className={cn('w-3.5 h-3.5 mt-0.5 shrink-0', sev.badgeText)} />
+            )}
             <span className="min-w-0">{a.descricao}</span>
           </div>
         </div>

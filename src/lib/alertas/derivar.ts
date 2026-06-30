@@ -1,4 +1,12 @@
-import type { MetricasSociaisDoc, StreamingSnapshot } from '@/lib/metricas-sociais/types'
+import type {
+  IntegracaoMetaDoc,
+  IntegracaoOneRpmDoc,
+  IntegracaoTikTokDoc,
+  IntegracaoYouTubeDoc,
+  MetricasSociaisDoc,
+  StatusIntegracao,
+  StreamingSnapshot,
+} from '@/lib/metricas-sociais/types'
 import { formatNumber } from '@/lib/utils'
 
 /**
@@ -153,9 +161,15 @@ export function derivarAlertas(
     alertaSeguidores(out, slug, nome, 'youtube', doc.youtube?.inscritos ?? null, doc.youtube?.inscritosAntes ?? null, doc.youtube?.coletadoEm ?? null, doc.youtube?.inscritosAntesEm ?? null)
   }
 
-  // crítico > atenção > oportunidade > operacional; depois mais recente.
-  const ordemSev: Record<SeveridadeAlerta, number> = { critico: 0, atencao: 1, oportunidade: 2, operacional: 3 }
-  return out.sort((a, b) => ordemSev[a.severidade] - ordemSev[b.severidade] || b.ts - a.ts)
+  return ordenarAlertas(out)
+}
+
+/** Prioridade de exibição: crítico > atenção > oportunidade > operacional. */
+const ORDEM_SEV: Record<SeveridadeAlerta, number> = { critico: 0, atencao: 1, oportunidade: 2, operacional: 3 }
+
+/** Ordena por severidade e, dentro dela, por recência (mais novo primeiro). */
+export function ordenarAlertas(alertas: AlertaDerivado[]): AlertaDerivado[] {
+  return [...alertas].sort((a, b) => ORDEM_SEV[a.severidade] - ORDEM_SEV[b.severidade] || b.ts - a.ts)
 }
 
 function mk(
@@ -249,5 +263,105 @@ function alertaStreaming(out: AlertaDerivado[], slug: string, nome: string, st: 
   } else if (pct <= -0.4) {
     const sev: SeveridadeAlerta = pct <= -0.6 ? 'critico' : 'atencao'
     out.push(mk(`str-queda-${slug}`, slug, nome, sev, 'queda_streaming', `Streaming em queda: ${(pct * 100).toFixed(0)}% na semana (${formatNumber(s7)} streams)`, 'Ver artista', `/artistas/${slug}`, ts))
+  }
+}
+
+/* ── alertas OPERACIONAIS (saúde das integrações) ─────────────────────────────
+ * Diferente dos demais: NÃO olham a performance do artista, e sim o encanamento.
+ * Uma fonte que falhou na última sincronização (status 'erro') ou que parou de
+ * atualizar (sync diário sem rodar há tempo demais) vira um alerta de SISTEMA —
+ * sem artista. A UI renderiza com um ícone no lugar do avatar. É a categoria
+ * "Operacional" prevista no contrato.
+ */
+
+export interface StatusIntegracoes {
+  meta?: IntegracaoMetaDoc | null
+  tiktok?: IntegracaoTikTokDoc | null
+  youtube?: IntegracaoYouTubeDoc | null
+  onerpm?: IntegracaoOneRpmDoc | null
+}
+
+interface FonteStatus {
+  chave: string
+  nome: string
+  status?: StatusIntegracao
+  ultimaSincronizacao?: string | null
+  erro?: string | null
+}
+
+/** Sync diário sem rodar por mais que isto (horas) está claramente parado. */
+const HORAS_SYNC_PARADO = 48
+
+export function derivarAlertasOperacionais(integ: StatusIntegracoes): AlertaDerivado[] {
+  const fontes: FonteStatus[] = [
+    { chave: 'meta', nome: 'Instagram (Meta)', status: integ.meta?.status, ultimaSincronizacao: integ.meta?.ultimaSincronizacao, erro: integ.meta?.erro },
+    { chave: 'tiktok', nome: 'TikTok', status: integ.tiktok?.status, ultimaSincronizacao: integ.tiktok?.ultimaSincronizacao, erro: integ.tiktok?.erro },
+    { chave: 'youtube', nome: 'YouTube', status: integ.youtube?.status, ultimaSincronizacao: integ.youtube?.ultimaSincronizacao, erro: integ.youtube?.erro },
+    { chave: 'onerpm', nome: 'OneRPM', status: integ.onerpm?.status, ultimaSincronizacao: integ.onerpm?.ultimaSincronizacao, erro: integ.onerpm?.erro },
+  ]
+
+  const out: AlertaDerivado[] = []
+  const agora = Date.now()
+
+  for (const f of fontes) {
+    // Sem doc, ou ainda não configurada: é ausência, não falha — a página de
+    // Integrações já sinaliza isso. Não polui o feed de alertas.
+    if (!f.status || f.status === 'nao_configurado') continue
+
+    const ts = f.ultimaSincronizacao ? Date.parse(f.ultimaSincronizacao) : agora
+
+    if (f.status === 'erro') {
+      const motivo = f.erro?.trim()
+      out.push(
+        mkSistema(
+          `op-erro-${f.chave}`,
+          f.nome,
+          'sync_falhou',
+          `Falha na última sincronização${motivo ? `: ${corta(motivo)}` : ''}`,
+          ts,
+        ),
+      )
+      continue
+    }
+
+    // Conectada, mas sem sincronizar há tempo demais — cron parado/quebrado.
+    if (f.ultimaSincronizacao) {
+      const horas = (agora - Date.parse(f.ultimaSincronizacao)) / 3_600_000
+      if (horas >= HORAS_SYNC_PARADO) {
+        const dias = Math.floor(horas / 24)
+        out.push(
+          mkSistema(
+            `op-parado-${f.chave}`,
+            f.nome,
+            'sync_parado',
+            `Sincronização parada há ${dias}d — o sync diário pode ter falhado`,
+            ts,
+          ),
+        )
+      }
+    }
+  }
+
+  return out
+}
+
+/** Alerta de SISTEMA (sem artista): a fonte vira o "nome" e o slug é estável. */
+function mkSistema(
+  id: string,
+  fonte: string,
+  categoria: string,
+  descricao: string,
+  ts: number,
+): AlertaDerivado {
+  return {
+    id,
+    artistaSlug: `sistema:${id}`,
+    artistaNome: fonte,
+    severidade: 'operacional',
+    categoria,
+    descricao,
+    acaoSugerida: 'Ver integrações',
+    url: '/integracoes',
+    ts,
   }
 }

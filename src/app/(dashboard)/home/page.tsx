@@ -16,7 +16,8 @@ import {
 import { corAvatarDe, iniciaisDe, listarArtistas, type ArtistaDoc } from '@/lib/artistas/client'
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
-import { derivarAlertas } from '@/lib/alertas/derivar'
+import { derivarAlertas, derivarAlertasOperacionais, ordenarAlertas, type StatusIntegracoes } from '@/lib/alertas/derivar'
+import { getStatusIntegracoes } from '@/lib/alertas/client'
 import { filtrarPorPrefs } from '@/lib/alertas/preferencias'
 import { derivarHealthScores, resumirSaude, type ArtistaSaude } from '@/lib/health/score'
 import { KPICard } from '@/components/shared/kpi-card'
@@ -41,15 +42,21 @@ export default function HomePage() {
   const [estado, setEstado] = useState<Estado>('load')
   const [arts, setArts] = useState<ArtistaDoc[]>([])
   const [mapa, setMapa] = useState<Map<string, MetricasSociaisDoc>>(new Map())
+  const [integ, setInteg] = useState<StatusIntegracoes>({})
 
   useEffect(() => {
     let vivo = true
     ;(async () => {
       try {
-        const [m, a] = await Promise.all([listarMetricasSociais(), listarArtistas()])
+        const [m, a, status] = await Promise.all([
+          listarMetricasSociais(),
+          listarArtistas(),
+          getStatusIntegracoes(),
+        ])
         if (!vivo) return
         setMapa(m)
         setArts(a)
+        setInteg(status)
         setEstado('ok')
       } catch {
         if (vivo) setEstado('erro')
@@ -62,7 +69,9 @@ export default function HomePage() {
 
   const dados = useMemo(() => {
     const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-    const alertas = filtrarPorPrefs(derivarAlertas(mapa, nome))
+    const alertas = filtrarPorPrefs(
+      ordenarAlertas([...derivarAlertas(mapa, nome), ...derivarAlertasOperacionais(integ)]),
+    )
     const saudes = derivarHealthScores(mapa, nome)
     const resumo = resumirSaude(saudes)
 
@@ -114,7 +123,7 @@ export default function HomePage() {
       streams28dPorSlug,
       atualizadoEm: ultimaColeta(mapa),
     }
-  }, [arts, mapa])
+  }, [arts, mapa, integ])
 
   if (estado === 'load') {
     return (

@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Search } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
+import { listarContasVinculadas } from '@/lib/artistas/client'
 import { getStatusMeta } from '@/lib/metricas-sociais/client'
 import type { IntegracaoMetaDoc } from '@/lib/metricas-sociais/types'
 import {
@@ -14,6 +15,7 @@ import {
   FonteCardCompacta,
   FonteModal,
   MensagemAcao,
+  PainelContasVinculadas,
   StatTile,
   formatarQuando,
   statusBadge,
@@ -151,6 +153,17 @@ export function MetaInstagramCard() {
             <StatTile valor={sincronizadas} label="coletadas" cor="text-emerald-400" />
             <StatTile valor={status?.ultimaSincronizacao ? formatarQuando(status.ultimaSincronizacao) : '—'} label="última atualização" />
           </div>
+
+          <PainelContasVinculadas
+            total={mapeadas}
+            rotulo="contas vinculadas"
+            carregar={() => listarContasVinculadas('instagram')}
+            recarregarSinal={status}
+            icon={ICONE}
+            corIcone={COR_ICONE}
+            nomeFonte="Instagram"
+            corHandle="text-emerald-300"
+          />
 
           <ChipsColeta itens={['seguidores', 'alcance', 'visualizações', 'engajamento']} />
 

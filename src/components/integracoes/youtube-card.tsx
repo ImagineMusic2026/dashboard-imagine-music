@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Search } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
+import { listarContasVinculadas } from '@/lib/artistas/client'
 import { getStatusYouTube } from '@/lib/metricas-sociais/client'
 import type { IntegracaoYouTubeDoc } from '@/lib/metricas-sociais/types'
 import {
@@ -14,6 +15,7 @@ import {
   FonteCardCompacta,
   FonteModal,
   MensagemAcao,
+  PainelContasVinculadas,
   StatTile,
   formatarQuando,
   statusBadge,
@@ -143,6 +145,17 @@ export function YouTubeCard() {
             <StatTile valor={comAnalytics} label="com Analytics" cor="text-emerald-400" />
             <StatTile valor={status?.ultimaSincronizacao ? formatarQuando(status.ultimaSincronizacao) : '—'} label="última atualização" />
           </div>
+
+          <PainelContasVinculadas
+            total={mapeados}
+            rotulo="canais mapeados"
+            carregar={() => listarContasVinculadas('youtube')}
+            recarregarSinal={status}
+            icon={ICONE}
+            corIcone={COR_ICONE}
+            nomeFonte="YouTube"
+            corHandle="text-red-300"
+          />
 
           <ChipsColeta itens={['inscritos', 'views', 'vídeos', 'tempo de exibição', 'retenção']} />
 

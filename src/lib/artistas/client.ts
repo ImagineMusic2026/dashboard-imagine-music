@@ -69,6 +69,56 @@ export async function listarArtistas(): Promise<ArtistaDoc[]> {
     .sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
 }
 
+/** Uma conta/artista vinculado a uma fonte, para as listas de "ver contas" nas Integrações. */
+export interface ContaVinculadaRef {
+  slug: string
+  nome: string
+  /** @username limpo (null quando a fonte não tem handle, ex.: streaming). */
+  handle: string | null
+  /** Texto secundário opcional (ex.: "12.3K streams"). */
+  detalhe?: string | null
+}
+
+/** Redes que guardam o vínculo em `redes.<plat>.id` (mesmo formato url/id/handle). */
+export type PlataformaRede = 'instagram' | 'tiktok' | 'youtube'
+
+/**
+ * Extrai um @username limpo do handle/URL cadastrado (sem importar código
+ * server-only). Devolve null quando não há um handle legível — ex.: URLs de
+ * canal do YouTube (`/channel/UC…`, `/user/…`, `/c/…`), onde o identificador é
+ * opaco e o melhor rótulo é o nome do artista.
+ */
+export function apelidoDaRede(rede?: { handle?: string | null; url?: string | null } | null): string | null {
+  const bruto = rede?.handle ?? rede?.url ?? null
+  if (!bruto) return null
+  const s = bruto.trim()
+
+  // @handle explícito (também casa youtube.com/@nome, tiktok.com/@nome).
+  const at = s.match(/@([A-Za-z0-9._-]+)/)
+  if (at) return at[1]
+
+  // URL de rede conhecida: usa o 1º segmento, ignorando "containers" sem handle.
+  const url = s.match(/(?:instagram\.com|tiktok\.com|youtube\.com|youtu\.be)\/(.+)$/i)
+  if (url) {
+    const partes = url[1].split(/[/?#]/).filter(Boolean)
+    const containers = new Set(['channel', 'user', 'c'])
+    if (!partes.length || containers.has(partes[0].toLowerCase())) return null
+    return partes[0]
+  }
+
+  // Valor solto (handle sem @ nem URL).
+  const limpo = s.replace(/^@+/, '').replace(/\/+$/, '')
+  return limpo || null
+}
+
+/** Artistas com a conta de uma rede vinculada (`redes.<plat>.id` gravado). */
+export async function listarContasVinculadas(plat: PlataformaRede): Promise<ContaVinculadaRef[]> {
+  const artistas = await listarArtistas()
+  return artistas
+    .filter((a) => a.redes?.[plat]?.id)
+    .map((a) => ({ slug: a.slug, nome: a.nome, handle: apelidoDaRede(a.redes?.[plat]) }))
+}
+
 export async function getArtista(slug: string): Promise<ArtistaDoc | null> {
   const s = await getDoc(doc(db, 'artistas', slug))
   return s.exists() ? { slug: s.id, ...(s.data() as Omit<ArtistaDoc, 'slug'>) } : null

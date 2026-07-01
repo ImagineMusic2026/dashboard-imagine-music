@@ -297,6 +297,14 @@ export interface StreamingDetalheDoc {
 
 export type StatusIntegracao = 'conectado' | 'nao_configurado' | 'erro'
 
+/** Um artista com streaming na última sincronização (para a lista "ver contas"). */
+export interface OneRpmArtistaResumo {
+  slug: string
+  nome: string
+  /** Streams na janela da última execução. */
+  streams: number
+}
+
 /** Documento `integracoes/onerpm` — status do sync de streaming (alimenta o card). */
 export interface IntegracaoOneRpmDoc {
   status: StatusIntegracao
@@ -312,6 +320,11 @@ export interface IntegracaoOneRpmDoc {
   ultimaSincronizacao: string | null
   /** Dia mais recente com dado no feed (YYYY-MM-DD). */
   ultimoDia: string | null
+  /**
+   * Lista compacta dos artistas com streaming (slug + nome + streams), ordenada
+   * por streams desc. Alimenta o "ver contas" do card sem varrer `metricas-sociais`.
+   */
+  artistas?: OneRpmArtistaResumo[]
   erro?: string | null
 }
 

@@ -1,6 +1,6 @@
 import SftpClient from 'ssh2-sftp-client'
-import { salvarStreamingArtista, salvarStreamingDetalhe } from '@/lib/metricas-sociais/firestore'
-import type { HistoricoStreamingDiaDoc } from '@/lib/metricas-sociais/types'
+import { mapaNomesArtistas, salvarStreamingArtista, salvarStreamingDetalhe } from '@/lib/metricas-sociais/firestore'
+import type { HistoricoStreamingDiaDoc, OneRpmArtistaResumo } from '@/lib/metricas-sociais/types'
 import { lerLinhasTrends } from './trends-parse'
 import { acumular, finalizar, novoAcumulador } from './trends-aggregate'
 import { resolverSlugArtista } from './trends-aliases'
@@ -48,6 +48,8 @@ export interface TrendsSyncResult {
   isrcs: number
   gravados: number
   periodo: { de: string; ate: string }
+  /** Artistas (slug do roster) com streaming na janela, deduplicados e ordenados por streams desc. */
+  porArtista: OneRpmArtistaResumo[]
 }
 
 export async function sincronizarTrends(opts?: { dias?: number }): Promise<TrendsSyncResult> {
@@ -122,6 +124,20 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
       gravados += Math.min(8, artistas.length - i)
     }
 
+    // Lista compacta p/ o card: agrega os streams por slug do roster (aliases
+    // podem juntar várias origens num artista só) e resolve o nome do cadastro.
+    const nomes = await mapaNomesArtistas()
+    const streamsPorSlug = new Map<string, number>()
+    for (const a of artistas) {
+      const slug = resolverSlugArtista(a.artistaSlug)
+      streamsPorSlug.set(slug, (streamsPorSlug.get(slug) ?? 0) + a.streams)
+    }
+    const porArtista: OneRpmArtistaResumo[] = []
+    streamsPorSlug.forEach((streams, slug) => {
+      porArtista.push({ slug, nome: nomes.get(slug) ?? slug, streams })
+    })
+    porArtista.sort((x, y) => y.streams - x.streams)
+
     return {
       arquivos,
       streams: agg.totais.streams,
@@ -129,6 +145,7 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
       isrcs: agg.totais.isrcs,
       gravados,
       periodo: { de: agg.periodo.de, ate: agg.periodo.ate },
+      porArtista,
     }
   } finally {
     await sftp.end().catch(() => {})

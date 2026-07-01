@@ -413,6 +413,14 @@ export async function salvarStreamingArtista(
   }
 }
 
+/** Mapa slug -> nome de todos os artistas (leitura leve: só o campo `nome`). */
+export async function mapaNomesArtistas(): Promise<Map<string, string>> {
+  const snap = await adminDb.collection('artistas').select('nome').get()
+  const m = new Map<string, string>()
+  snap.docs.forEach((d) => m.set(d.id, (d.data().nome as string) ?? d.id))
+  return m
+}
+
 /** Atualiza (merge) o status da integração em `integracoes/onerpm`. */
 export async function gravarStatusOneRpm(status: Partial<IntegracaoOneRpmDoc>): Promise<void> {
   await adminDb.doc('integracoes/onerpm').set(status, { merge: true })

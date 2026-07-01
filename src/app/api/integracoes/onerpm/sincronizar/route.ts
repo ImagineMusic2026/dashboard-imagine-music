@@ -48,6 +48,7 @@ async function handle(req: Request) {
       janelaDias: Number.isFinite(dias) ? dias : 35,
       ultimaSincronizacao: new Date().toISOString(),
       ultimoDia: r.periodo.ate || null,
+      artistas: r.porArtista,
       erro: null,
     })
 

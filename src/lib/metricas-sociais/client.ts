@@ -1,5 +1,7 @@
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { formatNumber } from '@/lib/utils'
+import { listarArtistas, type ContaVinculadaRef } from '@/lib/artistas/client'
 import type {
   HistoricoDiaDoc,
   HistoricoHealthDiaDoc,
@@ -33,6 +35,38 @@ export async function listarMetricasSociais(): Promise<Map<string, MetricasSocia
     m.set(d.id, { slug: d.id, ...(d.data() as object) } as MetricasSociaisDoc),
   )
   return m
+}
+
+/**
+ * Artistas com dados de streaming (OneRPM) — para a lista de "ver contas" na
+ * integração. Não há @handle; mostramos nome + total de streams na janela.
+ *
+ * Caminho rápido: lê a lista já pronta no doc `integracoes/onerpm` (1 leitura).
+ * Fallback (doc antigo, antes do próximo sync popular `artistas`): varre
+ * `metricas-sociais` e casa com o cadastro — mais pesado, mas mantém a feature viva.
+ */
+export async function listarArtistasComStreaming(): Promise<ContaVinculadaRef[]> {
+  const status = await getStatusOneRpm()
+  if (status?.artistas?.length) {
+    return [...status.artistas]
+      .sort((a, b) => b.streams - a.streams || a.nome.localeCompare(b.nome, 'pt-BR'))
+      .map((a) => ({ slug: a.slug, nome: a.nome, handle: null, detalhe: `${formatNumber(a.streams)} streams` }))
+  }
+
+  const [artistas, metricas] = await Promise.all([listarArtistas(), listarMetricasSociais()])
+  const nomePorSlug = new Map(artistas.map((a) => [a.slug, a.nome]))
+  const comStreaming: { conta: ContaVinculadaRef; streams: number }[] = []
+  metricas.forEach((m, slug) => {
+    if (!m.streaming) return
+    const streams = m.streaming.streams ?? 0
+    comStreaming.push({
+      conta: { slug, nome: nomePorSlug.get(slug) ?? slug, handle: null, detalhe: `${formatNumber(streams)} streams` },
+      streams,
+    })
+  })
+  return comStreaming
+    .sort((a, b) => b.streams - a.streams || a.conta.nome.localeCompare(b.conta.nome, 'pt-BR'))
+    .map((x) => x.conta)
 }
 
 /** Histórico diário (ordenado por dia asc), limitado aos últimos `limite` dias. */

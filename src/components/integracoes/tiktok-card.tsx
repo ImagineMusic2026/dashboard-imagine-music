@@ -5,6 +5,7 @@ import { Loader2, RefreshCw } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
+import { listarContasVinculadas } from '@/lib/artistas/client'
 import { getStatusTikTok } from '@/lib/metricas-sociais/client'
 import type { IntegracaoTikTokDoc } from '@/lib/metricas-sociais/types'
 import {
@@ -13,6 +14,7 @@ import {
   FonteCardCompacta,
   FonteModal,
   MensagemAcao,
+  PainelContasVinculadas,
   StatTile,
   formatarQuando,
   statusBadge,
@@ -130,6 +132,17 @@ export function TikTokCard() {
             <StatTile valor={sincronizadas} label="coletadas" cor="text-emerald-400" />
             <StatTile valor={status?.ultimaSincronizacao ? formatarQuando(status.ultimaSincronizacao) : '—'} label="última atualização" />
           </div>
+
+          <PainelContasVinculadas
+            total={conectadas}
+            rotulo="contas conectadas"
+            carregar={() => listarContasVinculadas('tiktok')}
+            recarregarSinal={status}
+            icon={ICONE}
+            corIcone={COR_ICONE}
+            nomeFonte="TikTok"
+            corHandle="text-cyan-300"
+          />
 
           <ChipsColeta itens={['seguidores', 'curtidas', 'vídeos', 'views', 'comentários', 'shares']} />
 

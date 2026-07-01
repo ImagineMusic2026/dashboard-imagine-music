@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Loader2, PlayCircle, RefreshCw } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
-import { getStatusOneRpm } from '@/lib/metricas-sociais/client'
+import { getStatusOneRpm, listarArtistasComStreaming } from '@/lib/metricas-sociais/client'
 import type { IntegracaoOneRpmDoc } from '@/lib/metricas-sociais/types'
 import { formatNumber } from '@/lib/utils'
 import {
@@ -13,6 +13,7 @@ import {
   FonteCardCompacta,
   FonteModal,
   MensagemAcao,
+  PainelContasVinculadas,
   StatTile,
   formatarQuando,
   statusBadge,
@@ -123,6 +124,17 @@ export function OneRpmCard() {
             <StatTile valor={conectado ? formatNumber(status?.streamsJanela ?? 0) : '—'} label={`streams (${status?.janelaDias ?? 35}d)`} cor="text-emerald-400" />
             <StatTile valor={status?.ultimaSincronizacao ? formatarQuando(status.ultimaSincronizacao) : '—'} label="última atualização" />
           </div>
+
+          <PainelContasVinculadas
+            total={artistas}
+            rotulo="artistas com streaming"
+            carregar={listarArtistasComStreaming}
+            recarregarSinal={status}
+            icon={ICONE}
+            corIcone={COR_ICONE}
+            nomeFonte="OneRPM"
+            corHandle="text-amber-300"
+          />
 
           <ChipsColeta titulo="O QUE COBRE" itens={['streams', 'skips', 'países', 'plataformas', 'por faixa (ISRC)']} />
 

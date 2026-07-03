@@ -111,6 +111,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
   }
 
   const { d } = estado
+  const foraDoRanking = d.porFaixa.filter((f) => f.streams < PISO_SKIP).length
   const paises = d.porPais
     .map((p) => ({ ...p, rate: p.streams > 0 ? p.skips / p.streams : 0 }))
     .slice(0, 8)
@@ -210,13 +211,20 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
                     <span className="num text-ink-300 text-right">{formatNumber(f.streams)}</span>
                     <span className="num text-ink-400 text-right">{formatNumber(f.skips)}</span>
                     <span className={cn('num font-semibold text-right', corSkip(f.rate))}>
-                      {(f.rate * 100).toFixed(0)}%
+                      {(f.rate * 100).toFixed(1)}%
                     </span>
                   </div>
                 )
               })
             )}
           </div>
+
+          {ordem === 'skip' && foraDoRanking > 0 && (
+            <div className="px-5 pb-2 text-[11px] text-ink-600">
+              {foraDoRanking} faixa{foraDoRanking === 1 ? '' : 's'} com menos de {PISO_SKIP} streams fora
+              do ranking (volume baixo demais pra taxa confiável).
+            </div>
+          )}
 
           {faixas.length > 12 && (
             <button
@@ -242,7 +250,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
                         <span className="text-[12px] font-semibold text-ink-200">{p.pais}</span>
                       </span>
                       <span className={cn('text-[11px] num font-semibold', corSkip(p.rate))}>
-                        {(p.rate * 100).toFixed(0)}%
+                        {(p.rate * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div className="text-[11px] num text-ink-500 mt-0.5">{formatNumber(p.streams)} streams</div>
@@ -277,7 +285,8 @@ function Aba({ ativa, onClick, children }: { ativa: boolean; onClick: () => void
   )
 }
 
-function corSkip(rate: number): string {
+/** Régua de cor do skip rate — compartilhada com o card de streaming. */
+export function corSkip(rate: number): string {
   if (rate >= 0.5) return 'text-red-400'
   if (rate >= 0.35) return 'text-amber-400'
   return 'text-ink-300'

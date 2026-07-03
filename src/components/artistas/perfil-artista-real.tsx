@@ -7,6 +7,9 @@ import { ArrowLeft, ExternalLink, Loader2, Pencil, Plug } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
+import { ResumoExecutivoArtista } from '@/components/artistas/resumo-executivo-artista'
+import { InsightsArtistaCard } from '@/components/artistas/insights-artista-card'
+import { ComparativoCanaisCard } from '@/components/artistas/comparativo-canais-card'
 import { InstagramArtistaCard } from '@/components/artistas/instagram-artista-card'
 import { TikTokArtistaCard } from '@/components/artistas/tiktok-artista-card'
 import { YouTubeArtistaCard } from '@/components/artistas/youtube-artista-card'
@@ -152,20 +155,37 @@ export function PerfilArtistaReal({
         </div>
       </div>
 
+      {/* Faixa executiva — o artista em 10 segundos (KPIs cross-plataforma). */}
+      <ResumoExecutivoArtista slug={a.slug} nome={a.nome} />
+
+      {/* O que merece atenção — alertas do próprio artista + diagnóstico do Health. */}
+      <InsightsArtistaCard slug={a.slug} nome={a.nome} />
+
       {/* Health Score — score real consolidado (mesma lib da home) */}
       <HealthScoreArtistaCard slug={a.slug} nome={a.nome} />
 
+      {/* Canais — comparativo lado a lado; clique rola até o card (âncoras abaixo). */}
+      <ComparativoCanaisCard slug={a.slug} />
+
       {/* Instagram — métricas reais via Meta (visíveis a todos os membros) */}
-      <InstagramArtistaCard slug={a.slug} />
+      <div id="card-instagram" className="scroll-mt-20">
+        <InstagramArtistaCard slug={a.slug} />
+      </div>
 
       {/* TikTok — métricas reais via Display API (visíveis a todos os membros) */}
-      <TikTokArtistaCard slug={a.slug} />
+      <div id="card-tiktok" className="scroll-mt-20">
+        <TikTokArtistaCard slug={a.slug} />
+      </div>
 
       {/* YouTube — base pública (Data API) + Analytics (OAuth) para quem conectar */}
-      <YouTubeArtistaCard slug={a.slug} />
+      <div id="card-youtube" className="scroll-mt-20">
+        <YouTubeArtistaCard slug={a.slug} />
+      </div>
 
       {/* Streaming — plays/skips reais via OneRPM (não sensível, visível a todos). */}
-      <StreamingArtistaCard slug={a.slug} />
+      <div id="card-streaming" className="scroll-mt-20">
+        <StreamingArtistaCard slug={a.slug} />
+      </div>
 
       {/* Análise de streaming (Fase 1): faixas por skip + geografia. */}
       <StreamingAnaliticoCard slug={a.slug} />

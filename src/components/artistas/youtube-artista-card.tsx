@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { MiniAreaChart } from '@/components/artistas/mini-area-chart'
 import {
+  BarChart3,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -16,7 +17,9 @@ import {
   Video,
 } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
-import { getHistoricoYouTube, getMetricasSociais } from '@/lib/metricas-sociais/client'
+import { Kpi, fmt, formatarQuando, janelaDaSerie } from '@/components/shared/kpi'
+import { aoAbrirCardCanal } from '@/lib/artistas/abrir-card'
+import { getHistoricoYouTube, getMetricasSociaisCached } from '@/lib/metricas-sociais/client'
 import type { HistoricoYouTubeDiaDoc, YouTubeSnapshot } from '@/lib/metricas-sociais/types'
 import { cn, formatNumber } from '@/lib/utils'
 
@@ -33,14 +36,17 @@ type Estado =
 
 export function YouTubeArtistaCard({ slug }: { slug: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
-  const [aberto, setAberto] = useState(true)
+  // Começa recolhido — expande pelo header ou pelo comparativo "Canais".
+  const [aberto, setAberto] = useState(false)
+
+  useEffect(() => aoAbrirCardCanal('youtube', () => setAberto(true)), [])
 
   useEffect(() => {
     let vivo = true
     ;(async () => {
       try {
         const [doc, historico] = await Promise.all([
-          getMetricasSociais(slug),
+          getMetricasSociaisCached(slug),
           getHistoricoYouTube(slug).catch(() => [] as HistoricoYouTubeDiaDoc[]),
         ])
         if (!vivo) return
@@ -143,7 +149,7 @@ export function YouTubeArtistaCard({ slug }: { slug: string }) {
               variacao !== 0 && (
                 <div className={cn('text-[11px] num', variacao > 0 ? 'text-emerald-400' : 'text-red-400')}>
                   {variacao > 0 ? '+' : '−'}
-                  {formatNumber(Math.abs(variacao))} no período
+                  {formatNumber(Math.abs(variacao))} {janelaDaSerie(serie) ?? 'no período'}
                 </div>
               )
             )}
@@ -169,12 +175,22 @@ export function YouTubeArtistaCard({ slug }: { slug: string }) {
           )}
 
           <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">
-            <Kpi icone={<Eye className="w-4 h-4" />} label="Views totais" valor={fmt(yt.viewsTotais)} nota="canal" />
-            <Kpi icone={<Video className="w-4 h-4" />} label="Vídeos" valor={fmt(yt.videos)} nota="total" />
-            <Kpi icone={<Play className="w-4 h-4" />} label="Views" valor={fmt(yt.viewsRecentes)} nota={notaRec} />
-            <Kpi icone={<Heart className="w-4 h-4" />} label="Curtidas" valor={fmt(yt.curtidasRecentes)} nota={notaRec} />
-            <Kpi icone={<MessageCircle className="w-4 h-4" />} label="Comentários" valor={fmt(yt.comentariosRecentes)} nota={notaRec} />
-            <Kpi icone={<Eye className="w-4 h-4" />} label="Inscritos" valor={fmt(yt.inscritos)} nota={yt.inscritosOcultos ? 'ocultos' : 'canal'} />
+            <Kpi corIcone="text-red-400/70" icone={<Eye className="w-4 h-4" />} label="Views totais" valor={fmt(yt.viewsTotais)} nota="canal" />
+            <Kpi corIcone="text-red-400/70" icone={<Video className="w-4 h-4" />} label="Vídeos" valor={fmt(yt.videos)} nota="total" />
+            <Kpi corIcone="text-red-400/70" icone={<Play className="w-4 h-4" />} label="Views" valor={fmt(yt.viewsRecentes)} nota={notaRec} />
+            <Kpi corIcone="text-red-400/70" icone={<Heart className="w-4 h-4" />} label="Curtidas" valor={fmt(yt.curtidasRecentes)} nota={notaRec} />
+            <Kpi corIcone="text-red-400/70" icone={<MessageCircle className="w-4 h-4" />} label="Comentários" valor={fmt(yt.comentariosRecentes)} nota={notaRec} />
+            <Kpi
+              corIcone="text-red-400/70"
+              icone={<BarChart3 className="w-4 h-4" />}
+              label="Média/vídeo"
+              valor={
+                yt.viewsRecentes != null && yt.videosConsiderados
+                  ? formatNumber(Math.round(yt.viewsRecentes / yt.videosConsiderados))
+                  : '—'
+              }
+              nota="views por vídeo"
+            />
           </div>
 
           {a && (
@@ -188,22 +204,22 @@ export function YouTubeArtistaCard({ slug }: { slug: string }) {
               </div>
               <div className="grid grid-cols-3 gap-px bg-bg-700/30">
                 <Kpi
+                  corIcone="text-emerald-400/70"
                   icone={<Clock className="w-4 h-4" />}
                   label="Tempo exib."
                   valor={fmtHoras(a.minutosExibidos)}
                   nota="horas"
-                  cor="emerald"
                 />
                 <Kpi
+                  corIcone="text-emerald-400/70"
                   icone={<Timer className="w-4 h-4" />}
                   label="Duração média"
                   valor={fmtDuracao(a.duracaoMediaSeg)}
                   nota="min:seg"
-                  cor="emerald"
                 />
-                <Kpi icone={<Play className="w-4 h-4" />} label="Views" valor={fmt(a.views)} nota={`${a.periodoDias}d`} cor="emerald" />
-                <Kpi icone={<UserPlus className="w-4 h-4" />} label="Inscritos +" valor={fmt(a.inscritosGanhos)} nota={`${a.periodoDias}d`} cor="emerald" />
-                <Kpi icone={<UserMinus className="w-4 h-4" />} label="Inscritos −" valor={fmt(a.inscritosPerdidos)} nota={`${a.periodoDias}d`} cor="red" />
+                <Kpi corIcone="text-emerald-400/70" icone={<Play className="w-4 h-4" />} label="Views" valor={fmt(a.views)} nota={`${a.periodoDias}d`} />
+                <Kpi corIcone="text-emerald-400/70" icone={<UserPlus className="w-4 h-4" />} label="Inscritos +" valor={fmt(a.inscritosGanhos)} nota={`${a.periodoDias}d`} />
+                <Kpi corIcone="text-red-400/70" icone={<UserMinus className="w-4 h-4" />} label="Inscritos −" valor={fmt(a.inscritosPerdidos)} nota={`${a.periodoDias}d`} />
               </div>
             </div>
           )}
@@ -211,35 +227,6 @@ export function YouTubeArtistaCard({ slug }: { slug: string }) {
       </div>
     </div>
   )
-}
-
-function Kpi({
-  icone,
-  label,
-  valor,
-  nota,
-  cor = 'red',
-}: {
-  icone: ReactNode
-  label: string
-  valor: string
-  nota?: string
-  cor?: 'red' | 'emerald'
-}) {
-  return (
-    <div className="p-4 bg-bg-900">
-      <div className="flex items-center gap-1.5 text-ink-500">
-        <span className={cor === 'emerald' ? 'text-emerald-400/70' : 'text-red-400/70'}>{icone}</span>
-        <span className="text-[10px] tracking-wider font-semibold uppercase">{label}</span>
-      </div>
-      <div className="num text-lg font-bold text-ink-100 mt-1">{valor}</div>
-      {nota && <div className="text-[10px] text-ink-600 num">{nota}</div>}
-    </div>
-  )
-}
-
-function fmt(n: number | null | undefined): string {
-  return n == null ? '—' : formatNumber(n)
 }
 
 /** Minutos assistidos -> horas (formatado). */
@@ -254,14 +241,4 @@ function fmtDuracao(seg: number | null | undefined): string {
   const m = Math.floor(seg / 60)
   const s = Math.round(seg % 60)
   return `${m}:${String(s).padStart(2, '0')}`
-}
-
-function formatarQuando(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60_000)
-  if (min < 1) return 'agora'
-  if (min < 60) return `há ${min}min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `há ${h}h`
-  return `há ${Math.floor(h / 24)}d`
 }

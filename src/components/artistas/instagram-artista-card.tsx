@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, Eye, Grid3x3, Heart, TrendingUp, UserPlus, Users } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { MiniAreaChart } from '@/components/artistas/mini-area-chart'
-import { getHistoricoInstagram, getMetricasSociais } from '@/lib/metricas-sociais/client'
+import { Kpi, fmt, formatarQuando, janelaDaSerie } from '@/components/shared/kpi'
+import { aoAbrirCardCanal } from '@/lib/artistas/abrir-card'
+import { getHistoricoInstagram, getMetricasSociaisCached } from '@/lib/metricas-sociais/client'
 import type { HistoricoDiaDoc, InstagramSnapshot } from '@/lib/metricas-sociais/types'
 import { cn, formatNumber } from '@/lib/utils'
 
@@ -22,14 +24,18 @@ type Estado =
 
 export function InstagramArtistaCard({ slug }: { slug: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
-  const [aberto, setAberto] = useState(true)
+  // Começa recolhido (só o header com seguidores) — expande pelo próprio
+  // header ou pelo clique no comparativo "Canais".
+  const [aberto, setAberto] = useState(false)
+
+  useEffect(() => aoAbrirCardCanal('instagram', () => setAberto(true)), [])
 
   useEffect(() => {
     let vivo = true
     ;(async () => {
       try {
         const [doc, historico] = await Promise.all([
-          getMetricasSociais(slug),
+          getMetricasSociaisCached(slug),
           getHistoricoInstagram(slug).catch(() => [] as HistoricoDiaDoc[]),
         ])
         if (!vivo) return
@@ -119,7 +125,7 @@ export function InstagramArtistaCard({ slug }: { slug: string }) {
                 className={cn('text-[11px] num', variacao > 0 ? 'text-emerald-400' : 'text-red-400')}
               >
                 {variacao > 0 ? '+' : '−'}
-                {formatNumber(Math.abs(variacao))} no período
+                {formatNumber(Math.abs(variacao))} {janelaDaSerie(serie) ?? 'no período'}
               </div>
             )}
           </div>
@@ -144,53 +150,15 @@ export function InstagramArtistaCard({ slug }: { slug: string }) {
           )}
 
           <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">
-            <Kpi icone={<Eye className="w-4 h-4" />} label="Alcance" valor={fmt(ig.alcance)} nota={`${ig.janelaDias}d`} />
-            <Kpi icone={<TrendingUp className="w-4 h-4" />} label="Visualizações" valor={fmt(ig.visualizacoes)} nota={`${ig.janelaDias}d`} />
-            <Kpi icone={<Heart className="w-4 h-4" />} label="Interações" valor={fmt(ig.interacoesTotais)} nota={`${ig.janelaDias}d`} />
-            <Kpi icone={<Users className="w-4 h-4" />} label="Contas engajadas" valor={fmt(ig.contasEngajadas)} nota={`${ig.janelaDias}d`} />
-            <Kpi icone={<UserPlus className="w-4 h-4" />} label="Visitas ao perfil" valor={fmt(ig.visitasPerfil)} nota={`${ig.janelaDias}d`} />
-            <Kpi icone={<Grid3x3 className="w-4 h-4" />} label="Publicações" valor={fmt(ig.publicacoes)} nota="total" />
+            <Kpi corIcone="text-fuchsia-400/70" icone={<Eye className="w-4 h-4" />} label="Alcance" valor={fmt(ig.alcance)} nota={`${ig.janelaDias}d`} />
+            <Kpi corIcone="text-fuchsia-400/70" icone={<TrendingUp className="w-4 h-4" />} label="Visualizações" valor={fmt(ig.visualizacoes)} nota={`${ig.janelaDias}d`} />
+            <Kpi corIcone="text-fuchsia-400/70" icone={<Heart className="w-4 h-4" />} label="Interações" valor={fmt(ig.interacoesTotais)} nota={`${ig.janelaDias}d`} />
+            <Kpi corIcone="text-fuchsia-400/70" icone={<Users className="w-4 h-4" />} label="Contas engajadas" valor={fmt(ig.contasEngajadas)} nota={`${ig.janelaDias}d`} />
+            <Kpi corIcone="text-fuchsia-400/70" icone={<UserPlus className="w-4 h-4" />} label="Visitas ao perfil" valor={fmt(ig.visitasPerfil)} nota={`${ig.janelaDias}d`} />
+            <Kpi corIcone="text-fuchsia-400/70" icone={<Grid3x3 className="w-4 h-4" />} label="Publicações" valor={fmt(ig.publicacoes)} nota="total" />
           </div>
         </div>
       </div>
     </div>
   )
-}
-
-function Kpi({
-  icone,
-  label,
-  valor,
-  nota,
-}: {
-  icone: ReactNode
-  label: string
-  valor: string
-  nota?: string
-}) {
-  return (
-    <div className="p-4 bg-bg-900">
-      <div className="flex items-center gap-1.5 text-ink-500">
-        <span className="text-fuchsia-400/70">{icone}</span>
-        <span className="text-[10px] tracking-wider font-semibold uppercase">{label}</span>
-      </div>
-      <div className="num text-lg font-bold text-ink-100 mt-1">{valor}</div>
-      {nota && <div className="text-[10px] text-ink-600 num">{nota}</div>}
-    </div>
-  )
-}
-
-function fmt(n: number | null | undefined): string {
-  return n == null ? '—' : formatNumber(n)
-}
-
-/** "há Xmin/h/d" simples a partir de um ISO timestamp. */
-function formatarQuando(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60_000)
-  if (min < 1) return 'agora'
-  if (min < 60) return `há ${min}min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `há ${h}h`
-  return `há ${Math.floor(h / 24)}d`
 }

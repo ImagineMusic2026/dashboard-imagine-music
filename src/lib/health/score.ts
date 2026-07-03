@@ -59,7 +59,8 @@ export interface ArtistaSaude {
 
 const DIA = 86_400_000
 
-const PESOS: Record<keyof SaudeBreakdown, number> = {
+/** Pesos dos pilares — exportado pra UI rotular a composição ("Engajamento · 25%"). */
+export const PESOS: Record<keyof SaudeBreakdown, number> = {
   audiencia: 0.2,
   crescimento: 0.15,
   engajamento: 0.25,
@@ -149,7 +150,8 @@ function faixaDe(score: number): FaixaSaude {
   return 'critico'
 }
 
-function motivoDominante(b: SaudeBreakdown): string | null {
+/** Pilar mais fraco, nomeado — exportado pra linha de diagnóstico do perfil. */
+export function motivoDominante(b: SaudeBreakdown): string | null {
   const cands: [string, number | null][] = [
     ['Perdendo seguidores', b.crescimento],
     ['Engajamento baixo', b.engajamento],

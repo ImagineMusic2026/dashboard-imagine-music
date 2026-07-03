@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Bell, CloudOff, Flame, MoonStar, PlayCircle, PlugZap, Star, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
+import { abrirCardCanal, rolarAteCard } from '@/lib/artistas/abrir-card'
 import { corAvatarDe, iniciaisDe } from '@/lib/artistas/client'
 import type { AlertaDerivado, SeveridadeAlerta } from '@/lib/alertas/derivar'
 import { cn } from '@/lib/utils'
@@ -48,9 +49,26 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
   const sev = SEV[a.severidade]
   const Icone = ICONE_ALERTA[a.categoria] ?? Bell
   const interno = a.url?.startsWith('/') ?? false
+  // Âncora na própria página (ex.: "#card-streaming" no perfil do artista) —
+  // rola até a seção em vez de navegar/abrir aba.
+  const ancora = a.url?.startsWith('#') ?? false
 
   const acao = a.url ? (
-    interno ? (
+    ancora ? (
+      <a
+        href={a.url}
+        onClick={(e) => {
+          e.preventDefault()
+          const id = a.url!.slice(1)
+          // Âncoras de card de plataforma ("card-streaming") também expandem o card.
+          if (id.startsWith('card-')) abrirCardCanal(id.slice(5))
+          rolarAteCard(id)
+        }}
+        className="text-violet-400 hover:text-violet-300 text-sm font-semibold shrink-0 self-start sm:self-center transition-colors"
+      >
+        {a.acaoSugerida} →
+      </a>
+    ) : interno ? (
       <Link
         href={a.url}
         className="text-violet-400 hover:text-violet-300 text-sm font-semibold shrink-0 self-start sm:self-center transition-colors"

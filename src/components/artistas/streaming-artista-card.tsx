@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, Globe, Music2, PlayCircle, SkipForward } from 'lucide-react'
 import { Bandeira } from '@/components/artistas/bandeira'
 import { MiniAreaChart } from '@/components/artistas/mini-area-chart'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
-import { getHistoricoStreaming, getMetricasSociais } from '@/lib/metricas-sociais/client'
+import { corSkip } from '@/components/artistas/streaming-analitico-card'
+import { Kpi, fmt, formatarQuando } from '@/components/shared/kpi'
+import { aoAbrirCardCanal } from '@/lib/artistas/abrir-card'
+import { getHistoricoStreaming, getMetricasSociaisCached } from '@/lib/metricas-sociais/client'
 import type { HistoricoStreamingDiaDoc, StreamingSnapshot } from '@/lib/metricas-sociais/types'
-import { cn, formatNumber } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 /**
  * Card "Streaming" do perfil do artista — plays/skips REAIS do feed de trends da
@@ -34,14 +37,18 @@ const COR_TXT: Record<string, string> = {
 
 export function StreamingArtistaCard({ slug }: { slug: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
-  const [aberto, setAberto] = useState(true)
+  // Começa recolhido — expande pelo header, pelo comparativo "Canais" ou por
+  // um alerta com âncora (#card-streaming).
+  const [aberto, setAberto] = useState(false)
+
+  useEffect(() => aoAbrirCardCanal('streaming', () => setAberto(true)), [])
 
   useEffect(() => {
     let vivo = true
     ;(async () => {
       try {
         const [doc, historico] = await Promise.all([
-          getMetricasSociais(slug),
+          getMetricasSociaisCached(slug),
           getHistoricoStreaming(slug).catch(() => [] as HistoricoStreamingDiaDoc[]),
         ])
         if (!vivo) return
@@ -84,6 +91,9 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
 
   const { s, historico } = estado
   const serie = historico.filter((h) => h.streams != null)
+  // Momentum: última semana vs média semanal das 3 anteriores — mesma régua do
+  // pilar de streaming do Health Score e dos alertas.
+  const momentum = momentumSemanal(s)
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
@@ -111,6 +121,7 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
             <div className="text-[12px] text-ink-500 mt-0.5">
               via OneRPM · {s.lojas.length} loja{s.lojas.length === 1 ? '' : 's'} · atualizado{' '}
               {formatarQuando(s.coletadoEm)}
+              {s.ultimoDia && <span className="num"> · dado até {diaCurto(s.ultimoDia)}</span>}
             </div>
           </div>
         </div>
@@ -120,7 +131,19 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
               Streams · 28d
             </div>
             <div className="num text-2xl font-bold text-ink-100">{fmt(s.streams28d ?? s.streams)}</div>
-            <div className="text-[11px] num text-ink-500">{fmt(s.streams)} no período</div>
+            {momentum != null ? (
+              <div
+                className={cn(
+                  'text-[11px] num',
+                  momentum > 0.02 ? 'text-emerald-400' : momentum < -0.02 ? 'text-red-400' : 'text-ink-500',
+                )}
+              >
+                {momentum > 0 ? '↑ +' : momentum < 0 ? '↓ −' : ''}
+                {Math.abs(momentum * 100).toFixed(0)}% semana vs média
+              </div>
+            ) : (
+              <div className="text-[11px] num text-ink-500">{fmt(s.streams)} no período</div>
+            )}
           </div>
           <span
             className="grid place-items-center w-7 h-7 rounded-md text-ink-400 hover:text-ink-100 hover:bg-bg-700/40 transition-colors shrink-0"
@@ -143,9 +166,9 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
           )}
 
           <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">
-            <Kpi icone={<PlayCircle className="w-4 h-4" />} label="Streams" valor={fmt(s.streams)} nota={`${s.periodo.dias}d`} />
-            <Kpi icone={<SkipForward className="w-4 h-4" />} label="Skip rate" valor={pct(s.skipRate)} nota={`${fmt(s.skips)} skips`} />
-            <Kpi icone={<Music2 className="w-4 h-4" />} label="Faixas" valor={fmt(s.faixas)} nota="ISRCs" />
+            <Kpi corIcone="text-amber-400/70" icone={<PlayCircle className="w-4 h-4" />} label="Streams" valor={fmt(s.streams)} nota={`${s.periodo.dias}d`} />
+            <Kpi corIcone="text-amber-400/70" icone={<SkipForward className="w-4 h-4" />} label="Skip rate" valor={pct(s.skipRate)} nota={`${fmt(s.skips)} skips`} />
+            <Kpi corIcone="text-amber-400/70" icone={<Music2 className="w-4 h-4" />} label="Faixas" valor={fmt(s.faixas)} nota="ISRCs" />
           </div>
 
           {s.porPlataforma.length > 0 && (
@@ -154,21 +177,30 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
                 Por plataforma
               </div>
               <div className="space-y-1.5">
-                {s.porPlataforma.map((p) => (
-                  <div key={p.plataforma} className="flex items-center gap-2.5">
-                    <span className={cn('w-4 h-4 block shrink-0', COR_TXT[p.corKey] ?? 'text-ink-400')}>
-                      <PlataformaIcon tipo={p.iconeTipo} />
-                    </span>
-                    <span className="text-[13px] text-ink-200 w-28 shrink-0 truncate">{p.plataforma}</span>
-                    <div className="flex-1 h-1.5 rounded-full bg-bg-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-amber-500/70"
-                        style={{ width: `${barra(p.streams, s.porPlataforma[0].streams)}%` }}
-                      />
+                {s.porPlataforma.map((p) => {
+                  const rate = p.streams > 0 ? p.skips / p.streams : null
+                  return (
+                    <div key={p.plataforma} className="flex items-center gap-2.5">
+                      <span className={cn('w-4 h-4 block shrink-0', COR_TXT[p.corKey] ?? 'text-ink-400')}>
+                        <PlataformaIcon tipo={p.iconeTipo} />
+                      </span>
+                      <span className="text-[13px] text-ink-200 w-28 shrink-0 truncate">{p.plataforma}</span>
+                      <div className="flex-1 h-1.5 rounded-full bg-bg-800 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-amber-500/70"
+                          style={{ width: `${barra(p.streams, s.porPlataforma[0].streams)}%` }}
+                        />
+                      </div>
+                      <span className="num text-[12px] text-ink-300 w-16 text-right shrink-0">{fmt(p.streams)}</span>
+                      <span
+                        className={cn('num text-[11px] w-14 text-right shrink-0', rate == null ? 'text-ink-600' : corSkip(rate))}
+                        title="Skip rate na loja"
+                      >
+                        {rate == null ? '—' : `${(rate * 100).toFixed(1)}%`}
+                      </span>
                     </div>
-                    <span className="num text-[12px] text-ink-300 w-16 text-right shrink-0">{fmt(p.streams)}</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -198,23 +230,6 @@ export function StreamingArtistaCard({ slug }: { slug: string }) {
   )
 }
 
-function Kpi({ icone, label, valor, nota }: { icone: ReactNode; label: string; valor: string; nota?: string }) {
-  return (
-    <div className="p-4 bg-bg-900">
-      <div className="flex items-center gap-1.5 text-ink-500">
-        <span className="text-amber-400/70">{icone}</span>
-        <span className="text-[10px] tracking-wider font-semibold uppercase">{label}</span>
-      </div>
-      <div className="num text-lg font-bold text-ink-100 mt-1">{valor}</div>
-      {nota && <div className="text-[10px] text-ink-600 num">{nota}</div>}
-    </div>
-  )
-}
-
-function fmt(n: number | null | undefined): string {
-  return n == null ? '—' : formatNumber(n)
-}
-
 function pct(n: number | null | undefined): string {
   return n == null ? '—' : `${(n * 100).toFixed(1)}%`
 }
@@ -224,13 +239,21 @@ function barra(v: number, max: number): number {
   return Math.max(3, Math.round((v / max) * 100))
 }
 
-/** "há Xmin/h/d" simples a partir de um ISO timestamp. */
-function formatarQuando(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60_000)
-  if (min < 1) return 'agora'
-  if (min < 60) return `há ${min}min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `há ${h}h`
-  return `há ${Math.floor(h / 24)}d`
+/**
+ * Streams da última semana vs média semanal das 3 anteriores (null sem base) —
+ * mesma conta de `pontosStreaming` (health) e `alertaStreaming` (alertas).
+ */
+function momentumSemanal(s: StreamingSnapshot): number | null {
+  const s28 = s.streams28d ?? 0
+  const s7 = s.streams7d ?? 0
+  if (s28 <= 0) return null
+  const prior = (s28 - s7) / 3
+  if (prior <= 0) return null
+  return (s7 - prior) / prior
+}
+
+/** "YYYY-MM-DD" -> "dd/mm" (defasagem do feed SFTP visível no header). */
+function diaCurto(dia: string): string {
+  const [, m, d] = dia.split('-')
+  return m && d ? `${d}/${m}` : dia
 }

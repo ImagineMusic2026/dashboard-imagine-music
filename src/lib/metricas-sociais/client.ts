@@ -27,6 +27,26 @@ export async function getMetricasSociais(slug: string): Promise<MetricasSociaisD
   return s.exists() ? ({ slug: s.id, ...(s.data() as object) } as MetricasSociaisDoc) : null
 }
 
+const TTL_METRICAS = 60_000
+const cacheMetricas = new Map<string, { promessa: Promise<MetricasSociaisDoc | null>; em: number }>()
+
+/**
+ * `getMetricasSociais` com cache curto por slug: os ~8 cards do perfil do
+ * artista montam juntos e cada um pedia o MESMO doc — com o cache, a visita
+ * inteira divide uma única leitura do Firestore. Falha não fica cacheada.
+ */
+export function getMetricasSociaisCached(slug: string): Promise<MetricasSociaisDoc | null> {
+  const agora = Date.now()
+  const hit = cacheMetricas.get(slug)
+  if (hit && agora - hit.em < TTL_METRICAS) return hit.promessa
+  const promessa = getMetricasSociais(slug).catch((e) => {
+    cacheMetricas.delete(slug)
+    throw e
+  })
+  cacheMetricas.set(slug, { promessa, em: agora })
+  return promessa
+}
+
 /** Mapa slug -> métricas, para uso em listagens. */
 export async function listarMetricasSociais(): Promise<Map<string, MetricasSociaisDoc>> {
   const snap = await getDocs(collection(db, 'metricas-sociais'))

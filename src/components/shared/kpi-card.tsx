@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-type AccentColor = 'violet' | 'amber' | 'emerald' | 'red'
+type AccentColor = 'violet' | 'amber' | 'emerald' | 'red' | 'fuchsia'
 
 type KPICardProps = {
   label: string
@@ -18,6 +18,7 @@ const glowMap: Record<AccentColor, string> = {
   amber: 'bg-amber-500/15',
   emerald: 'bg-emerald-500/10',
   red: 'bg-red-500/10',
+  fuchsia: 'bg-fuchsia-500/10',
 }
 
 const iconColorMap: Record<AccentColor, string> = {
@@ -25,6 +26,7 @@ const iconColorMap: Record<AccentColor, string> = {
   amber: 'text-amber-400',
   emerald: 'text-emerald-400',
   red: 'text-red-400',
+  fuchsia: 'text-fuchsia-400',
 }
 
 export function KPICard({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { MiniAreaChart } from '@/components/artistas/mini-area-chart'
 import {
   ChevronDown,
@@ -13,7 +13,9 @@ import {
   Video,
 } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
-import { getHistoricoTikTok, getMetricasSociais } from '@/lib/metricas-sociais/client'
+import { Kpi, fmt, formatarQuando, janelaDaSerie } from '@/components/shared/kpi'
+import { aoAbrirCardCanal } from '@/lib/artistas/abrir-card'
+import { getHistoricoTikTok, getMetricasSociaisCached } from '@/lib/metricas-sociais/client'
 import type { HistoricoTikTokDiaDoc, TikTokSnapshot } from '@/lib/metricas-sociais/types'
 import { cn, formatNumber } from '@/lib/utils'
 
@@ -31,14 +33,17 @@ type Estado =
 
 export function TikTokArtistaCard({ slug }: { slug: string }) {
   const [estado, setEstado] = useState<Estado>({ st: 'load' })
-  const [aberto, setAberto] = useState(true)
+  // Começa recolhido — expande pelo header ou pelo comparativo "Canais".
+  const [aberto, setAberto] = useState(false)
+
+  useEffect(() => aoAbrirCardCanal('tiktok', () => setAberto(true)), [])
 
   useEffect(() => {
     let vivo = true
     ;(async () => {
       try {
         const [doc, historico] = await Promise.all([
-          getMetricasSociais(slug),
+          getMetricasSociaisCached(slug),
           getHistoricoTikTok(slug).catch(() => [] as HistoricoTikTokDiaDoc[]),
         ])
         if (!vivo) return
@@ -129,7 +134,7 @@ export function TikTokArtistaCard({ slug }: { slug: string }) {
                 className={cn('text-[11px] num', variacao > 0 ? 'text-emerald-400' : 'text-red-400')}
               >
                 {variacao > 0 ? '+' : '−'}
-                {formatNumber(Math.abs(variacao))} no período
+                {formatNumber(Math.abs(variacao))} {janelaDaSerie(serie) ?? 'no período'}
               </div>
             )}
           </div>
@@ -154,53 +159,15 @@ export function TikTokArtistaCard({ slug }: { slug: string }) {
           )}
 
           <div className="grid grid-cols-3 gap-px bg-bg-700/30 border-t border-bg-700/30">
-            <Kpi icone={<Heart className="w-4 h-4" />} label="Curtidas" valor={fmt(tt.curtidas)} nota="total" />
-            <Kpi icone={<Video className="w-4 h-4" />} label="Vídeos" valor={fmt(tt.videos)} nota="total" />
-            <Kpi icone={<Play className="w-4 h-4" />} label="Views" valor={fmt(tt.viewsRecentes)} nota={notaRec} />
-            <Kpi icone={<ThumbsUp className="w-4 h-4" />} label="Curtidas" valor={fmt(tt.curtidasRecentes)} nota={notaRec} />
-            <Kpi icone={<MessageCircle className="w-4 h-4" />} label="Comentários" valor={fmt(tt.comentariosRecentes)} nota={notaRec} />
-            <Kpi icone={<Share2 className="w-4 h-4" />} label="Compart." valor={fmt(tt.compartilhamentosRecentes)} nota={notaRec} />
+            <Kpi corIcone="text-cyan-400/70" icone={<Heart className="w-4 h-4" />} label="Curtidas" valor={fmt(tt.curtidas)} nota="total" />
+            <Kpi corIcone="text-cyan-400/70" icone={<Video className="w-4 h-4" />} label="Vídeos" valor={fmt(tt.videos)} nota="total" />
+            <Kpi corIcone="text-cyan-400/70" icone={<Play className="w-4 h-4" />} label="Views" valor={fmt(tt.viewsRecentes)} nota={notaRec} />
+            <Kpi corIcone="text-cyan-400/70" icone={<ThumbsUp className="w-4 h-4" />} label="Curtidas" valor={fmt(tt.curtidasRecentes)} nota={notaRec} />
+            <Kpi corIcone="text-cyan-400/70" icone={<MessageCircle className="w-4 h-4" />} label="Comentários" valor={fmt(tt.comentariosRecentes)} nota={notaRec} />
+            <Kpi corIcone="text-cyan-400/70" icone={<Share2 className="w-4 h-4" />} label="Compart." valor={fmt(tt.compartilhamentosRecentes)} nota={notaRec} />
           </div>
         </div>
       </div>
     </div>
   )
-}
-
-function Kpi({
-  icone,
-  label,
-  valor,
-  nota,
-}: {
-  icone: ReactNode
-  label: string
-  valor: string
-  nota?: string
-}) {
-  return (
-    <div className="p-4 bg-bg-900">
-      <div className="flex items-center gap-1.5 text-ink-500">
-        <span className="text-cyan-400/70">{icone}</span>
-        <span className="text-[10px] tracking-wider font-semibold uppercase">{label}</span>
-      </div>
-      <div className="num text-lg font-bold text-ink-100 mt-1">{valor}</div>
-      {nota && <div className="text-[10px] text-ink-600 num">{nota}</div>}
-    </div>
-  )
-}
-
-function fmt(n: number | null | undefined): string {
-  return n == null ? '—' : formatNumber(n)
-}
-
-/** "há Xmin/h/d" simples a partir de um ISO timestamp. */
-function formatarQuando(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60_000)
-  if (min < 1) return 'agora'
-  if (min < 60) return `há ${min}min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `há ${h}h`
-  return `há ${Math.floor(h / 24)}d`
 }

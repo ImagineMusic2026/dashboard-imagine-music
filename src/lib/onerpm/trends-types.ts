@@ -7,7 +7,8 @@ import type { PlataformaTipo } from '@/components/artistas/plataforma-icon'
  * simples vindo por SFTP. Um arquivo por dia (`YYYY-MM-DD.csv`) com as colunas:
  *   store, date_stat, country_code, quantity, skips, isrc, artist_name
  * Grão = uma linha por **store × dia × país × ISRC**. NÃO tem receita nem título
- * da faixa (a faixa é identificada só pelo ISRC; o título virá num catálogo à parte).
+ * da faixa — a faixa é identificada só pelo ISRC; o título vem do catálogo
+ * `catalogo-faixas` (CSV oficial da OneRPM + fallback Deezer, ver `catalogo-faixas.ts`).
  */
 
 /** Linha crua do CSV de trends, já com `.trim()` e prefixo de artista removido. */

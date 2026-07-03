@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { exigirSessaoAtiva } from '@/lib/server-auth'
 import { getCatalogoFaixas, salvarCatalogoFaixasLote } from '@/lib/metricas-sociais/firestore'
-import { resolverISRCDeezer, type CatalogoFaixaDoc } from '@/lib/onerpm/deezer'
+import type { CatalogoFaixaDoc } from '@/lib/onerpm/catalogo-faixas'
+import { resolverISRCDeezer } from '@/lib/onerpm/deezer'
 
 // fetch (Deezer) + firebase-admin precisam do runtime Node.
 export const runtime = 'nodejs'
@@ -12,10 +13,12 @@ const MAX_ISRCS = 80
 const MAX_RESOLVER = 50 // máx. de buscas no Deezer por request (bound de tempo)
 
 /**
- * Resolve ISRC → título (via Deezer, cacheado em `catalogo-faixas`). O card da
- * análise de faixas manda os ISRCs visíveis e recebe os títulos + link do Deezer.
- * Os títulos NÃO ficam no detalhe (que o cron reconstrói) — ficam neste cache à
- * parte. Qualquer membro ativo pode chamar (título de faixa não é sensível).
+ * Resolve ISRC → título a partir de `catalogo-faixas` (catálogo oficial da
+ * OneRPM importado + fallback Deezer pros ISRCs sem doc). O card da análise de
+ * faixas manda os ISRCs visíveis e recebe título + link (o link só existe
+ * quando veio do Deezer — o catálogo da OneRPM não tem link). Os títulos NÃO
+ * ficam no detalhe (que o cron reconstrói) — ficam neste cache à parte.
+ * Qualquer membro ativo pode chamar (título de faixa não é sensível).
  */
 export async function POST(req: Request) {
   const auth = await exigirSessaoAtiva(req)
@@ -38,12 +41,12 @@ export async function POST(req: Request) {
   if (!isrcs.length) return NextResponse.json({ titulos: {} })
 
   const cache = await getCatalogoFaixas(isrcs)
-  const titulos: Record<string, { titulo: string; link: string }> = {}
+  const titulos: Record<string, { titulo: string; link: string | null }> = {}
   const aResolver: string[] = []
   for (const isrc of isrcs) {
     const c = cache.get(isrc)
     if (c) {
-      if (c.titulo && c.link) titulos[isrc] = { titulo: c.titulo, link: c.link }
+      if (c.titulo) titulos[isrc] = { titulo: c.titulo, link: c.link ?? null }
       // c.naoEncontrado: já sabemos que o Deezer não tem — não re-busca.
     } else {
       aResolver.push(isrc)

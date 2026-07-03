@@ -156,7 +156,7 @@ export function finalizar(acc: TrendsAcc): OneRpmTrendsAggregate {
     if (nomes.size > 1) {
       avisos.push(
         `Artista "${slug}" aparece com grafias diferentes no CSV (${Array.from(nomes).join(' / ')}); ` +
-          `agrupei pela slug. Quando vier o catálogo ISRC→artista, troco a chave de junção.`,
+          `agrupei pela slug (divergências com o roster se resolvem nos aliases de trends-aliases.ts).`,
       )
     }
   }

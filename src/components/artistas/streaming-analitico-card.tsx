@@ -12,7 +12,8 @@ import { cn, formatNumber } from '@/lib/utils'
  * Card de ANÁLISE de streaming (Fase 1 do analytics): tabela de faixas (ISRC)
  * ordenável por skip rate ou por streams + skip rate por país. Lê o detalhe
  * granular da subcoleção `streaming-detalhe/atual` (separada do snapshot pra não
- * pesar as listas). A faixa aparece por ISRC até o catálogo de títulos da OneRPM.
+ * pesar as listas). O título vem do catálogo (`/api/faixas/titulos`: catálogo
+ * oficial da OneRPM + fallback Deezer); sem título, mostra o ISRC cru.
  */
 
 type Estado = { st: 'load' } | { st: 'vazio' } | { st: 'ok'; d: StreamingDetalheDoc }
@@ -27,7 +28,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
   const [ordem, setOrdem] = useState<Ordem>('skip')
   const [todas, setTodas] = useState(false)
   const [aberto, setAberto] = useState(true)
-  const [titulos, setTitulos] = useState<Record<string, { titulo: string; link: string }>>({})
+  const [titulos, setTitulos] = useState<Record<string, { titulo: string; link: string | null }>>({})
 
   useEffect(() => {
     let vivo = true
@@ -56,7 +57,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
 
   const visiveis = useMemo(() => (todas ? faixas : faixas.slice(0, 12)), [faixas, todas])
 
-  // Resolve os títulos (via Deezer, pela rota) das faixas visíveis ainda sem nome.
+  // Resolve os títulos (catálogo OneRPM + Deezer, pela rota) das faixas visíveis ainda sem nome.
   useEffect(() => {
     const pendentes = visiveis.map((f) => f.isrc).filter((isrc) => !(isrc in titulos))
     if (!pendentes.length) return
@@ -71,7 +72,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
           body: JSON.stringify({ isrcs: pendentes }),
         })
         const data = (await res.json().catch(() => null)) as {
-          titulos?: Record<string, { titulo: string; link: string }>
+          titulos?: Record<string, { titulo: string; link: string | null }>
         } | null
         if (vivo && data?.titulos) setTitulos((prev) => ({ ...prev, ...data.titulos }))
       } catch {
@@ -192,7 +193,7 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
                     className="grid grid-cols-[1.5rem_1fr_4.5rem_4.5rem_3.5rem] gap-2 px-3 py-2 rounded-lg hover:bg-bg-800/30 items-center text-[13px]"
                   >
                     <span className="text-ink-600 num text-center">{i + 1}</span>
-                    {info ? (
+                    {info?.link ? (
                       <a
                         href={info.link}
                         target="_blank"
@@ -203,6 +204,10 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
                         <span className="truncate">{info.titulo}</span>
                         <ExternalLink className="w-3 h-3 shrink-0 text-ink-600" />
                       </a>
+                    ) : info ? (
+                      <span className="text-ink-200 truncate" title={info.titulo}>
+                        {info.titulo}
+                      </span>
                     ) : (
                       <span className="num text-ink-400 truncate" title={f.isrc}>
                         {f.isrc}
@@ -261,8 +266,8 @@ export function StreamingAnaliticoCard({ slug }: { slug: string }) {
           )}
 
           <div className="border-t border-bg-700/30 px-5 py-2.5 text-[11px] text-ink-500">
-            Títulos resolvidos pelo <span className="text-ink-400">Deezer</span> (clique pra abrir a faixa). O
-            que não estiver lá aparece por ISRC; o catálogo da OneRPM substitui depois.
+            Títulos do <span className="text-ink-400">catálogo oficial da OneRPM</span> (complemento via
+            Deezer — quando há link, o clique abre a faixa). O que faltar aparece por ISRC.
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase-admin'
-import type { CatalogoFaixaDoc } from '@/lib/onerpm/deezer'
+import type { CatalogoFaixaDoc } from '@/lib/onerpm/catalogo-faixas'
 import type {
   HistoricoDiaDoc,
   HistoricoHealthDiaDoc,
@@ -435,7 +435,7 @@ export async function salvarStreamingDetalhe(slug: string, detalhe: StreamingDet
   await adminDb.doc(`metricas-sociais/${slug}/streaming-detalhe/atual`).set(detalhe)
 }
 
-/* ── Catálogo de faixas (ISRC → título, cache do Deezer) ──────────────────── */
+/* ── Catálogo de faixas (ISRC → título; catálogo OneRPM + fallback Deezer) ── */
 
 /** Lê o cache de títulos por ISRC (batch). Só os ISRCs que já têm doc. */
 export async function getCatalogoFaixas(isrcs: string[]): Promise<Map<string, CatalogoFaixaDoc>> {
@@ -447,11 +447,23 @@ export async function getCatalogoFaixas(isrcs: string[]): Promise<Map<string, Ca
   return out
 }
 
-/** Grava (set) um lote de entradas do catálogo de faixas (lotes de 400). */
+/**
+ * Grava um lote de entradas NOVAS do catálogo de faixas. `create` por doc, não
+ * `set`: quem chama só resolve cache miss (Deezer), e se o doc passou a existir
+ * no meio (ex.: o import do catálogo oficial rodou durante o request) o doc
+ * 'onerpm' NÃO pode ser rebaixado pra 'deezer' — o create falha e ignoramos.
+ */
 export async function salvarCatalogoFaixasLote(docs: CatalogoFaixaDoc[]): Promise<void> {
-  for (let i = 0; i < docs.length; i += 400) {
-    const batch = adminDb.batch()
-    for (const d of docs.slice(i, i + 400)) batch.set(adminDb.doc(`catalogo-faixas/${d.isrc}`), d)
-    await batch.commit()
+  for (let i = 0; i < docs.length; i += 50) {
+    await Promise.all(
+      docs.slice(i, i + 50).map((d) =>
+        adminDb
+          .doc(`catalogo-faixas/${d.isrc}`)
+          .create(d)
+          .catch((e: { code?: number }) => {
+            if (e?.code !== 6) throw e // 6 = ALREADY_EXISTS (gRPC)
+          }),
+      ),
+    )
   }
 }

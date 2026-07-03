@@ -1,27 +1,15 @@
 /**
  * Resolução de ISRC → título via a API pública do Deezer (sem chave). As faixas
  * da OneRPM são distribuídas pro Deezer, então o lookup por ISRC acha quase tudo.
- * Usado pra dar nome às faixas enquanto o catálogo de títulos da OneRPM não chega.
+ * Hoje é o FALLBACK do catálogo oficial da OneRPM (`catalogo-faixas`, ver
+ * `catalogo-faixas.ts`) pras faixas que ainda não estão no arquivo — e a única
+ * fonte do `link` clicável.
  */
 
 export interface FaixaResolvida {
   titulo: string
   link: string
   releaseDate: string | null
-}
-
-/**
- * Doc de cache `catalogo-faixas/{isrc}`. `naoEncontrado` evita re-buscar o que o
- * Deezer não tem. SERVER-ONLY (escrito pela rota/script via Admin SDK).
- */
-export interface CatalogoFaixaDoc {
-  isrc: string
-  titulo: string | null
-  link: string | null
-  releaseDate: string | null
-  naoEncontrado?: boolean
-  fonte: 'deezer'
-  atualizadoEm: string
 }
 
 /** Busca uma faixa por ISRC no Deezer. null se não achar ou der erro. */

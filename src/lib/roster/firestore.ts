@@ -2,7 +2,14 @@ import admin from 'firebase-admin'
 import { adminDb } from '@/lib/firebase-admin'
 import { slugify } from '../onerpm/aggregate'
 import { extrairInstagram, extrairSpotify, extrairTiktok, extrairYoutube } from './extrair'
-import type { RedeSocial, RosterArtist, RosterParseResult } from './types'
+import type {
+  AnaliseArtista,
+  AnaliseRoster,
+  RedeKey,
+  RedeSocial,
+  RosterArtist,
+  RosterParseResult,
+} from './types'
 
 /**
  * Persistência do cadastro de artistas (⚠️ só servidor — Admin SDK).
@@ -20,6 +27,8 @@ export interface RosterMeta {
   tamanhoBytes: number
   uid: string
   email: string
+  /** Resumo das decisões de conflito (auditoria), quando a importação foi revisada. */
+  conflitos?: { mantidos: number; trocados: number }
 }
 
 export interface CadastroResumo {
@@ -59,6 +68,70 @@ function mesclarRedesRoster(
     out[net] = combinarRedeRoster(atuais[net] ?? null, nova)
   }
   return out
+}
+
+const REDES: RedeKey[] = ['spotify', 'youtube', 'instagram', 'tiktok']
+
+/** True quando a rede tem alguma identidade gravada (url, id ou handle). */
+function temRede(r: RedeSocial | null | undefined): r is RedeSocial {
+  return Boolean(r && (r.url || r.id || r.handle))
+}
+
+/**
+ * Compara a planilha com o que JÁ existe em `artistas/{slug}` — SEM gravar nada.
+ * É a fase 1 da importação: aponta artistas novos, redes que só preenchem
+ * lacunas e CONFLITOS (painel tem uma conta, planilha traz outra), pro usuário
+ * revisar um a um antes de confirmar.
+ */
+export async function analisarRoster(res: RosterParseResult): Promise<AnaliseRoster> {
+  const validos = res.artistas.filter((a) => a.slug)
+
+  const slugs = Array.from(new Set(validos.map((a) => a.slug)))
+  const refs = slugs.map((s) => adminDb.collection(ARTISTAS).doc(s))
+  const snaps = refs.length ? await adminDb.getAll(...refs) : []
+  const docs = new Map(snaps.map((s) => [s.id, s]))
+
+  const artistas: AnaliseArtista[] = validos.map((a) => {
+    const snap = docs.get(a.slug)
+    const existe = Boolean(snap?.exists)
+    const dados = existe ? snap!.data() : undefined
+    const nomeAtual = existe ? ((dados?.nome as string | undefined) ?? null) : null
+    const redesAtuais = (dados?.redes ?? {}) as Record<string, RedeSocial | null | undefined>
+
+    const redesNovas: RedeKey[] = []
+    const conflitos: AnaliseArtista['conflitos'] = []
+    for (const rede of REDES) {
+      const novo = a[rede]
+      if (!temRede(novo)) continue
+      const atual = redesAtuais[rede]
+      if (!temRede(atual)) {
+        if (existe) redesNovas.push(rede)
+        continue
+      }
+      if (!mesmaIdentidade(atual, novo)) conflitos.push({ rede, atual, novo })
+    }
+
+    const status: AnaliseArtista['status'] = !existe
+      ? 'novo'
+      : conflitos.length
+        ? 'conflito'
+        : redesNovas.length || (nomeAtual !== null && nomeAtual !== a.nome)
+          ? 'atualiza'
+          : 'igual'
+
+    return { artista: a, status, nomeAtual, redesNovas, conflitos }
+  })
+
+  return {
+    artistas,
+    totais: {
+      total: artistas.length,
+      novos: artistas.filter((x) => x.status === 'novo').length,
+      iguais: artistas.filter((x) => x.status === 'igual').length,
+      atualizados: artistas.filter((x) => x.status === 'atualiza').length,
+      comConflito: artistas.filter((x) => x.status === 'conflito').length,
+    },
+  }
 }
 
 export async function salvarRoster(
@@ -106,6 +179,7 @@ export async function salvarRoster(
     totais: res.totais,
     avisos: res.avisos,
     artistas: res.artistas.map((a) => a.slug),
+    ...(meta.conflitos ? { conflitos: meta.conflitos } : {}),
     criadoEm: agora,
     criadoPorUid: meta.uid,
     criadoPorEmail: meta.email,

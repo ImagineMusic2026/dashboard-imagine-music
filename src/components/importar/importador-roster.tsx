@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
-import { AlertTriangle, CheckCircle2, Loader2, Lock, Users2, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, FileDown, Loader2, Lock, Users2, X } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { auth } from '@/lib/firebase'
-import type { RosterArtist } from '@/lib/roster/types'
+import { RevisarRosterDialog } from '@/components/importar/revisar-roster-dialog'
+import type { AnaliseRoster, DecisoesRoster, RosterArtist } from '@/lib/roster/types'
 import { cn } from '@/lib/utils'
 
 type Resumo = {
@@ -23,7 +24,43 @@ type Recente = {
   criadoPorEmail: string
 }
 
+type Revisao = {
+  analise: AnaliseRoster
+  arquivoNome: string
+  tamanhoBytes: number
+}
+
 const fmtInt = (n: number) => n.toLocaleString('pt-BR')
+
+/**
+ * Uma rede com decisão "manter" fica FORA da importação (a conta do painel é
+ * preservada) — mas no card de resultado ela apareceria como ausente ("✕").
+ * Aqui repomos, só pra exibição, a conta mantida e recalculamos os totais.
+ */
+function reporContasMantidas(resumo: Resumo, analise: AnaliseRoster, decisoes: DecisoesRoster): Resumo {
+  const porSlug = new Map(analise.artistas.map((x) => [x.artista.slug, x]))
+  const artistas = resumo.artistas.map((a) => {
+    const dec = decisoes[a.slug]
+    const conflitos = porSlug.get(a.slug)?.conflitos
+    if (!dec || !conflitos) return a
+    const patch: Partial<RosterArtist> = {}
+    for (const c of conflitos) {
+      if (dec[c.rede] === 'manter') patch[c.rede] = c.atual
+    }
+    return { ...a, ...patch }
+  })
+  return {
+    ...resumo,
+    artistas,
+    totais: {
+      total: artistas.length,
+      comSpotifyId: artistas.filter((a) => a.spotify?.id).length,
+      comYoutube: artistas.filter((a) => a.youtube?.url).length,
+      comInstagram: artistas.filter((a) => a.instagram?.url).length,
+      comTiktok: artistas.filter((a) => a.tiktok?.url).length,
+    },
+  }
+}
 
 const fmtTamanho = (b: number) =>
   b >= 1_048_576 ? `${(b / 1_048_576).toFixed(1)}MB` : b >= 1024 ? `${(b / 1024).toFixed(0)}KB` : `${b}B`
@@ -53,8 +90,11 @@ export function ImportadorRoster() {
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [resultado, setResultado] = useState<Resumo | null>(null)
+  const [analiseTotais, setAnaliseTotais] = useState<AnaliseRoster['totais'] | null>(null)
+  const [revisao, setRevisao] = useState<Revisao | null>(null)
   const [nomeArquivo, setNomeArquivo] = useState<string | null>(null)
   const [arrastando, setArrastando] = useState(false)
+  const [baixandoModelo, setBaixandoModelo] = useState(false)
   const [recentes, setRecentes] = useState<Recente[]>([])
 
   const ehAdmin = role === 'admin'
@@ -75,10 +115,39 @@ export function ImportadorRoster() {
     if (ehAdmin) void carregarRecentes()
   }, [ehAdmin, carregarRecentes])
 
+  /** Fase 2: grava a importação com as decisões de conflito (se houver). */
+  const confirmar = useCallback(
+    async (rev: Revisao, decisoes: DecisoesRoster) => {
+      const token = await auth.currentUser?.getIdToken()
+      if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+      const res = await fetch('/api/importar/roster/confirmar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          arquivoNome: rev.arquivoNome,
+          tamanhoBytes: rev.tamanhoBytes,
+          artistas: rev.analise.artistas.map((x) => x.artista),
+          decisoes,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error ?? 'Não foi possível importar o cadastro.')
+      setResultado(reporContasMantidas(data.resumo as Resumo, rev.analise, decisoes))
+      setAnaliseTotais(rev.analise.totais)
+      void carregarRecentes()
+    },
+    [carregarRecentes]
+  )
+
+  /**
+   * Fase 1: envia a planilha pra ANÁLISE (nada é gravado). Sem conflito com o
+   * cadastro atual, confirma direto; com conflito, abre a revisão um a um.
+   */
   const enviar = useCallback(
     async (file: File) => {
       setErro(null)
       setResultado(null)
+      setAnaliseTotais(null)
       setNomeArquivo(file.name)
       setEnviando(true)
       try {
@@ -87,28 +156,64 @@ export function ImportadorRoster() {
         if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
         const fd = new FormData()
         fd.append('file', file)
-        const res = await fetch('/api/importar/roster', {
+        const res = await fetch('/api/importar/roster/analisar', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: fd,
         })
         const data = await res.json().catch(() => null)
-        if (!res.ok) throw new Error(data?.error ?? 'Não foi possível importar o cadastro.')
-        setResultado(data.resumo as Resumo)
-        void carregarRecentes()
+        if (!res.ok) throw new Error(data?.error ?? 'Não foi possível analisar a planilha.')
+        const analise = data.analise as AnaliseRoster
+        const rev: Revisao = { analise, arquivoNome: file.name, tamanhoBytes: file.size }
+        if (analise.totais.comConflito > 0) {
+          setRevisao(rev)
+        } else {
+          await confirmar(rev, {})
+        }
       } catch (e) {
         setErro(e instanceof Error ? e.message : 'Erro inesperado ao importar.')
       } finally {
         setEnviando(false)
       }
     },
-    [carregarRecentes]
+    [confirmar]
   )
+
+  const baixarModelo = useCallback(async () => {
+    if (baixandoModelo) return
+    setErro(null)
+    setBaixandoModelo(true)
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+      const res = await fetch('/api/importar/roster/modelo', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error ?? 'Não foi possível gerar o modelo.')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'modelo-cadastro-artistas.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro inesperado ao baixar o modelo.')
+    } finally {
+      setBaixandoModelo(false)
+    }
+  }, [baixandoModelo])
 
   const abrirSeletor = () => inputRef.current?.click()
   const aoSoltar = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setArrastando(false)
+    if (enviando) return // o clique já é bloqueado; sem isso o drop dispararia 2 importações em paralelo
     const file = e.dataTransfer.files?.[0]
     if (file) void enviar(file)
   }
@@ -166,6 +271,22 @@ export function ImportadorRoster() {
         )}
       </div>
 
+      <div className="flex justify-end -mt-2">
+        <button
+          type="button"
+          onClick={() => void baixarModelo()}
+          disabled={baixandoModelo}
+          className="inline-flex items-center gap-1.5 text-[12px] text-ink-400 hover:text-cyan-300 transition-colors disabled:opacity-50"
+        >
+          {baixandoModelo ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <FileDown className="w-3.5 h-3.5" />
+          )}
+          Baixar modelo da planilha (.xlsx)
+        </button>
+      </div>
+
       {erro && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
@@ -176,7 +297,28 @@ export function ImportadorRoster() {
         </div>
       )}
 
-      {resultado && <ResultadoRoster resumo={resultado} onFechar={() => setResultado(null)} />}
+      {resultado && (
+        <ResultadoRoster
+          resumo={resultado}
+          analiseTotais={analiseTotais}
+          onFechar={() => {
+            setResultado(null)
+            setAnaliseTotais(null)
+          }}
+        />
+      )}
+
+      {revisao && (
+        <RevisarRosterDialog
+          analise={revisao.analise}
+          arquivoNome={revisao.arquivoNome}
+          onCancelar={() => setRevisao(null)}
+          onConfirmar={async (decisoes) => {
+            await confirmar(revisao, decisoes)
+            setRevisao(null)
+          }}
+        />
+      )}
 
       <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-bg-700/30 flex items-center justify-between">
@@ -218,7 +360,15 @@ export function ImportadorRoster() {
   )
 }
 
-function ResultadoRoster({ resumo, onFechar }: { resumo: Resumo; onFechar: () => void }) {
+function ResultadoRoster({
+  resumo,
+  analiseTotais,
+  onFechar,
+}: {
+  resumo: Resumo
+  analiseTotais: AnaliseRoster['totais'] | null
+  onFechar: () => void
+}) {
   const t = resumo.totais
   return (
     <div className="bg-bg-900 border border-cyan-500/30 rounded-xl overflow-hidden">
@@ -233,6 +383,13 @@ function ResultadoRoster({ resumo, onFechar }: { resumo: Resumo; onFechar: () =>
               Spotify ID {t.comSpotifyId}/{t.total} · YouTube {t.comYoutube}/{t.total} · Instagram{' '}
               {t.comInstagram}/{t.total} · TikTok {t.comTiktok}/{t.total}
             </div>
+            {analiseTotais && (
+              <div className="text-[12px] text-ink-500 mt-0.5">
+                {analiseTotais.novos} novos · {analiseTotais.atualizados} atualizados ·{' '}
+                {analiseTotais.iguais} sem mudança
+                {analiseTotais.comConflito > 0 && <> · {analiseTotais.comConflito} revisados</>}
+              </div>
+            )}
           </div>
         </div>
         <button type="button" onClick={onFechar} aria-label="Fechar" className="shrink-0">

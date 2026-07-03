@@ -61,6 +61,8 @@ export function lerRoster(buf: Buffer | ArrayBuffer | Uint8Array): RosterParseRe
     const r = rows[i] ?? []
     const nome = limpa(r[cNome])
     if (!nome) continue
+    // Linhas de exemplo do modelo baixado do painel, caso o usuário esqueça de apagá-las.
+    if (/apague esta linha/i.test(nome)) continue
 
     const spotify = cSpotify >= 0 ? extrairSpotify(limpa(r[cSpotify])) : null
     const youtube = cYoutube >= 0 ? extrairYoutube(limpa(r[cYoutube])) : null
@@ -77,6 +79,15 @@ export function lerRoster(buf: Buffer | ArrayBuffer | Uint8Array): RosterParseRe
 
   if (!artistas.length) throw new RosterParseError('Nenhum artista encontrado na planilha.')
 
+  return resumirRoster(artistas)
+}
+
+/**
+ * Totais + avisos a partir da lista de artistas. Usado no parse do XLSX e
+ * também na confirmação da importação (que remonta a lista já com as
+ * decisões de conflito aplicadas).
+ */
+export function resumirRoster(artistas: RosterArtist[]): RosterParseResult {
   const totais = {
     total: artistas.length,
     comSpotifyId: artistas.filter((a) => a.spotify?.id).length,

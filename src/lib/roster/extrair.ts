@@ -22,6 +22,8 @@ function limparHandle(v: string): string | null {
 
 /** True quando o valor é um @/handle digitado à mão, não uma URL. */
 function ehHandleCru(v: string): boolean {
+  // "@fulano.de.tal" é handle mesmo com pontos — URL nunca começa com @.
+  if (v.startsWith('@')) return !v.includes('/')
   return !v.includes('://') && !v.includes('.')
 }
 

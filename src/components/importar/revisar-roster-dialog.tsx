@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, GitCompareArrows, Loader2, X } from 'lucide-react'
+import type { KeyboardEvent } from 'react'
+import { ArrowLeft, ArrowRight, Check, ExternalLink, GitCompareArrows, Loader2, X } from 'lucide-react'
+import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import type {
   AnaliseArtista,
   AnaliseRoster,
@@ -18,32 +20,69 @@ const REDE_LABEL: Record<RedeKey, { nome: string; cor: string }> = {
   tiktok: { nome: 'TikTok', cor: 'text-cyan-400' },
 }
 
-/** Identidade "principal" pra exibir: @handle > id > url. */
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
+
+/** IDs longos (channelId/artistId) ficam legíveis: "UCXOvG…sAMzA". */
+function abreviar(v: string): string {
+  return v.length > 18 ? `${v.slice(0, 8)}…${v.slice(-5)}` : v
+}
+
+/** Identidade "principal" pra exibir: @handle > id abreviado > url sem protocolo. */
 function identidade(r: RedeSocial): string {
   if (r.handle) return `@${r.handle}`
-  if (r.id) return r.id
-  return r.url || '—'
+  if (r.id) return abreviar(r.id)
+  return r.url ? r.url.replace(/^https?:\/\/(www\.)?/i, '') : '—'
+}
+
+/** URL clicável do perfil — a salva ou, faltando ela, uma reconstruída do handle/id. */
+function urlPerfil(tipo: RedeKey, r: RedeSocial): string | null {
+  const u = (r.url ?? '').trim()
+  if (/^https?:\/\//i.test(u)) return u
+  if (r.handle) {
+    if (tipo === 'youtube') return `https://youtube.com/@${r.handle}`
+    if (tipo === 'instagram') return `https://instagram.com/${r.handle}`
+    if (tipo === 'tiktok') return `https://tiktok.com/@${r.handle}`
+  }
+  if (r.id) {
+    if (tipo === 'spotify') return `https://open.spotify.com/artist/${r.id}`
+    if (tipo === 'youtube') return `https://youtube.com/channel/${r.id}`
+  }
+  return null
 }
 
 function OpcaoConta({
   titulo,
+  tipo,
   rede,
   selecionado,
   onEscolher,
 }: {
   titulo: string
+  tipo: RedeKey
   rede: RedeSocial
   selecionado: boolean
   onEscolher: () => void
 }) {
   const principal = identidade(rede)
+  const link = urlPerfil(tipo, rede)
+  const aoTeclar = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onEscolher()
+    }
+  }
+  // div com role=radio (não <button>) porque o card carrega um <a> "conferir"
+  // dentro — botão dentro de botão é HTML inválido.
   return (
-    <button
-      type="button"
+    <div
+      role="radio"
+      aria-checked={selecionado}
+      tabIndex={0}
       onClick={onEscolher}
-      aria-pressed={selecionado}
+      onKeyDown={aoTeclar}
       className={cn(
-        'text-left rounded-lg border p-3 min-w-0 transition-colors',
+        'rounded-lg border p-3 min-w-0 cursor-pointer transition-colors outline-none',
+        'focus-visible:ring-2 focus-visible:ring-cyan-500/50',
         selecionado
           ? 'border-cyan-500/60 bg-cyan-500/10'
           : 'border-bg-700/50 bg-bg-800/30 hover:bg-bg-800/60'
@@ -58,13 +97,35 @@ function OpcaoConta({
         >
           {titulo}
         </span>
-        {selecionado && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+        <span
+          className={cn(
+            'w-4 h-4 rounded-full border grid place-items-center shrink-0 transition-colors',
+            selecionado ? 'border-cyan-400 bg-cyan-500/20' : 'border-bg-700'
+          )}
+          aria-hidden
+        >
+          {selecionado && <Check className="w-3 h-3 text-cyan-400" />}
+        </span>
       </div>
-      <div className="text-sm font-semibold text-ink-100 mt-1 truncate num">{principal}</div>
-      {rede.url && rede.url !== principal && (
-        <div className="text-[11px] text-ink-500 truncate mt-0.5">{rede.url}</div>
+      <div className="text-sm font-semibold text-ink-100 mt-1.5 truncate num" title={rede.url || principal}>
+        {principal}
+      </div>
+      {link ? (
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-[11px] text-ink-500 hover:text-cyan-300 mt-1 transition-colors max-w-full"
+          title={link}
+        >
+          <span className="truncate">conferir perfil</span>
+          <ExternalLink className="w-3 h-3 shrink-0" />
+        </a>
+      ) : (
+        <div className="text-[11px] text-ink-600 mt-1">sem link</div>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -123,32 +184,53 @@ export function RevisarRosterDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-bg-950/70 backdrop-blur-sm" aria-hidden />
-      <div className="relative w-full max-w-lg bg-bg-900 border border-bg-700/50 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-bg-700/40">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <GitCompareArrows className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="font-bold text-ink-100">Revisar duplicados</span>
+      <div className="relative w-full max-w-xl bg-bg-900 border border-bg-700/50 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        <div className="px-5 py-4 border-b border-bg-700/40">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <GitCompareArrows className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="font-bold text-ink-100">Revisar duplicados</span>
+              </div>
+              <div className="text-[11px] text-ink-500 mt-0.5 truncate">{arquivoNome}</div>
             </div>
-            <div className="text-[11px] text-ink-500 mt-0.5 truncate">
-              {arquivoNome} · {t.novos} novos · {t.atualizados} atualizações · {t.iguais} sem mudança ·{' '}
-              <span className="text-amber-400 font-semibold">{t.comConflito} com conflito</span>
-            </div>
+            <button
+              type="button"
+              onClick={confirmando ? undefined : onCancelar}
+              aria-label="Cancelar importação"
+              className="p-1.5 rounded-md hover:bg-bg-800 text-ink-400 transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={confirmando ? undefined : onCancelar}
-            aria-label="Cancelar importação"
-            className="p-1.5 rounded-md hover:bg-bg-800 text-ink-400 transition-colors shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+            <span className="text-[10px] px-1.5 py-0.5 rounded num bg-emerald-500/15 text-emerald-400">
+              {plural(t.novos, 'novo', 'novos')}
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded num bg-cyan-500/15 text-cyan-400">
+              {plural(t.atualizados, 'atualização', 'atualizações')}
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded num bg-bg-800 text-ink-500">
+              {t.iguais} sem mudança
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded num bg-amber-500/15 text-amber-400 font-semibold">
+              {plural(t.comConflito, 'conflito pra revisar', 'conflitos pra revisar')}
+            </span>
+          </div>
+        </div>
+
+        {/* Progresso entre os artistas em conflito. */}
+        <div className="h-1 bg-bg-800 shrink-0" aria-hidden>
+          <div
+            className="h-full bg-amber-500/70 transition-all duration-300"
+            style={{ width: `${((idx + 1) / conflitados.length) * 100}%` }}
+          />
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="font-bold text-ink-100 truncate">{atual.artista.nome}</div>
+              <div className="font-bold text-ink-100 text-lg truncate">{atual.artista.nome}</div>
               <div className="text-[11px] text-ink-500 num truncate">
                 {atual.artista.slug}
                 {atual.nomeAtual && atual.nomeAtual !== atual.artista.nome && (
@@ -163,23 +245,29 @@ export function RevisarRosterDialog({
 
           <p className="text-[12px] text-ink-400 leading-relaxed">
             Este artista <strong className="text-ink-200 font-semibold">já existe no painel</strong> com
-            contas diferentes das da planilha. Escolha, rede por rede, qual vale.
+            contas diferentes das da planilha. Confira os perfis e escolha, rede por rede, qual vale —
+            nada é gravado até a confirmação final.
           </p>
 
           {atual.conflitos.map((c) => (
             <div key={c.rede} className="space-y-1.5">
-              <div className={cn('text-[11px] font-bold tracking-wider uppercase', REDE_LABEL[c.rede].cor)}>
-                {REDE_LABEL[c.rede].nome}
+              <div className={cn('flex items-center gap-1.5', REDE_LABEL[c.rede].cor)}>
+                <PlataformaIcon tipo={c.rede} className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-bold tracking-wider uppercase">
+                  {REDE_LABEL[c.rede].nome}
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={REDE_LABEL[c.rede].nome}>
                 <OpcaoConta
                   titulo="Manter · no painel"
+                  tipo={c.rede}
                   rede={c.atual}
                   selecionado={decisoes[atual.artista.slug]?.[c.rede] !== 'trocar'}
                   onEscolher={() => escolher(atual.artista.slug, c.rede, 'manter')}
                 />
                 <OpcaoConta
                   titulo="Trocar · da planilha"
+                  tipo={c.rede}
                   rede={c.novo}
                   selecionado={decisoes[atual.artista.slug]?.[c.rede] === 'trocar'}
                   onEscolher={() => escolher(atual.artista.slug, c.rede, 'trocar')}

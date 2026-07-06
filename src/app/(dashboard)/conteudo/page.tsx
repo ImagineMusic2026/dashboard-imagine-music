@@ -10,6 +10,12 @@ import { cn, formatNumber, formatInt } from '@/lib/utils'
 
 type Plataforma = 'youtube' | 'instagram' | 'tiktok'
 
+const PLAT_META: Record<Plataforma, { nome: string; cor: string }> = {
+  youtube: { nome: 'YouTube', cor: 'text-red-400' },
+  instagram: { nome: 'Instagram', cor: 'text-fuchsia-400' },
+  tiktok: { nome: 'TikTok', cor: 'text-cyan-400' },
+}
+
 interface Item {
   key: string
   artistaSlug: string
@@ -544,18 +550,17 @@ function CarrosselDestaques({ itens }: { itens: Item[] }) {
 }
 
 function CardConteudo({ item: i, destaque }: { item: Item; destaque?: boolean }) {
-  const cor =
-    i.plataforma === 'youtube' ? 'text-red-400' : i.plataforma === 'tiktok' ? 'text-cyan-400' : 'text-fuchsia-400'
+  const plat = PLAT_META[i.plataforma]
   const cresc = destaque ? crescLabel(i) : null
   const conteudo = (
     <>
       <div className="relative aspect-video bg-bg-950 overflow-hidden">
         <ThumbImg src={i.thumbUrl} plataforma={i.plataforma} />
         <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-bg-950/75 backdrop-blur-sm text-[10px] font-semibold text-ink-100">
-          <span className={cn('w-3.5 h-3.5 block', cor)}>
+          <span className={cn('w-3.5 h-3.5 block', plat.cor)}>
             <PlataformaIcon tipo={i.plataforma as PlataformaTipo} />
           </span>
-          {i.plataforma === 'youtube' ? 'YouTube' : i.plataforma === 'tiktok' ? 'TikTok' : 'Instagram'}
+          {plat.nome}
         </span>
         {cresc && (
           <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/90 text-[10px] font-bold text-bg-950">
@@ -620,6 +625,14 @@ function RankBlock({
               <span className="num text-sm font-bold text-ink-600 w-4 text-center shrink-0">{idx + 1}</span>
               <div className="relative w-12 h-12 rounded-md overflow-hidden bg-bg-950 shrink-0">
                 <ThumbImg src={i.thumbUrl} plataforma={i.plataforma} />
+                <span
+                  title={PLAT_META[i.plataforma].nome}
+                  className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded bg-bg-950/85 backdrop-blur-sm grid place-items-center"
+                >
+                  <span className={cn('w-2.5 h-2.5 block', PLAT_META[i.plataforma].cor)}>
+                    <PlataformaIcon tipo={i.plataforma as PlataformaTipo} />
+                  </span>
+                </span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] text-ink-100 font-medium truncate">{i.titulo}</div>

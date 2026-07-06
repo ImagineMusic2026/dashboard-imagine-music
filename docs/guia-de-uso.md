@@ -202,7 +202,7 @@ A página **Conteúdo** é um feed dos vídeos e posts recentes dos artistas, co
 
 ## 10. Integrações (conectar e sincronizar cada fonte)
 
-A página **Integrações** mostra o status de cada fonte de dados e os botões de ação. As fontes são: **OneRPM (streaming), Meta (Instagram), TikTok, YouTube e Spotify for Artists**. Há ainda um atalho para a **Importação manual** (receita e cadastro via planilha).
+A página **Integrações** mostra o status de cada fonte de dados e os botões de ação. As fontes são: **OneRPM (streaming), Meta (Instagram), TikTok e YouTube**. Há ainda um atalho para a **Importação manual** (receita e cadastro via planilha).
 
 Cada card mostra o status (**conectado**, **não configurado** ou **erro**), a última sincronização e eventuais erros. Os detalhes e os botões de ação ficam dentro do "Ver mais" de cada card.
 
@@ -212,7 +212,7 @@ Cada card mostra o status (**conectado**, **não configurado** ou **erro**), a �
 - **Meta (Instagram):** o admin clica em **"Descobrir contas"** (que liga cada @ ao artista certo) e depois em **"Sincronizar agora"**. Um token central lê todas as contas vinculadas — não há login individual por artista.
 - **TikTok:** cada artista **conecta a própria conta** por uma autorização (OAuth). O artista clica no link, autoriza no TikTok e os dados começam a ser coletados.
 - **YouTube:** funciona em duas camadas — uma **pública** (Data API: o admin usa "Descobrir canais" + "Sincronizar" para ler qualquer canal mapeado) e uma **privada** (Analytics, com dados mais detalhados como tempo de exibição e retenção, só para quem **conectou** a conta Google). O artista conecta a camada de Analytics pelo próprio perfil ou pelo portal.
-- **Spotify for Artists:** **ainda não integrado** ("em breve", sem previsão definida). A receita e os streams do Spotify já chegam pela OneRPM; o Spotify for Artists entraria como camada extra de audiência/demografia.
+> **E o Spotify?** Não há integração direta com o Spotify (a API do Spotify for Artists foi descontinuada). Os **streams e a receita do Spotify já chegam pela OneRPM** — nada se perde.
 
 ### Sincronizar
 

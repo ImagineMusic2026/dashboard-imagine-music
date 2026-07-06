@@ -4,7 +4,6 @@ import { OneRpmCard } from '@/components/integracoes/onerpm-card'
 import { MetaInstagramCard } from '@/components/integracoes/meta-instagram-card'
 import { TikTokCard } from '@/components/integracoes/tiktok-card'
 import { YouTubeCard } from '@/components/integracoes/youtube-card'
-import { SpotifyCard } from '@/components/integracoes/spotify-card'
 
 export default function IntegracoesPage() {
   return (
@@ -22,7 +21,6 @@ export default function IntegracoesPage() {
         <MetaInstagramCard />
         <TikTokCard />
         <YouTubeCard />
-        <SpotifyCard />
 
         <Link
           href="/importar"

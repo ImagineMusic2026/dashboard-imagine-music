@@ -5,15 +5,17 @@ import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
 import { MatrizPermissoes } from '@/components/configuracoes/matriz-permissoes'
 import { NotificacoesPrefs } from '@/components/configuracoes/notificacoes-prefs'
+import { PerfilTab } from '@/components/configuracoes/perfil-tab'
 import { cn } from '@/lib/utils'
 
-type Aba = 'time' | 'artistas' | 'permissoes' | 'notificacoes'
+type Aba = 'time' | 'artistas' | 'permissoes' | 'notificacoes' | 'perfil'
 
 const ABAS: { key: Aba; label: string }[] = [
   { key: 'time', label: 'Time' },
   { key: 'artistas', label: 'Artistas' },
   { key: 'permissoes', label: 'Permissões' },
   { key: 'notificacoes', label: 'Notificações' },
+  { key: 'perfil', label: 'Perfil' },
 ]
 
 export function ConfiguracoesView() {
@@ -59,6 +61,7 @@ export function ConfiguracoesView() {
           )}
           {aba === 'permissoes' && <MatrizPermissoes />}
           {aba === 'notificacoes' && <NotificacoesPrefs />}
+          {aba === 'perfil' && <PerfilTab />}
         </div>
       </div>
     </div>

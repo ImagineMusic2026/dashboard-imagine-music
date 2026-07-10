@@ -184,15 +184,26 @@ export function ReceitaArtistaCard({
             type="button"
             onClick={() => setVerFaixas((v) => !v)}
             aria-expanded={verFaixas}
-            className="w-full flex items-center justify-between gap-3 px-5 py-3.5 hover:bg-bg-800/30 transition-colors"
+            className={cn(
+              'w-full flex items-center justify-between gap-3 px-5 py-3.5 border-l-2 transition-colors',
+              verFaixas
+                ? 'border-amber-500 bg-amber-500/10'
+                : 'border-amber-500/40 bg-amber-500/[0.06] hover:bg-amber-500/15'
+            )}
           >
-            <span className="flex items-center gap-2 text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
-              <Music2 className="w-3.5 h-3.5" /> Receita por faixa
-              <span className="text-ink-600 normal-case tracking-normal">· {faixas.length} músicas</span>
+            <span className="flex items-center gap-2.5 min-w-0">
+              <span className="w-6 h-6 rounded-md bg-amber-500/20 grid place-items-center shrink-0">
+                <Music2 className="w-3.5 h-3.5 text-amber-400" />
+              </span>
+              <span className="text-[11px] tracking-wider font-bold uppercase text-amber-300">
+                Receita por faixa
+              </span>
+              <span className="text-[11px] text-ink-500 num truncate">· {faixas.length} músicas</span>
             </span>
-            <ChevronDown
-              className={cn('w-4 h-4 text-ink-500 transition-transform', verFaixas && 'rotate-180')}
-            />
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400 shrink-0">
+              <span className="hidden sm:inline">{verFaixas ? 'Recolher' : 'Ver por música'}</span>
+              <ChevronDown className={cn('w-4 h-4 transition-transform', verFaixas && 'rotate-180')} />
+            </span>
           </button>
 
           {verFaixas && (

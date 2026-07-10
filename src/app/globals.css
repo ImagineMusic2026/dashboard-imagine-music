@@ -55,6 +55,25 @@
     mask-image: linear-gradient(to right, transparent, black 7%, black 93%, transparent);
   }
 
+  /* Marquee de VALOR (célula de receita): mesma keyframe do carrossel de logos,
+     mas com duração definida inline (proporcional à largura, pra velocidade
+     constante) e pausável no hover. Só entra em ação quando o texto não cabe. */
+  .marquee-valor {
+    animation-name: marquee;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+  .marquee-valor:hover {
+    animation-play-state: paused;
+  }
+  /* Quem prefere menos movimento não vê o marquee (o valor completo fica no title). */
+  @media (prefers-reduced-motion: reduce) {
+    .marquee-valor {
+      animation: none;
+      transform: none;
+    }
+  }
+
   /* Showcase de features: barra de progresso sob a aba ativa (0→100%).
      Remontada via key={ativo} no JSX, então reinicia a cada troca de aba. */
   .animate-showcase-progress {

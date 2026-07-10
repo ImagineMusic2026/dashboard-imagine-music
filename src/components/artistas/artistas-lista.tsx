@@ -21,6 +21,7 @@ import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
 import { derivarHealthScores } from '@/lib/health/score'
 import { derivarAlertas } from '@/lib/alertas/derivar'
 import { Sparkline } from '@/components/artistas/sparkline'
+import { MarqueeValor } from '@/components/artistas/marquee-valor'
 import { formatarMoedasCompacto } from '@/lib/onerpm/display'
 import { cn, formatNumber, getHealthColor, getHealthGradient } from '@/lib/utils'
 
@@ -441,9 +442,10 @@ export function ArtistasLista() {
                         <td className="px-4 py-3 text-right">
                           {r ? (
                             <div>
-                              <div className="num text-sm font-semibold text-emerald-400">
-                                {formatarMoedasCompacto(r.netPorMoeda)}
-                              </div>
+                              <MarqueeValor
+                                texto={formatarMoedasCompacto(r.netPorMoeda)}
+                                className="num text-sm font-semibold text-emerald-400 max-w-[8rem] ml-auto"
+                              />
                               <div className="text-[11px] num text-ink-500">{formatNumber(r.streams)} streams</div>
                             </div>
                           ) : (

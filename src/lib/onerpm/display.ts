@@ -82,3 +82,73 @@ export function receitaPorPlataformaDisplay(
   out.sort((a, b) => magnitude(b.receitaPorMoeda) - magnitude(a.receitaPorMoeda))
   return out
 }
+
+export interface FaixaReceita {
+  titulo: string
+  streams: number
+  receitaPorMoeda: MoneyByCurrency
+  /** Quantos lançamentos/ISRCs diferentes foram agrupados nesta música. */
+  lancamentos: number
+}
+
+const semAcentoLower = (s: string) =>
+  (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+/**
+ * Nome "canônico" da música pra agrupar lançamentos.
+ *
+ * O vídeo do YouTube vem com o título inteiro: "BODY SPLASH - Netto Brito | Pra
+ * Encher e Derramar 3.0". Tiramos o que vem depois do " | " (o álbum) e, se sobrar
+ * " - <artista>" no fim, removemos — daí "Body Splash" e a versão-vídeo caem no
+ * mesmo balde. NÃO cortamos em qualquer " - ": vídeos como "NETTO BRITO - Retro..."
+ * começam com o nome do artista e seriam todos fundidos num balde errado.
+ *
+ * Heurístico, mas conservador: na dúvida, mantém separado. O dado por lançamento
+ * continua guardado — dá pra detalhar depois.
+ */
+function chaveMusica(titulo: string, artistaNome: string): string {
+  let base = titulo.split(' | ')[0].trim()
+  const artista = semAcentoLower(artistaNome).trim()
+  if (artista) {
+    // Remove " - Artista" só quando é sufixo do título (padrão "MÚSICA - Artista").
+    const semAcento = semAcentoLower(base)
+    const sufixo = ` - ${artista}`
+    if (semAcento.endsWith(sufixo)) base = base.slice(0, base.length - sufixo.length)
+  }
+  return semAcentoLower(base).replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Receita por MÚSICA (agrupa lançamentos), na moeda original, ordenada por receita.
+ * Lê `agg.porFaixa` — que já vem por moeda; some se o artista não tiver faixas.
+ * `artistaNome` desgruda o título-longo dos vídeos do nome do artista.
+ */
+export function receitaPorFaixaDisplay(
+  agg: Pick<OneRpmAggregate, 'porFaixa'>,
+  artistaNome = '',
+  cfg: OneRpmConfig = onerpmConfig
+): FaixaReceita[] {
+  const grupos = new Map<string, FaixaReceita>()
+
+  for (const f of agg.porFaixa) {
+    const titulo = (f.titulo ?? '').trim() || '(sem título)'
+    const key = chaveMusica(titulo, artistaNome) || semAcentoLower(titulo)
+    let g = grupos.get(key)
+    if (!g) {
+      g = { titulo, streams: 0, receitaPorMoeda: {}, lancamentos: 0 }
+      grupos.set(key, g)
+    }
+    // Título de exibição: o mais curto (evita o título-longo de vídeo do YouTube).
+    if (titulo.length < g.titulo.length) g.titulo = titulo
+    g.streams += f.streams
+    g.lancamentos++
+    const valor = cfg.base === 'gross' ? f.grossPorMoeda : f.netPorMoeda
+    for (const [moeda, v] of Object.entries(valor)) {
+      g.receitaPorMoeda[moeda] = (g.receitaPorMoeda[moeda] ?? 0) + v
+    }
+  }
+
+  return Array.from(grupos.values()).sort(
+    (a, b) => magnitude(b.receitaPorMoeda) - magnitude(a.receitaPorMoeda)
+  )
+}

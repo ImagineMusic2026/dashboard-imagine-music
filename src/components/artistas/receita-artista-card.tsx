@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { doc, getDoc } from 'firebase/firestore'
-import { DollarSign } from 'lucide-react'
+import { ChevronDown, DollarSign, Music2 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import type { ReceitaPlataforma } from '@/types'
 import type { ReceitaArtistaDoc } from '@/lib/onerpm/types'
 import type { PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { ReceitaPlataformaItem } from '@/components/artistas/receita-plataforma-item'
-import { formatarMoedas, receitaPorPlataformaDisplay } from '@/lib/onerpm/display'
-import { formatCurrency } from '@/lib/utils'
+import { formatarMoedas, receitaPorFaixaDisplay, receitaPorPlataformaDisplay } from '@/lib/onerpm/display'
+import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 
 /** Líquido − repasse, moeda a moeda. O que efetivamente fica com o artista. */
 function subtrairMoedas(
@@ -54,6 +54,8 @@ export function ReceitaArtistaCard({
   fallbackItems: ReceitaPlataforma[]
 }) {
   const [estado, setEstado] = useState<Estado>({ tipo: 'carregando' })
+  const [verFaixas, setVerFaixas] = useState(false)
+  const [verTodasFaixas, setVerTodasFaixas] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -109,6 +111,10 @@ export function ReceitaArtistaCard({
   const netPorMoeda = real?.totais?.netPorMoeda ?? {}
   const repassePorMoeda = real?.repassePorMoeda ?? {}
   const temRepasse = Object.values(repassePorMoeda).some((v) => Math.abs(v) >= 0.005)
+
+  // Receita por música (agrupa lançamentos), a partir do agregado por moeda.
+  const faixas = real?.agregado ? receitaPorFaixaDisplay(real.agregado, real.nome) : []
+  const faixasVisiveis = verTodasFaixas ? faixas : faixas.slice(0, 10)
 
   const periodoLabel = real
     ? real.periodo.transactionMonths.length
@@ -170,6 +176,56 @@ export function ReceitaArtistaCard({
           />
         ))}
       </div>
+
+      {/* Receita por música — agrupa lançamentos; começa recolhida (pode ter centenas). */}
+      {real && faixas.length > 0 && (
+        <div className="border-t border-bg-700/30">
+          <button
+            type="button"
+            onClick={() => setVerFaixas((v) => !v)}
+            aria-expanded={verFaixas}
+            className="w-full flex items-center justify-between gap-3 px-5 py-3.5 hover:bg-bg-800/30 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
+              <Music2 className="w-3.5 h-3.5" /> Receita por faixa
+              <span className="text-ink-600 normal-case tracking-normal">· {faixas.length} músicas</span>
+            </span>
+            <ChevronDown
+              className={cn('w-4 h-4 text-ink-500 transition-transform', verFaixas && 'rotate-180')}
+            />
+          </button>
+
+          {verFaixas && (
+            <div className="px-5 pb-4">
+              <div className="divide-y divide-bg-700/20">
+                {faixasVisiveis.map((f) => (
+                  <div key={f.titulo} className="flex items-center gap-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-ink-100 truncate">{f.titulo}</div>
+                      <div className="text-[11px] text-ink-500 num">
+                        {formatNumber(f.streams)} streams
+                        {f.lancamentos > 1 && ` · ${f.lancamentos} lançamentos`}
+                      </div>
+                    </div>
+                    <div className="num text-[13px] font-semibold text-ink-200 shrink-0 text-right">
+                      {formatarMoedas(f.receitaPorMoeda)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {faixas.length > 10 && (
+                <button
+                  type="button"
+                  onClick={() => setVerTodasFaixas((v) => !v)}
+                  className="mt-3 text-[12px] text-amber-400 hover:text-amber-300 font-semibold"
+                >
+                  {verTodasFaixas ? 'Mostrar menos' : `Ver todas as ${faixas.length} músicas`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Split artista × selo — só aparece pra quem tem repasse na OneRPM. */}
       {real && temRepasse && (

@@ -2,8 +2,13 @@ import admin from 'firebase-admin'
 import { adminDb } from '@/lib/firebase-admin'
 import { enxugarAgregado, loteIdDe, reconciliarArtistas, type ArtistaRoster } from './aggregate'
 import { onerpmConfig } from './config'
-import { paraBRL, receitaPorPlataformaDisplay, repasseAoSeloBRL, totalReceitaBRL } from './display'
-import type { ArtistaImportado, OneRpmAggregate, OneRpmLote } from './types'
+import { receitaPorPlataformaDisplay } from './display'
+import type { ArtistaImportado, MoneyByCurrency, OneRpmAggregate, OneRpmLote } from './types'
+
+/** Líquido por moeda na base configurada (net/gross). Nunca soma moedas. */
+function netExibicao(totais: OneRpmAggregate['totais']): MoneyByCurrency {
+  return onerpmConfig.base === 'gross' ? totais.grossPorMoeda : totais.netPorMoeda
+}
 
 /**
  * Persistência da importação da OneRPM (⚠️ só servidor — usa o Admin SDK).
@@ -17,8 +22,8 @@ import type { ArtistaImportado, OneRpmAggregate, OneRpmLote } from './types'
  *
  * A receita (dado sensível) fica numa coleção SEPARADA de `artistas` de propósito:
  * assim o marketing pode ver a lista/cadastro sem ver receita (regras do Firestore).
- * Guardamos os valores ORIGINAIS por moeda, então a exibição (base net/gross e
- * câmbio) pode ser recalculada sem reimportar.
+ * Guardamos os valores por moeda ORIGINAL (bruto e líquido) e NÃO convertemos —
+ * a cliente consolida o câmbio manualmente, na data do saque (ver `config.ts`).
  */
 
 const IMPORTACOES = 'importacoes'
@@ -46,7 +51,8 @@ export interface ImportacaoResumo {
   artistasCriados: number
   linhas: number
   streams: number
-  totalBRL: number
+  /** Líquido do arquivo inteiro, por moeda original (nunca somado). */
+  netPorMoeda: MoneyByCurrency
   moedas: string[]
   periodo: OneRpmAggregate['periodo']
   avisos: string[]
@@ -57,7 +63,7 @@ export interface ImportacaoResumo {
 export async function salvarLote(
   lote: OneRpmLote,
   meta: ImportMeta
-): Promise<{ loteId: string; artistas: ArtistaImportado[]; totalBRL: number; avisos: string[] }> {
+): Promise<{ loteId: string; artistas: ArtistaImportado[]; avisos: string[] }> {
   const agora = admin.firestore.FieldValue.serverTimestamp()
   const agoraMs = Date.now()
   const loteId = loteIdDe(lote.periodo)
@@ -99,13 +105,12 @@ export async function salvarLote(
       nome: a.artistaNome,
       linhas: a.totais.linhas,
       streams: a.totais.streams,
-      totalBRL: totalReceitaBRL(a),
-      repasseBRL: repasseAoSeloBRL(a.repassePorMoeda),
+      netPorMoeda: netExibicao(a.totais),
+      repassePorMoeda: a.repassePorMoeda,
       semConta: a.origens.conta === 0,
       criado: rec.criado,
     }
   })
-  const totalBRL = totalReceitaBRL(lote)
 
   // Escreve em blocos: são 2 writes por artista + 1 do lote.
   const operacoes: Array<(b: admin.firestore.WriteBatch) => void> = []
@@ -114,7 +119,6 @@ export async function salvarLote(
     const rec = reconciliacao.get(agg.artistaSlug)!
     const receitaRef = adminDb.collection(RECEITAS).doc(rec.slug)
     const artistaRef = adminDb.collection(ARTISTAS).doc(rec.slug)
-    const repasseBRL = repasseAoSeloBRL(agg.repassePorMoeda)
 
     // Receita (SENSÍVEL): coleção separada, admin-only.
     operacoes.push((b) =>
@@ -125,13 +129,11 @@ export async function salvarLote(
         fonte: 'onerpm',
         receitaPorPlataforma: receitaPorPlataformaDisplay(agg), // já no formato que o painel exibe
         totais: agg.totais,
-        totalBRL: totalReceitaBRL(agg),
         streams: agg.totais.streams,
         moedas: agg.moedas,
         periodo: agg.periodo,
         origens: agg.origens,
-        repassePorMoeda: agg.repassePorMoeda, // fatia do selo; JÁ dentro de totalBRL
-        repasseBRL,
+        repassePorMoeda: agg.repassePorMoeda, // fatia do selo, por moeda; JÁ dentro de totais
         agregado: enxugarAgregado(agg), // p/ recálculo sem reimportar (o cliente já enxuga; aqui é garantia)
         configUsada: onerpmConfig,
         ultimaImportacaoId: loteId,
@@ -179,16 +181,14 @@ export async function salvarLote(
       moedas: lote.moedas,
       periodo: lote.periodo,
       totais: lote.totais,
-      totalBRL,
       artistas,
       artistasCriados: artistas.filter((a) => a.criado).length,
       pagoTerceirosPorMoeda: lote.pagoTerceirosPorMoeda,
-      pagoTerceirosBRL: paraBRL(lote.pagoTerceirosPorMoeda),
       naoAtribuido: lote.naoAtribuido
         ? {
             linhas: lote.naoAtribuido.totais.linhas,
             streams: lote.naoAtribuido.totais.streams,
-            totalBRL: totalReceitaBRL(lote.naoAtribuido),
+            netPorMoeda: netExibicao(lote.naoAtribuido.totais),
           }
         : null,
       avisos: [...lote.avisos, ...avisos],
@@ -205,7 +205,7 @@ export async function salvarLote(
     await batch.commit()
   }
 
-  return { loteId, artistas, totalBRL, avisos }
+  return { loteId, artistas, avisos }
 }
 
 export async function listarImportacoes(max = 20): Promise<ImportacaoResumo[]> {
@@ -226,7 +226,8 @@ export async function listarImportacoes(max = 20): Promise<ImportacaoResumo[]> {
       artistasCriados: x.artistasCriados ?? 0,
       linhas: x.linhas ?? 0,
       streams: x.streams ?? 0,
-      totalBRL: x.totalBRL ?? 0,
+      // `totais.netPorMoeda` sempre existiu; `totalBRL` era o campo dos docs antigos.
+      netPorMoeda: x.totais?.netPorMoeda ?? {},
       moedas: x.moedas ?? [],
       periodo: x.periodo ?? { transactionMonths: [], accountedFrom: null, accountedTo: null },
       avisos: x.avisos ?? [],

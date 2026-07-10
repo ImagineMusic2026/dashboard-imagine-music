@@ -7,7 +7,7 @@
  */
 import fs from 'node:fs'
 import { parseOneRpm } from '../src/lib/onerpm/parse'
-import { paraBRL, receitaPorPlataformaDisplay, repasseAoSeloBRL, totalReceitaBRL } from '../src/lib/onerpm/display'
+import { receitaPorPlataformaDisplay } from '../src/lib/onerpm/display'
 import { enxugarLote, slugify } from '../src/lib/onerpm/aggregate'
 
 const path =
@@ -74,8 +74,7 @@ for (const a of lote.artistas.slice(0, 12)) {
   console.log(
     ' ',
     a.artistaNome.slice(0, 24).padEnd(26),
-    'R$',
-    f(totalReceitaBRL(a)).padStart(12),
+    money(a.totais.netPorMoeda).padEnd(34),
     int(a.totais.streams).padStart(12),
     'str  |',
     via
@@ -85,7 +84,7 @@ for (const a of lote.artistas.slice(0, 12)) {
 console.log('\n--- NÃO ATRIBUÍDO ---')
 if (lote.naoAtribuido) {
   const n = lote.naoAtribuido
-  console.log(`  ${int(n.totais.linhas)} linhas · ${int(n.totais.streams)} streams · R$ ${f(totalReceitaBRL(n))}`)
+  console.log(`  ${int(n.totais.linhas)} linhas · ${int(n.totais.streams)} streams · ${money(n.totais.netPorMoeda)}`)
   console.log('  amostra:', n.porFaixa.slice(0, 3).map((x) => x.titulo.slice(0, 40)).join(' | '))
 } else {
   console.log('  ✅ nada sobrou')
@@ -104,10 +103,10 @@ for (const a of comRepasse.slice(0, 8)) {
     'gerou', f(gerado).padStart(11),
     '| repassa', f(rep).padStart(10),
     `(${pct}%)`.padStart(8),
-    '| R$', f(repasseAoSeloBRL(a.repassePorMoeda)).padStart(11)
+    '|', money(a.repassePorMoeda)
   )
 }
-console.log('  pago pelo selo a terceiros:', money(lote.pagoTerceirosPorMoeda), `→ R$ ${f(paraBRL(lote.pagoTerceirosPorMoeda))}`)
+console.log('  pago pelo selo a terceiros:', money(lote.pagoTerceirosPorMoeda))
 
 console.log('\n--- REPASSE NÃO PODE INFLAR A RECEITA ---')
 const repasseTotal = lote.artistas.reduce((a, x) => a + soma(x.repassePorMoeda), 0)
@@ -115,12 +114,14 @@ const okNaoSoma = Math.abs(netArtistas + netSobra - netTotal) < 0.01
 console.log(`  repasse total: ${f(repasseTotal)} (fatia do selo, já dentro dos ${f(netTotal)} de receita)`)
 console.log(`  receita do arquivo continua ${f(netTotal)}  ${okNaoSoma ? '✅' : '❌'}`)
 
-console.log('\n--- MAIOR ARTISTA: display ---')
+console.log('\n--- MAIOR ARTISTA: display (por moeda, sem conversão) ---')
 const top = lote.artistas[0]
-for (const r of receitaPorPlataformaDisplay(top)) {
-  console.log(' ', r.plataforma.padEnd(15), 'R$', f(r.receita).padStart(10), `${r.percentualTotal}%`.padStart(5), '|', int(r.streams), 'streams')
+if (top) {
+  for (const r of receitaPorPlataformaDisplay(top)) {
+    console.log(' ', r.plataforma.padEnd(15), money(r.receitaPorMoeda).padEnd(34), `${r.percentualTotal}%`.padStart(5), '|', int(r.streams), 'streams')
+  }
 }
-console.log('TOTAL lote:', 'R$', f(totalReceitaBRL(lote)))
+console.log('TOTAL lote:', money(lote.totais.netPorMoeda))
 
 console.log('\n--- TAMANHOS (payload da API e docs do Firestore) ---')
 const kb = (n: number) => (n / 1024).toFixed(0) + 'KB'

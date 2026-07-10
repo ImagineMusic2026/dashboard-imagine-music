@@ -21,7 +21,8 @@ import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
 import { derivarHealthScores } from '@/lib/health/score'
 import { derivarAlertas } from '@/lib/alertas/derivar'
 import { Sparkline } from '@/components/artistas/sparkline'
-import { cn, formatCurrency, formatNumber, getHealthColor, getHealthGradient } from '@/lib/utils'
+import { formatarMoedasCompacto } from '@/lib/onerpm/display'
+import { cn, formatNumber, getHealthColor, getHealthGradient } from '@/lib/utils'
 
 const REDES: { tipo: PlataformaTipo; cor: string; get: (a: ArtistaDoc) => boolean }[] = [
   { tipo: 'spotify', cor: 'text-emerald-400', get: (a) => !!a.redes?.spotify?.url },
@@ -213,7 +214,8 @@ export function ArtistasLista() {
         case 'audiencia':
           return saude && saude.seguidoresTotal > 0 ? saude.seguidoresTotal : null
         case 'receita':
-          return receitas.get(a.slug)?.totalBRL ?? null
+          // Sem câmbio no painel (moedas não somam) — ordena por streams, que é comparável.
+          return receitas.get(a.slug)?.streams ?? null
         case 'alertas':
           return alertasPorSlug.get(a.slug) ?? 0
       }
@@ -440,7 +442,7 @@ export function ArtistasLista() {
                           {r ? (
                             <div>
                               <div className="num text-sm font-semibold text-emerald-400">
-                                {formatCurrency(r.totalBRL)}
+                                {formatarMoedasCompacto(r.netPorMoeda)}
                               </div>
                               <div className="text-[11px] num text-ink-500">{formatNumber(r.streams)} streams</div>
                             </div>
@@ -570,7 +572,7 @@ export function ArtistasLista() {
                   </div>
                   {ehAdmin && r && (
                     <div className="mt-2 text-[12px] num text-emerald-400">
-                      {formatCurrency(r.totalBRL)}{' '}
+                      {formatarMoedasCompacto(r.netPorMoeda)}{' '}
                       <span className="text-ink-500">· {formatNumber(r.streams)} streams</span>
                     </div>
                   )}

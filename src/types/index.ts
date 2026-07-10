@@ -74,7 +74,11 @@ export interface ReceitaPlataforma {
   plataforma: string
   cor: string
   streams: number
-  receita: number
-  variacao: number
+  /** Receita por moeda original — nunca somamos moedas diferentes. */
+  receitaPorMoeda: Record<string, number>
+  /** Participação no total do artista, por STREAMS (base comparável sem câmbio). */
   percentualTotal: number
+  /** @deprecated só p/ mocks antigos que passavam um valor único; a exibição usa `receitaPorMoeda`. */
+  receita?: number
+  variacao?: number
 }

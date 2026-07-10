@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ReceitaPlataforma } from '@/types'
+import { formatarMoedas } from '@/lib/onerpm/display'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 
 type CorMap = {
@@ -67,13 +68,8 @@ type ReceitaPlataformaItemProps = {
 
 export function ReceitaPlataformaItem({ item, icone }: ReceitaPlataformaItemProps) {
   const cores = corMap[item.cor] ?? corMap.gray
-  const variacaoCor =
-    item.variacao > 5
-      ? 'text-emerald-400'
-      : item.variacao < -5
-      ? 'text-red-400'
-      : 'text-ink-400'
-  const arrow = item.variacao > 0 ? '↑' : item.variacao < 0 ? '↓' : '—'
+  // Receita por moeda (novo) ou o valor único em R$ dos mocks antigos (fallback).
+  const valor = item.receitaPorMoeda ? formatarMoedas(item.receitaPorMoeda) : formatCurrency(item.receita ?? 0)
 
   return (
     <div className="flex items-center gap-4 p-4 hover:bg-bg-800/30 transition-colors">
@@ -108,11 +104,8 @@ export function ReceitaPlataformaItem({ item, icone }: ReceitaPlataformaItemProp
         </div>
       </div>
 
-      <div className="shrink-0 w-32 text-right">
-        <div className="num text-base font-bold text-ink-100">{formatCurrency(item.receita)}</div>
-        <div className={cn('text-[11px] num mt-0.5', variacaoCor)}>
-          {item.variacao === 0 ? '— estável' : `${arrow} ${Math.abs(item.variacao)}%`}
-        </div>
+      <div className="shrink-0 w-40 text-right">
+        <div className="num text-sm font-bold text-ink-100 leading-tight">{valor}</div>
       </div>
     </div>
   )

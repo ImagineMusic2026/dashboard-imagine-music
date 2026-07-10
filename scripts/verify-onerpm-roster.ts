@@ -12,15 +12,13 @@ import fs from 'node:fs'
 import admin from 'firebase-admin'
 import { parseOneRpm } from '../src/lib/onerpm/parse'
 import { reconciliarArtistas, type ArtistaRoster } from '../src/lib/onerpm/aggregate'
-import { totalReceitaBRL } from '../src/lib/onerpm/display'
+import { formatarMoedas } from '../src/lib/onerpm/display'
 
 const caminho = process.argv[2]
 if (!caminho) {
   console.error('Uso: npx tsx scripts/verify-onerpm-roster.ts "<arquivo.xlsx>"')
   process.exit(1)
 }
-
-const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 async function main() {
   admin.initializeApp({
@@ -59,7 +57,7 @@ async function main() {
     for (const a of criados) {
       const r = rec.get(a.artistaSlug)!
       const alerta = r.possivelDuplicata ? `  ⚠️  parece "${r.possivelDuplicata}"` : ''
-      console.log(`  ${a.artistaNome.padEnd(26)} ${brl(totalReceitaBRL(a)).padStart(14)}${alerta}`)
+      console.log(`  ${a.artistaNome.padEnd(26)} ${formatarMoedas(a.totais.netPorMoeda).padEnd(30)}${alerta}`)
     }
   }
 

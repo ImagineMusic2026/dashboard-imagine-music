@@ -19,7 +19,7 @@ import {
 import { useAuth } from '@/components/auth/auth-provider'
 import { auth } from '@/lib/firebase'
 import { enxugarLote } from '@/lib/onerpm/aggregate'
-import { paraBRL } from '@/lib/onerpm/display'
+import { formatarMoedas, formatarMoedasCompacto } from '@/lib/onerpm/display'
 import type { EntradaWorker, SaidaWorker } from '@/lib/onerpm/parse.worker'
 import type { ArtistaImportado, MoneyByCurrency, OneRpmAggregate, OneRpmLote } from '@/lib/onerpm/types'
 import { cn } from '@/lib/utils'
@@ -29,7 +29,6 @@ type Resumo = {
   periodo: OneRpmAggregate['periodo']
   moedas: string[]
   totais: OneRpmAggregate['totais']
-  totalBRL: number
   artistas: ArtistaImportado[]
   pagoTerceirosPorMoeda: MoneyByCurrency
   naoAtribuido: { linhas: number; streams: number } | null
@@ -46,11 +45,22 @@ type Recente = {
   artistasCriados: number
   linhas: number
   streams: number
-  totalBRL: number
+  netPorMoeda: MoneyByCurrency
   periodo: OneRpmAggregate['periodo']
   criadoEmISO: string | null
   criadoPorEmail: string
 }
+
+/** Soma vários mapas por moeda, sem cruzar moedas (US$ com US$, R$ com R$). */
+function somarMoedas(mapas: MoneyByCurrency[]): MoneyByCurrency {
+  const out: MoneyByCurrency = {}
+  for (const m of mapas) for (const [moeda, v] of Object.entries(m)) out[moeda] = (out[moeda] ?? 0) + v
+  return out
+}
+
+const temValor = (m: MoneyByCurrency) => Object.values(m).some((v) => Math.abs(v) >= 0.005)
+/** Magnitude só pra dimensionar a barra (nunca exibida) — ver display.ts. */
+const magnitude = (m: MoneyByCurrency) => Object.values(m).reduce((a, v) => a + Math.abs(v), 0)
 
 /** O arquivo é lido no browser; o teto só evita travar a máquina da usuária. */
 const TAMANHO_MAX = 50 * 1024 * 1024
@@ -63,18 +73,6 @@ const rotuloEtapa: Record<Etapa, string> = {
 }
 
 const fmtInt = (n: number) => n.toLocaleString('pt-BR')
-const fmtBRL = (n: number) =>
-  n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
-
-const simboloMoeda = (m: string) => (m === 'BRL' ? 'R$' : m === 'USD' ? 'US$' : m === 'EUR' ? '€' : m + ' ')
-
-const fmtMoedas = (m: MoneyByCurrency) => {
-  const partes = Object.entries(m)
-    .filter(([, v]) => Math.abs(v) >= 0.005)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => `${simboloMoeda(k)} ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
-  return partes.length ? partes.join('  +  ') : '—'
-}
 
 const fmtTamanho = (bytes: number) => {
   if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)}MB`
@@ -346,7 +344,7 @@ export function ImportadorOneRpm() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="num text-sm font-bold text-emerald-400">{fmtBRL(imp.totalBRL)}</div>
+                  <div className="num text-[13px] font-bold text-emerald-400">{formatarMoedasCompacto(imp.netPorMoeda)}</div>
                   <div className="text-[11px] text-ink-500 num">{formatarData(imp.criadoEmISO)}</div>
                 </div>
               </div>
@@ -360,11 +358,12 @@ export function ImportadorOneRpm() {
 
 function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: () => void }) {
   const [verTodos, setVerTodos] = useState(false)
+  // Já vem ordenado por receita; a barra usa a magnitude (só p/ tamanho, não exibida).
   const visiveis = verTodos ? resumo.artistas : resumo.artistas.slice(0, 10)
-  const maiorBRL = resumo.artistas[0]?.totalBRL ?? 0
+  const maiorMag = Math.max(1, ...resumo.artistas.map((a) => magnitude(a.netPorMoeda)))
   const criados = resumo.artistas.filter((a) => a.criado)
-  const repasseTotal = resumo.artistas.reduce((a, x) => a + x.repasseBRL, 0)
-  const pagoTerceiros = paraBRL(resumo.pagoTerceirosPorMoeda ?? {})
+  const repasseTotal = somarMoedas(resumo.artistas.map((a) => a.repassePorMoeda ?? {}))
+  const pagoTerceiros = resumo.pagoTerceirosPorMoeda ?? {}
 
   return (
     <div className="bg-bg-900 border border-emerald-500/30 rounded-xl overflow-hidden">
@@ -401,26 +400,31 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
           nota={criados.length ? `${criados.length} cadastrados agora` : undefined}
         />
         <Kpi icon={Music2} label="Streams" valor={fmtInt(resumo.totais.streams)} />
-        <Kpi icon={DollarSign} label="Líquido (original)" valor={fmtMoedas(resumo.totais.netPorMoeda)} destaque />
-        <Kpi icon={DollarSign} label="Líquido (≈ R$)" valor={fmtBRL(resumo.totalBRL)} nota="câmbio placeholder" />
+        <Kpi icon={DollarSign} label="Líquido (moeda original)" valor={formatarMoedas(resumo.totais.netPorMoeda)} destaque />
+        <Kpi
+          icon={DollarSign}
+          label="Repasse ao selo"
+          valor={temValor(repasseTotal) ? formatarMoedas(repasseTotal) : '—'}
+          nota={temValor(repasseTotal) ? 'já dentro da receita' : undefined}
+        />
       </div>
 
       {/* Divisão com o selo — o repasse já está DENTRO da receita gerada acima. */}
-      {(repasseTotal > 0 || pagoTerceiros < 0) && (
+      {(temValor(repasseTotal) || temValor(pagoTerceiros)) && (
         <div className="border-b border-bg-700/30 px-5 py-4 space-y-2">
           <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
             Divisão do dinheiro (aba “Shares In &amp; Out”)
           </div>
-          {repasseTotal > 0 && (
+          {temValor(repasseTotal) && (
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="text-ink-400">Repasse dos artistas à Imagine</span>
-              <span className="num text-emerald-400">{fmtBRL(repasseTotal)}</span>
+              <span className="num text-emerald-400">{formatarMoedas(repasseTotal)}</span>
             </div>
           )}
-          {pagoTerceiros < 0 && (
+          {temValor(pagoTerceiros) && (
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="text-ink-400">Pago pelo selo a terceiros</span>
-              <span className="num text-amber-400/90">{fmtBRL(pagoTerceiros)}</span>
+              <span className="num text-amber-400/90">{formatarMoedas(pagoTerceiros)}</span>
             </div>
           )}
           <p className="text-[11px] text-ink-500 pt-1">
@@ -455,7 +459,7 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
         </div>
         <div className="space-y-2.5">
           {visiveis.map((a) => {
-            const pct = maiorBRL > 0 ? Math.max(2, Math.round((a.totalBRL / maiorBRL) * 100)) : 0
+            const pct = Math.max(2, Math.round((magnitude(a.netPorMoeda) / maiorMag) * 100))
             return (
               <div key={a.slug} className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
@@ -471,7 +475,7 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
                         </span>
                       )}
                     </span>
-                    <span className="num text-ink-300 shrink-0">{fmtBRL(a.totalBRL)}</span>
+                    <span className="num text-ink-300 shrink-0 text-[13px]">{formatarMoedas(a.netPorMoeda)}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex-1 h-1.5 bg-bg-700 rounded-full overflow-hidden">
@@ -480,12 +484,12 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    {a.repasseBRL > 0 && (
+                    {temValor(a.repassePorMoeda ?? {}) && (
                       <span
                         className="text-[10px] text-amber-400/80 num shrink-0"
                         title="Fatia que vai pro selo (já inclusa na receita)"
                       >
-                        −{fmtBRL(a.repasseBRL)}
+                        −{formatarMoedasCompacto(a.repassePorMoeda)}
                       </span>
                     )}
                     <span className="text-[10px] text-ink-500 num w-20 text-right shrink-0">

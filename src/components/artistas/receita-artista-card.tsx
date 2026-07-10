@@ -9,7 +9,18 @@ import type { ReceitaArtistaDoc } from '@/lib/onerpm/types'
 import type { PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { ReceitaPlataformaItem } from '@/components/artistas/receita-plataforma-item'
+import { formatarMoedas, receitaPorPlataformaDisplay } from '@/lib/onerpm/display'
 import { formatCurrency } from '@/lib/utils'
+
+/** Líquido − repasse, moeda a moeda. O que efetivamente fica com o artista. */
+function subtrairMoedas(
+  net: Record<string, number>,
+  repasse: Record<string, number>
+): Record<string, number> {
+  const out: Record<string, number> = { ...net }
+  for (const [moeda, v] of Object.entries(repasse)) out[moeda] = (out[moeda] ?? 0) - v
+  return out
+}
 
 /** Mapeia o nome canônico da plataforma para o ícone. */
 function iconeDaPlataforma(nome: string): PlataformaTipo {
@@ -76,7 +87,13 @@ export function ReceitaArtistaCard({
   }
 
   const real = estado.tipo === 'real' ? estado.dados : null
-  const items = real ? real.receitaPorPlataforma : fallbackItems
+  // A receita por plataforma sai do `agregado` (por moeda). O `receitaPorPlataforma`
+  // gravado é fallback pra docs antigos — ele trazia um valor único convertido.
+  const items = real
+    ? real.agregado
+      ? receitaPorPlataformaDisplay(real.agregado)
+      : real.receitaPorPlataforma
+    : fallbackItems
 
   // Artista real sem receita importada (e sem mock de fallback): estado limpo.
   if (!real && items.length === 0) {
@@ -88,7 +105,10 @@ export function ReceitaArtistaCard({
     )
   }
 
-  const total = items.reduce((acc, r) => acc + r.receita, 0)
+  // Total do artista, por moeda original (nunca somado entre moedas).
+  const netPorMoeda = real?.totais?.netPorMoeda ?? {}
+  const repassePorMoeda = real?.repassePorMoeda ?? {}
+  const temRepasse = Object.values(repassePorMoeda).some((v) => Math.abs(v) >= 0.005)
 
   const periodoLabel = real
     ? real.periodo.transactionMonths.length
@@ -117,7 +137,7 @@ export function ReceitaArtistaCard({
             </div>
             <div className="text-[12px] text-ink-500 mt-0.5">
               {real
-                ? `Importado da OneRPM · ${fmtMoedas(real)} · líquido convertido (câmbio placeholder)`
+                ? `Importado da OneRPM · líquido na moeda original (sem conversão)`
                 : 'Dados oficiais de streaming · período de referência: abr/2026'}
             </div>
           </div>
@@ -126,8 +146,18 @@ export function ReceitaArtistaCard({
           <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
             {real ? `Total ${periodoLabel}` : 'Total 30D'}
           </div>
-          <div className="num text-2xl font-bold text-emerald-400">{formatCurrency(total)}</div>
-          {!real && <div className="text-[11px] text-emerald-400 num">↑ 24% vs. mês anterior</div>}
+          {real ? (
+            <div className="num text-lg font-bold text-emerald-400 leading-tight">
+              {formatarMoedas(netPorMoeda)}
+            </div>
+          ) : (
+            <>
+              <div className="num text-2xl font-bold text-emerald-400">
+                {formatCurrency(items.reduce((a, r) => a + (r.receita ?? 0), 0))}
+              </div>
+              <div className="text-[11px] text-emerald-400 num">↑ 24% vs. mês anterior</div>
+            </>
+          )}
         </div>
       </div>
 
@@ -142,15 +172,19 @@ export function ReceitaArtistaCard({
       </div>
 
       {/* Split artista × selo — só aparece pra quem tem repasse na OneRPM. */}
-      {real && !!real.repasseBRL && (
+      {real && temRepasse && (
         <div className="border-t border-bg-700/30 px-5 py-4 space-y-2">
           <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
             Divisão com o selo
           </div>
-          <Linha rotulo="Receita gerada" valor={formatCurrency(total)} />
-          <Linha rotulo="Repasse à Imagine" valor={`− ${formatCurrency(real.repasseBRL)}`} sutil />
+          <Linha rotulo="Receita gerada" valor={formatarMoedas(netPorMoeda)} />
+          <Linha rotulo="Repasse à Imagine" valor={`− ${formatarMoedas(repassePorMoeda)}`} sutil />
           <div className="pt-2 border-t border-bg-700/30">
-            <Linha rotulo="Fica com o artista" valor={formatCurrency(total - real.repasseBRL)} destaque />
+            <Linha
+              rotulo="Fica com o artista"
+              valor={formatarMoedas(subtrairMoedas(netPorMoeda, repassePorMoeda))}
+              destaque
+            />
           </div>
         </div>
       )}
@@ -196,14 +230,3 @@ function Linha({
   )
 }
 
-function fmtMoedas(real: ReceitaArtistaDoc): string {
-  const net = real.totais?.netPorMoeda ?? {}
-  const partes = Object.entries(net)
-    .filter(([, v]) => Math.abs(v) >= 0.005)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => {
-      const simbolo = k === 'BRL' ? 'R$' : k === 'USD' ? 'US$' : k + ' '
-      return `${simbolo} ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    })
-  return partes.length ? partes.join(' + ') : '—'
-}

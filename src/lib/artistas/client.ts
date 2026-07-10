@@ -35,7 +35,8 @@ export interface ArtistaDoc {
 /** Resumo de receita (coleção `receitas`, admin-only). */
 export interface ReceitaResumo {
   slug: string
-  totalBRL: number
+  /** Líquido por moeda original — não somamos moedas; a lista ordena por streams. */
+  netPorMoeda: Record<string, number>
   streams: number
 }
 
@@ -133,7 +134,11 @@ export async function listarReceitas(): Promise<Map<string, ReceitaResumo>> {
   const m = new Map<string, ReceitaResumo>()
   snap.docs.forEach((d) => {
     const x = d.data()
-    m.set(d.id, { slug: d.id, totalBRL: Number(x.totalBRL ?? 0), streams: Number(x.streams ?? 0) })
+    m.set(d.id, {
+      slug: d.id,
+      netPorMoeda: (x.totais?.netPorMoeda ?? {}) as Record<string, number>,
+      streams: Number(x.streams ?? 0),
+    })
   })
   return m
 }

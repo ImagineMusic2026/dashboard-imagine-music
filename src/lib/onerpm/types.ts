@@ -143,9 +143,10 @@ export interface ArtistaImportado {
   nome: string
   linhas: number
   streams: number
-  totalBRL: number
-  /** Fatia que vai pro selo, em BRL. Já está dentro de `totalBRL`. */
-  repasseBRL: number
+  /** Receita líquida por moeda original — nunca somada. */
+  netPorMoeda: MoneyByCurrency
+  /** Fatia que vai pro selo, por moeda. Já está dentro de `netPorMoeda`. */
+  repassePorMoeda: MoneyByCurrency
   /** Não tem sub-conta própria na OneRPM — foi inferido de "Artists"/"Album/Channel". */
   semConta: boolean
   /** O cadastro do artista foi CRIADO por esta importação (não existia no roster). */
@@ -167,9 +168,10 @@ export interface ReceitaArtistaDoc {
   streams: number
   moedas: string[]
   periodo: OneRpmAggregate['periodo']
-  /** Fatia que vai pro selo. Ausente = este artista não tem split. */
+  /** Fatia que vai pro selo, por moeda. Ausente/vazio = este artista não tem split. */
   repassePorMoeda?: MoneyByCurrency
-  repasseBRL?: number
+  /** Agregado por moeda (fonte da receita por plataforma na exibição). */
+  agregado?: OneRpmAggregate
   ultimaImportacaoId?: string
 }
 

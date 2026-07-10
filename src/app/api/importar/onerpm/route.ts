@@ -121,7 +121,6 @@ export async function POST(req: Request) {
         periodo: lote.periodo,
         moedas: lote.moedas,
         totais: lote.totais,
-        totalBRL: res.totalBRL,
         artistas: res.artistas,
         pagoTerceirosPorMoeda: lote.pagoTerceirosPorMoeda,
         naoAtribuido: lote.naoAtribuido

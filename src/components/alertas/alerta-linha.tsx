@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell, CloudOff, Flame, MoonStar, PlayCircle, PlugZap, Star, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
+import { Bell, CloudOff, Flame, MoonStar, PlayCircle, PlugZap, Star, TrendingDown, TrendingUp, Trophy, UserPlus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { abrirCardCanal, rolarAteCard } from '@/lib/artistas/abrir-card'
@@ -26,6 +26,7 @@ export const ICONE_ALERTA: Record<string, LucideIcon> = {
   marco_seguidores: Trophy,
   viralizacao_streaming: PlayCircle,
   queda_streaming: TrendingDown,
+  perfil_incompleto: UserPlus,
   sync_falhou: PlugZap,
   sync_parado: CloudOff,
 }

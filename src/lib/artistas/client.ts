@@ -21,6 +21,9 @@ export interface ArtistaDoc {
   genero?: string
   label?: string
   fonteCadastro?: string
+  /** Criado por uma importação de receita, sem redes sociais. Limpo ao editar o perfil. */
+  pendenteConfiguracao?: boolean
+  pendenteDesde?: number
   redes?: {
     spotify?: RedeSocialDoc | null
     youtube?: RedeSocialDoc | null

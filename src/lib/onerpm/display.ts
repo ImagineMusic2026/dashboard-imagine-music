@@ -30,7 +30,7 @@ function valorBase(
  * - `percentualTotal`: participação na receita do próprio arquivo.
  */
 export function receitaPorPlataformaDisplay(
-  agg: OneRpmAggregate,
+  agg: Pick<OneRpmAggregate, 'porPlataforma'>,
   cfg: OneRpmConfig = onerpmConfig
 ): ReceitaPlataforma[] {
   const items = agg.porPlataforma.map((p) => ({
@@ -50,7 +50,18 @@ export function receitaPorPlataformaDisplay(
   return items
 }
 
-/** Total de receita do arquivo, em BRL, já aplicando base + câmbio. */
-export function totalReceitaBRL(agg: OneRpmAggregate, cfg: OneRpmConfig = onerpmConfig): number {
+/** Total de receita em BRL, já aplicando base + câmbio. Serve pro artista e pro lote. */
+export function totalReceitaBRL(
+  agg: Pick<OneRpmAggregate, 'totais'>,
+  cfg: OneRpmConfig = onerpmConfig
+): number {
   return paraBRL(valorBase(agg.totais.grossPorMoeda, agg.totais.netPorMoeda, cfg), cfg)
+}
+
+/**
+ * Repasse ao selo em BRL. Só existe em `net` (a aba de shares não tem bruto/líquido
+ * separados), então o `base: 'gross'` do config não se aplica aqui.
+ */
+export function repasseAoSeloBRL(m: MoneyByCurrency, cfg: OneRpmConfig = onerpmConfig): number {
+  return paraBRL(m, cfg)
 }

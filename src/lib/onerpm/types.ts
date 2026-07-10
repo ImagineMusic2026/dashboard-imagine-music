@@ -91,6 +91,68 @@ export interface OneRpmAggregate {
 }
 
 /**
+ * Como a linha foi atribuída a um artista, em ordem de confiança:
+ *  - `conta`     : sub-conta da OneRPM ("Imagine Music co: Netto Brito"). Autoritativa.
+ *  - `performer` : 1º performer do campo "Artists". Usada quando a linha vem na
+ *                  conta do selo (sem `:`).
+ *  - `canal`     : nome do canal em "Album/Channel". Único recurso para vídeos do
+ *                  YouTube, que vêm SEM "Artists" e SEM sub-conta.
+ */
+export type OrigemAtribuicao = 'conta' | 'performer' | 'canal'
+
+/**
+ * Linha da aba "Shares In & Out": um repasse entre duas contas da OneRPM.
+ * Não é receita nova — é o split de uma linha que já existe em "Sales".
+ */
+export interface OneRpmShareRow {
+  shareType: string // "Stream (Share In)" | "Stream (Share Out)" | "Download (Share Out)"
+  payerName: string
+  receiverName: string
+  currency: string
+  net: number
+}
+
+/** Agregado de um artista + de onde vieram as linhas dele. */
+export interface ArtistaAgregado extends OneRpmAggregate {
+  origens: Record<OrigemAtribuicao, number>
+  /** Fatia da receita deste artista que vai pro selo. JÁ inclusa em `totais` — nunca somar. */
+  repassePorMoeda: MoneyByCurrency
+}
+
+/**
+ * Um relatório da OneRPM é do SELO INTEIRO — dezenas de artistas numa aba só.
+ * O lote é o resultado de fatiar esse arquivo por artista.
+ */
+export interface OneRpmLote {
+  fonte: 'onerpm'
+  label: string
+  periodo: OneRpmAggregate['periodo']
+  moedas: string[]
+  totais: OneRpmAggregate['totais']
+  artistas: ArtistaAgregado[]
+  /** Linhas que nenhuma regra conseguiu atribuir. NÃO viram receita de ninguém. */
+  naoAtribuido: OneRpmAggregate | null
+  /** O que o selo paga a terceiros (colaboradores). Negativo. Não é de nenhum artista. */
+  pagoTerceirosPorMoeda: MoneyByCurrency
+  avisos: string[]
+}
+
+/** Resumo de um artista dentro do doc do lote (o agregado completo vai em `receitas/{slug}`). */
+export interface ArtistaImportado {
+  slug: string
+  nome: string
+  linhas: number
+  streams: number
+  totalBRL: number
+  /** Fatia que vai pro selo, em BRL. Já está dentro de `totalBRL`. */
+  repasseBRL: number
+  /** Não tem sub-conta própria na OneRPM — foi inferido de "Artists"/"Album/Channel". */
+  semConta: boolean
+  /** O cadastro do artista foi CRIADO por esta importação (não existia no roster). */
+  criado: boolean
+}
+
+/**
  * Snapshot gravado em `artistas/{slug}` — é o que o perfil do artista lê
  * (client SDK). Já vem com a receita no formato de exibição do painel.
  */
@@ -105,6 +167,9 @@ export interface ReceitaArtistaDoc {
   streams: number
   moedas: string[]
   periodo: OneRpmAggregate['periodo']
+  /** Fatia que vai pro selo. Ausente = este artista não tem split. */
+  repassePorMoeda?: MoneyByCurrency
+  repasseBRL?: number
   ultimaImportacaoId?: string
 }
 

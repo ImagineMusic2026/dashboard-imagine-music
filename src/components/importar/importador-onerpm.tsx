@@ -2,37 +2,37 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
+import Link from 'next/link'
 import {
   AlertTriangle,
   CheckCircle2,
   DollarSign,
   FileSpreadsheet,
-  Globe,
   Loader2,
   Lock,
   Music2,
   UploadCloud,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { auth } from '@/lib/firebase'
-import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
+import { enxugarLote } from '@/lib/onerpm/aggregate'
 import { paraBRL } from '@/lib/onerpm/display'
-import type { MoneyByCurrency, PlataformaAgregada, FaixaAgregada, TerritorioAgregado } from '@/lib/onerpm/types'
+import type { EntradaWorker, SaidaWorker } from '@/lib/onerpm/parse.worker'
+import type { ArtistaImportado, MoneyByCurrency, OneRpmAggregate, OneRpmLote } from '@/lib/onerpm/types'
 import { cn } from '@/lib/utils'
 
 type Resumo = {
-  artistaNome: string
-  artistaSlug: string
   label: string
-  periodo: { transactionMonths: string[]; accountedFrom: string | null; accountedTo: string | null }
+  periodo: OneRpmAggregate['periodo']
   moedas: string[]
-  totais: { linhas: number; streams: number; grossPorMoeda: MoneyByCurrency; netPorMoeda: MoneyByCurrency }
+  totais: OneRpmAggregate['totais']
   totalBRL: number
-  porPlataforma: PlataformaAgregada[]
-  porFaixa: FaixaAgregada[]
-  porTerritorio: TerritorioAgregado[]
+  artistas: ArtistaImportado[]
+  pagoTerceirosPorMoeda: MoneyByCurrency
+  naoAtribuido: { linhas: number; streams: number } | null
   avisos: string[]
 }
 
@@ -40,15 +40,26 @@ type Recente = {
   id: string
   arquivoNome: string
   tamanhoBytes: number
-  artistaNome: string
-  artistaSlug: string
+  label: string
   status: 'processado' | 'erro'
+  artistas: number
+  artistasCriados: number
   linhas: number
   streams: number
   totalBRL: number
-  periodo: { transactionMonths: string[]; accountedFrom: string | null; accountedTo: string | null }
+  periodo: OneRpmAggregate['periodo']
   criadoEmISO: string | null
   criadoPorEmail: string
+}
+
+/** O arquivo é lido no browser; o teto só evita travar a máquina da usuária. */
+const TAMANHO_MAX = 50 * 1024 * 1024
+
+type Etapa = 'lendo' | 'agregando' | 'salvando'
+const rotuloEtapa: Record<Etapa, string> = {
+  lendo: 'Lendo a planilha',
+  agregando: 'Separando por artista',
+  salvando: 'Salvando no banco',
 }
 
 const fmtInt = (n: number) => n.toLocaleString('pt-BR')
@@ -71,21 +82,11 @@ const fmtTamanho = (bytes: number) => {
   return `${bytes}B`
 }
 
-const corBar: Record<string, string> = {
-  emerald: 'from-emerald-500 to-emerald-400',
-  pink: 'from-pink-500 to-pink-400',
-  red: 'from-red-500 to-red-400',
-  violet: 'from-violet-500 to-violet-400',
-  blue: 'from-blue-500 to-blue-400',
-  amber: 'from-amber-500 to-amber-400',
-  cyan: 'from-cyan-500 to-cyan-400',
-  gray: 'from-bg-700 to-ink-500',
-}
-
 export function ImportadorOneRpm() {
   const { role, loading } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [enviando, setEnviando] = useState(false)
+  const workerRef = useRef<Worker | null>(null)
+  const [etapa, setEtapa] = useState<Etapa | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [resultado, setResultado] = useState<Resumo | null>(null)
   const [nomeArquivo, setNomeArquivo] = useState<string | null>(null)
@@ -93,6 +94,7 @@ export function ImportadorOneRpm() {
   const [arrastando, setArrastando] = useState(false)
 
   const ehAdmin = role === 'admin'
+  const enviando = etapa !== null
 
   const carregarRecentes = useCallback(async () => {
     try {
@@ -110,36 +112,80 @@ export function ImportadorOneRpm() {
     if (ehAdmin) void carregarRecentes()
   }, [ehAdmin, carregarRecentes])
 
+  useEffect(() => () => workerRef.current?.terminate(), [])
+
+  /** Lê o .xlsx fora da thread principal — são ~120k linhas e alguns segundos. */
+  const parsearNoWorker = useCallback(
+    (arquivo: ArrayBuffer) =>
+      new Promise<OneRpmLote>((resolve, reject) => {
+        workerRef.current?.terminate()
+        const worker = new Worker(new URL('../../lib/onerpm/parse.worker.ts', import.meta.url))
+        workerRef.current = worker
+
+        worker.onmessage = (e: MessageEvent<SaidaWorker>) => {
+          const msg = e.data
+          if (!msg.ok) {
+            worker.terminate()
+            reject(new Error(msg.erro))
+            return
+          }
+          if (msg.etapa === 'pronto') {
+            worker.terminate()
+            resolve(msg.lote)
+            return
+          }
+          setEtapa(msg.etapa)
+        }
+        worker.onerror = () => {
+          worker.terminate()
+          reject(new Error('Falha ao processar a planilha no navegador.'))
+        }
+
+        const entrada: EntradaWorker = { arquivo }
+        worker.postMessage(entrada, [arquivo]) // transferível: não copia os 15MB
+      }),
+    []
+  )
+
   const enviar = useCallback(
     async (file: File) => {
       setErro(null)
       setResultado(null)
       setNomeArquivo(file.name)
-      setEnviando(true)
+      setEtapa('lendo')
       try {
         if (!/\.(xlsx|xls)$/i.test(file.name)) {
           throw new Error('Envie o arquivo .xlsx exportado da OneRPM.')
         }
+        if (file.size === 0) throw new Error('O arquivo está vazio.')
+        if (file.size > TAMANHO_MAX) throw new Error('Arquivo muito grande (máx. 50MB).')
+
         const token = await auth.currentUser?.getIdToken()
         if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
-        const fd = new FormData()
-        fd.append('file', file)
+
+        const lote = await parsearNoWorker(await file.arrayBuffer())
+
+        setEtapa('salvando')
         const res = await fetch('/api/importar/onerpm', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            arquivoNome: file.name,
+            tamanhoBytes: file.size,
+            lote: enxugarLote(lote),
+          }),
         })
         const data = await res.json().catch(() => null)
-        if (!res.ok) throw new Error(data?.error ?? 'Não foi possível importar o arquivo.')
+        if (!res.ok) throw new Error(data?.error ?? `A importação falhou (HTTP ${res.status}).`)
         setResultado(data.resumo as Resumo)
         void carregarRecentes()
       } catch (e) {
         setErro(e instanceof Error ? e.message : 'Erro inesperado ao importar.')
       } finally {
-        setEnviando(false)
+        setEtapa(null)
       }
     },
-    [carregarRecentes]
+    [carregarRecentes, parsearNoWorker]
   )
 
   const abrirSeletor = () => inputRef.current?.click()
@@ -199,10 +245,10 @@ export function ImportadorOneRpm() {
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-lg text-ink-100">Relatório OneRPM (.xlsx)</h3>
           <p className="text-sm text-ink-400 mt-1 leading-snug">
-            A planilha de vendas exportada da OneRPM — streams e receita por faixa, loja e país.
+            A planilha de vendas do selo inteiro — streams e receita por faixa, loja e país.
           </p>
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-500 mt-3">
-            <li>✓ Lê a aba “Sales” automaticamente</li>
+            <li>✓ Separa a receita por artista</li>
             <li>✓ Agrupa lojas (Spotify, Apple, Meta…)</li>
             <li>✓ Bruto e líquido por moeda</li>
           </ul>
@@ -229,18 +275,24 @@ export function ImportadorOneRpm() {
             : 'border-bg-700/60 bg-bg-900/30 hover:bg-bg-900/50'
         )}
       >
-        {enviando ? (
+        {etapa ? (
           <>
             <Loader2 className="w-12 h-12 text-amber-400 mx-auto mb-4 animate-spin" />
-            <h3 className="text-xl font-semibold text-ink-100">Processando {nomeArquivo}…</h3>
-            <p className="text-sm text-ink-400 mt-1">Lendo a planilha e agregando os dados</p>
+            <h3 className="text-xl font-semibold text-ink-100">
+              {rotuloEtapa[etapa]}
+              <span className="text-ink-400">…</span>
+            </h3>
+            <p className="text-sm text-ink-400 mt-1 truncate">{nomeArquivo}</p>
+            <p className="text-[11px] text-ink-500 mt-3">
+              Planilhas grandes levam alguns segundos — pode deixar a aba aberta.
+            </p>
           </>
         ) : (
           <>
             <UploadCloud className="w-12 h-12 text-ink-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-ink-100">Arraste o .xlsx da OneRPM aqui</h3>
             <p className="text-sm text-ink-400 mt-1">ou clique pra escolher o arquivo</p>
-            <p className="text-[11px] text-ink-500 mt-3 num">Máx. 25MB · .xlsx / .xls</p>
+            <p className="text-[11px] text-ink-500 mt-3 num">Máx. 50MB · .xlsx / .xls</p>
           </>
         )}
       </div>
@@ -287,7 +339,9 @@ export function ImportadorOneRpm() {
                     </span>
                   </div>
                   <div className="text-[11px] text-ink-500 num mt-0.5">
-                    {imp.artistaNome} · {fmtTamanho(imp.tamanhoBytes)} · {fmtInt(imp.streams)} streams ·{' '}
+                    {fmtInt(imp.artistas)} {imp.artistas === 1 ? 'artista' : 'artistas'}
+                    {imp.artistasCriados > 0 && ` (${fmtInt(imp.artistasCriados)} novos)`} ·{' '}
+                    {fmtTamanho(imp.tamanhoBytes)} · {fmtInt(imp.streams)} streams ·{' '}
                     {fmtInt(imp.linhas)} linhas
                   </div>
                 </div>
@@ -305,10 +359,12 @@ export function ImportadorOneRpm() {
 }
 
 function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: () => void }) {
-  const totalNetBRL = resumo.porPlataforma.reduce((acc, p) => acc + paraBRL(p.netPorMoeda), 0)
-  const plataformas = resumo.porPlataforma
-    .map((p) => ({ ...p, brl: paraBRL(p.netPorMoeda) }))
-    .sort((a, b) => b.brl - a.brl)
+  const [verTodos, setVerTodos] = useState(false)
+  const visiveis = verTodos ? resumo.artistas : resumo.artistas.slice(0, 10)
+  const maiorBRL = resumo.artistas[0]?.totalBRL ?? 0
+  const criados = resumo.artistas.filter((a) => a.criado)
+  const repasseTotal = resumo.artistas.reduce((a, x) => a + x.repasseBRL, 0)
+  const pagoTerceiros = paraBRL(resumo.pagoTerceirosPorMoeda ?? {})
 
   return (
     <div className="bg-bg-900 border border-emerald-500/30 rounded-xl overflow-hidden">
@@ -319,13 +375,13 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-ink-100 text-lg">{resumo.artistaNome}</span>
+              <span className="font-bold text-ink-100 text-lg">{resumo.label || 'Relatório importado'}</span>
               <span className="text-[10px] tracking-wider font-bold text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
                 FONTE: ONERPM
               </span>
             </div>
             <div className="text-[12px] text-ink-500 mt-0.5">
-              {resumo.label} · meses {resumo.periodo.transactionMonths[0]} →{' '}
+              meses {resumo.periodo.transactionMonths[0]} →{' '}
               {resumo.periodo.transactionMonths[resumo.periodo.transactionMonths.length - 1]} · lançado{' '}
               {formatarDataCurta(resumo.periodo.accountedFrom)}–{formatarDataCurta(resumo.periodo.accountedTo)}
             </div>
@@ -338,96 +394,133 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-bg-700/30">
+        <Kpi
+          icon={Users}
+          label="Artistas"
+          valor={fmtInt(resumo.artistas.length)}
+          nota={criados.length ? `${criados.length} cadastrados agora` : undefined}
+        />
         <Kpi icon={Music2} label="Streams" valor={fmtInt(resumo.totais.streams)} />
-        <Kpi
-          icon={DollarSign}
-          label="Líquido (original)"
-          valor={fmtMoedas(resumo.totais.netPorMoeda)}
-          destaque
-        />
+        <Kpi icon={DollarSign} label="Líquido (original)" valor={fmtMoedas(resumo.totais.netPorMoeda)} destaque />
         <Kpi icon={DollarSign} label="Líquido (≈ R$)" valor={fmtBRL(resumo.totalBRL)} nota="câmbio placeholder" />
-        <Kpi
-          icon={Globe}
-          label="Faixas · países"
-          valor={`${resumo.porFaixa.length}+ · ${resumo.porTerritorio.length}+`}
-        />
       </div>
 
-      {/* Por plataforma */}
+      {/* Divisão com o selo — o repasse já está DENTRO da receita gerada acima. */}
+      {(repasseTotal > 0 || pagoTerceiros < 0) && (
+        <div className="border-b border-bg-700/30 px-5 py-4 space-y-2">
+          <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
+            Divisão do dinheiro (aba “Shares In &amp; Out”)
+          </div>
+          {repasseTotal > 0 && (
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-ink-400">Repasse dos artistas à Imagine</span>
+              <span className="num text-emerald-400">{fmtBRL(repasseTotal)}</span>
+            </div>
+          )}
+          {pagoTerceiros < 0 && (
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-ink-400">Pago pelo selo a terceiros</span>
+              <span className="num text-amber-400/90">{fmtBRL(pagoTerceiros)}</span>
+            </div>
+          )}
+          <p className="text-[11px] text-ink-500 pt-1">
+            O repasse já está dentro da receita de cada artista — é a fatia do selo, não uma receita extra.
+          </p>
+        </div>
+      )}
+
+      {/* Artistas criados agora — precisam de perfil configurado */}
+      {criados.length > 0 && (
+        <div className="border-b border-bg-700/30 bg-amber-500/5 p-4 flex items-start gap-3">
+          <UserPlus className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-[12px] text-amber-200/90">
+            <span className="font-semibold">
+              {criados.length} {criados.length === 1 ? 'artista foi cadastrado' : 'artistas foram cadastrados'} agora
+            </span>{' '}
+            porque {criados.length === 1 ? 'tinha' : 'tinham'} receita mas não {criados.length === 1 ? 'existia' : 'existiam'} no
+            painel: {criados.map((a) => a.nome).join(', ')}. {criados.length === 1 ? 'Ele está' : 'Eles estão'} sem redes
+            sociais — há um alerta em{' '}
+            <Link href="/alertas" className="underline underline-offset-2 hover:text-amber-100">
+              Alertas
+            </Link>{' '}
+            pedindo a configuração do perfil.
+          </div>
+        </div>
+      )}
+
+      {/* Receita por artista */}
       <div className="p-5">
         <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase mb-3">
-          Receita líquida por plataforma
+          Receita líquida por artista
         </div>
         <div className="space-y-2.5">
-          {plataformas.map((p) => {
-            const pct = totalNetBRL > 0 ? Math.round((p.brl / totalNetBRL) * 100) : 0
+          {visiveis.map((a) => {
+            const pct = maiorBRL > 0 ? Math.max(2, Math.round((a.totalBRL / maiorBRL) * 100)) : 0
             return (
-              <div key={p.plataforma} className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-lg grid place-items-center shrink-0 text-white bg-gradient-to-br',
-                    corBar[p.corKey] ?? corBar.gray
-                  )}
-                >
-                  <span className="block w-4 h-4">
-                    <PlataformaIcon tipo={p.iconeTipo} />
-                  </span>
-                </div>
+              <div key={a.slug} className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="font-semibold text-ink-100 truncate">{p.plataforma}</span>
-                    <span className="num text-ink-300 shrink-0">{fmtMoedas(p.netPorMoeda)}</span>
+                    <span className="font-semibold text-ink-100 truncate flex items-center gap-1.5">
+                      {a.nome}
+                      {a.criado && (
+                        <span
+                          className="text-[9px] tracking-wider font-bold text-amber-400 px-1.5 py-0.5 rounded bg-amber-500/15 shrink-0"
+                          title="Cadastro criado por esta importação — falta configurar o perfil"
+                        >
+                          NOVO
+                        </span>
+                      )}
+                    </span>
+                    <span className="num text-ink-300 shrink-0">{fmtBRL(a.totalBRL)}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex-1 h-1.5 bg-bg-700 rounded-full overflow-hidden">
                       <div
-                        className={cn('h-full rounded-full bg-gradient-to-r', corBar[p.corKey] ?? corBar.gray)}
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-ink-500 num w-14 text-right shrink-0">
-                      {fmtInt(p.streams)} str
+                    {a.repasseBRL > 0 && (
+                      <span
+                        className="text-[10px] text-amber-400/80 num shrink-0"
+                        title="Fatia que vai pro selo (já inclusa na receita)"
+                      >
+                        −{fmtBRL(a.repasseBRL)}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-ink-500 num w-20 text-right shrink-0">
+                      {fmtInt(a.streams)} str
                     </span>
-                    <span className="text-[10px] text-ink-400 num w-8 text-right shrink-0">{pct}%</span>
                   </div>
                 </div>
               </div>
             )
           })}
         </div>
+        {resumo.artistas.length > 10 && (
+          <button
+            type="button"
+            onClick={() => setVerTodos((v) => !v)}
+            className="mt-4 text-[12px] text-amber-400 hover:text-amber-300 font-semibold"
+          >
+            {verTodos ? 'Mostrar menos' : `Ver todos os ${resumo.artistas.length} artistas`}
+          </button>
+        )}
       </div>
 
-      {/* Top faixas + países */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-bg-700/30 border-t border-bg-700/30">
-        <div className="bg-bg-900 p-5">
-          <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase mb-3">
-            Top faixas
-          </div>
-          <div className="space-y-2">
-            {resumo.porFaixa.slice(0, 5).map((f) => (
-              <div key={f.trackId || f.titulo} className="flex items-center justify-between gap-2 text-sm">
-                <span className="text-ink-200 truncate">{f.titulo}</span>
-                <span className="num text-ink-400 text-[12px] shrink-0">{fmtMoedas(f.netPorMoeda)}</span>
-              </div>
-            ))}
+      {/* Sobra não atribuída */}
+      {resumo.naoAtribuido && (
+        <div className="border-t border-bg-700/30 bg-red-500/5 p-4 flex items-start gap-3">
+          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          <div className="text-[12px] text-red-200/90">
+            <span className="font-semibold">
+              {fmtInt(resumo.naoAtribuido.linhas)} linhas ficaram fora dos perfis
+            </span>{' '}
+            ({fmtInt(resumo.naoAtribuido.streams)} streams). Nenhum artista foi identificado nelas — a
+            receita não foi atribuída a ninguém.
           </div>
         </div>
-        <div className="bg-bg-900 p-5">
-          <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase mb-3">
-            Top países
-          </div>
-          <div className="space-y-2">
-            {resumo.porTerritorio.slice(0, 5).map((t) => (
-              <div key={t.territorio} className="flex items-center justify-between gap-2 text-sm">
-                <span className="text-ink-200">{t.territorio}</span>
-                <span className="num text-ink-400 text-[12px] shrink-0">
-                  {fmtInt(t.streams)} str · {fmtMoedas(t.netPorMoeda)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Avisos */}
       {resumo.avisos.length > 0 && (

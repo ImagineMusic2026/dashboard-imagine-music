@@ -141,6 +141,20 @@ export function ReceitaArtistaCard({
         ))}
       </div>
 
+      {/* Split artista × selo — só aparece pra quem tem repasse na OneRPM. */}
+      {real && !!real.repasseBRL && (
+        <div className="border-t border-bg-700/30 px-5 py-4 space-y-2">
+          <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
+            Divisão com o selo
+          </div>
+          <Linha rotulo="Receita gerada" valor={formatCurrency(total)} />
+          <Linha rotulo="Repasse à Imagine" valor={`− ${formatCurrency(real.repasseBRL)}`} sutil />
+          <div className="pt-2 border-t border-bg-700/30">
+            <Linha rotulo="Fica com o artista" valor={formatCurrency(total - real.repasseBRL)} destaque />
+          </div>
+        </div>
+      )}
+
       <div className="px-5 py-3 border-t border-bg-700/30 flex items-center justify-between">
         <div className="text-[11px] text-ink-500 num">
           {real
@@ -149,6 +163,35 @@ export function ReceitaArtistaCard({
         </div>
         <span className="text-violet-400/60 text-sm">Exportar relatório completo ↓</span>
       </div>
+    </div>
+  )
+}
+
+function Linha({
+  rotulo,
+  valor,
+  sutil,
+  destaque,
+}: {
+  rotulo: string
+  valor: string
+  sutil?: boolean
+  destaque?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className={destaque ? 'font-semibold text-ink-100' : 'text-ink-400'}>{rotulo}</span>
+      <span
+        className={
+          destaque
+            ? 'num font-bold text-emerald-400'
+            : sutil
+              ? 'num text-amber-400/90'
+              : 'num text-ink-200'
+        }
+      >
+        {valor}
+      </span>
     </div>
   )
 }

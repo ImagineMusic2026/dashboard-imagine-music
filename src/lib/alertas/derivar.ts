@@ -345,6 +345,39 @@ export function derivarAlertasOperacionais(integ: StatusIntegracoes): AlertaDeri
   return out
 }
 
+/** O mínimo que um alerta de cadastro precisa saber do artista. */
+export interface ArtistaCadastro {
+  slug: string
+  nome: string
+  /** Criado por uma importação (ex.: OneRPM) e ainda sem perfil configurado. */
+  pendenteConfiguracao?: boolean
+  /** Quando virou pendente (ms) — dá recência ao alerta. */
+  pendenteDesde?: number
+}
+
+/**
+ * Artistas que a importação da OneRPM criou sozinha: existem porque têm receita,
+ * mas ninguém preencheu redes sociais/gênero, então ficam de fora de toda métrica
+ * social. Cobra a configuração até alguém editar o perfil.
+ */
+export function derivarAlertasCadastro(artistas: ArtistaCadastro[]): AlertaDerivado[] {
+  return artistas
+    .filter((a) => a.pendenteConfiguracao)
+    .map((a) =>
+      mk(
+        `cadastro-pendente-${a.slug}`,
+        a.slug,
+        a.nome,
+        'atencao',
+        'perfil_incompleto',
+        'Criado pela importação da OneRPM — falta ligar as redes sociais pra ele entrar nas métricas',
+        'Configurar perfil',
+        `/artistas/${a.slug}`,
+        a.pendenteDesde ?? Date.now(),
+      ),
+    )
+}
+
 /** Alerta de SISTEMA (sem artista): a fonte vira o "nome" e o slug é estável. */
 function mkSistema(
   id: string,

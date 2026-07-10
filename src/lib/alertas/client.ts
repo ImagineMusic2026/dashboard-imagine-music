@@ -8,6 +8,7 @@ import {
 } from '@/lib/metricas-sociais/client'
 import {
   derivarAlertas,
+  derivarAlertasCadastro,
   derivarAlertasOperacionais,
   ordenarAlertas,
   type AlertaDerivado,
@@ -30,8 +31,8 @@ export async function getStatusIntegracoes(): Promise<StatusIntegracoes> {
 }
 
 /**
- * Carrega TODOS os alertas abertos (sociais + operacionais), já ordenados por
- * severidade e recência. Fonte única da página de Alertas e do badge do sino —
+ * Carrega TODOS os alertas abertos (sociais + cadastro + operacionais), já ordenados
+ * por severidade e recência. Fonte única da página de Alertas e do badge do sino —
  * assim os dois números sempre batem.
  */
 export async function carregarAlertas(): Promise<AlertaDerivado[]> {
@@ -41,5 +42,9 @@ export async function carregarAlertas(): Promise<AlertaDerivado[]> {
     getStatusIntegracoes(),
   ])
   const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-  return ordenarAlertas([...derivarAlertas(mapa, nome), ...derivarAlertasOperacionais(integ)])
+  return ordenarAlertas([
+    ...derivarAlertas(mapa, nome),
+    ...derivarAlertasCadastro(arts),
+    ...derivarAlertasOperacionais(integ),
+  ])
 }

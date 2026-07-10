@@ -339,6 +339,10 @@ export async function atualizarArtistaManual(
     genero: genero ?? admin.firestore.FieldValue.delete(),
     cadastroAtualizadoEm: agora,
     cadastroPorEmail: meta.email,
+    // Editar o perfil é exatamente o que o alerta de artista criado pela importação
+    // da OneRPM pedia. Some daqui em diante.
+    pendenteConfiguracao: admin.firestore.FieldValue.delete(),
+    pendenteDesde: admin.firestore.FieldValue.delete(),
   }
 
   const redes: ArtistaManualResultado['redes'] = { spotify: null, youtube: null, instagram: null, tiktok: null }

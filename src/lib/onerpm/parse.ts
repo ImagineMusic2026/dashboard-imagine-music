@@ -1,12 +1,16 @@
 import * as XLSX from 'xlsx'
-import { agregar } from './aggregate'
-import type { OneRpmAggregate, OneRpmRawRow } from './types'
+import { agregarPorArtista } from './aggregate'
+import type { OneRpmLote, OneRpmRawRow, OneRpmShareRow } from './types'
 
 /**
- * Leitura do XLSX da OneRPM (aba "Sales") -> linhas cruas -> agregado.
+ * Leitura do XLSX da OneRPM (aba "Sales") -> linhas cruas -> lote por artista.
  *
- * ⚠️ Só servidor: importa `xlsx`. Parseia direto do BUFFER do upload (sem tocar
- * em disco), então não precisa de `XLSX.set_fs`.
+ * ISOMÓRFICO: roda no browser (Web Worker do importador) e no Node (scripts).
+ * Parseia direto do buffer, sem tocar em disco, então não precisa de `XLSX.set_fs`.
+ *
+ * O relatório do selo inteiro chega a ~15MB / 120k linhas — acima do limite de
+ * corpo de requisição da Vercel (4,5MB) e do tempo de uma função serverless. Por
+ * isso quem parseia é o browser; o servidor só recebe o agregado, que é pequeno.
  */
 
 /** Erro de parsing com mensagem amigável pra mostrar na UI. */
@@ -17,7 +21,10 @@ export class OneRpmParseError extends Error {
   }
 }
 
+const ABA_VENDAS = 'Sales'
+const ABA_REPASSES = 'Shares In & Out'
 const COLUNAS_OBRIGATORIAS = ['Title', 'Artists', 'Store', 'Currency', 'Quantity', 'Gross', 'Net']
+const COLUNAS_REPASSE = ['Share Type', 'Payer Name', 'Receiver Name', 'Currency', 'Net']
 
 function txt(v: unknown): string {
   return v == null ? '' : String(v).trim()
@@ -29,64 +36,147 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** Lê uma célula tolerando espaços/caixa diferentes na chave do cabeçalho. */
-function makeGetter(row: Record<string, unknown>) {
-  const mapa = new Map<string, string>()
-  for (const k of Object.keys(row)) mapa.set(k.trim().toLowerCase(), k)
-  return (coluna: string): unknown => {
-    const real = mapa.get(coluna.trim().toLowerCase())
-    return real ? row[real] : null
-  }
+function toUint8(buf: Buffer | ArrayBuffer | Uint8Array): Uint8Array {
+  if (buf instanceof Uint8Array) return buf
+  return new Uint8Array(buf)
 }
 
-export function lerLinhasOneRpm(buf: Buffer | ArrayBuffer | Uint8Array): OneRpmRawRow[] {
-  let wb: XLSX.WorkBook
+/**
+ * Lê só as abas que usamos. A pasta tem outras (ex.: "Commissions") e cada aba
+ * ignorada é tempo de parse economizado.
+ */
+function abrir(buf: Buffer | ArrayBuffer | Uint8Array): XLSX.WorkBook {
+  const dados = toUint8(buf)
   try {
-    wb = XLSX.read(buf, { type: 'buffer' })
+    const wb = XLSX.read(dados, { type: 'array', sheets: [ABA_VENDAS, ABA_REPASSES], dense: true })
+    if (wb.Sheets[ABA_VENDAS]) return wb
+    // Sem aba "Sales" (export antigo?): relê o arquivo todo pra tentar a primeira aba.
+    return XLSX.read(dados, { type: 'array', dense: true })
   } catch {
     throw new OneRpmParseError('Não consegui abrir o arquivo. Confirme que é um .xlsx válido exportado da OneRPM.')
   }
+}
 
-  const sheetName = wb.SheetNames.includes('Sales') ? 'Sales' : wb.SheetNames[0]
-  const ws = sheetName ? wb.Sheets[sheetName] : undefined
+function abaDeVendas(wb: XLSX.WorkBook): XLSX.WorkSheet {
+  const ws = wb.Sheets[ABA_VENDAS] ?? (wb.SheetNames[0] ? wb.Sheets[wb.SheetNames[0]] : undefined)
   if (!ws) throw new OneRpmParseError('A planilha está vazia ou sem a aba de vendas ("Sales").')
+  return ws
+}
 
-  const raw = XLSX.utils.sheet_to_json(ws, { defval: null }) as Record<string, unknown>[]
-  if (!raw.length) throw new OneRpmParseError('A planilha não tem linhas de dados.')
+/** Matriz de células + índice do cabeçalho, resolvido UMA vez (são ~120k linhas). */
+function tabela(ws: XLSX.WorkSheet): { matriz: unknown[][]; posicao: Map<string, number> } {
+  const matriz = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null, blankrows: false })
+  const posicao = new Map<string, number>()
+  ;(matriz[0] ?? []).forEach((h, i) => posicao.set(txt(h).toLowerCase(), i))
+  return { matriz, posicao }
+}
 
-  const headers = Object.keys(raw[0]).map((h) => h.trim().toLowerCase())
-  const faltando = COLUNAS_OBRIGATORIAS.filter((c) => !headers.includes(c.toLowerCase()))
+const emCelula = (linha: unknown[], i: number): unknown => (i < 0 ? null : linha[i])
+
+/** Abre o arquivo e devolve as duas abas já em linhas cruas. */
+export function lerOneRpm(buf: Buffer | ArrayBuffer | Uint8Array): {
+  vendas: OneRpmRawRow[]
+  repasses: OneRpmShareRow[]
+} {
+  const wb = abrir(buf)
+  return { vendas: lerVendas(abaDeVendas(wb)), repasses: lerRepasses(wb) }
+}
+
+function lerVendas(ws: XLSX.WorkSheet): OneRpmRawRow[] {
+  const { matriz, posicao } = tabela(ws)
+  if (matriz.length < 2) throw new OneRpmParseError('A planilha não tem linhas de dados.')
+
+  const faltando = COLUNAS_OBRIGATORIAS.filter((c) => !posicao.has(c.toLowerCase()))
   if (faltando.length) {
     throw new OneRpmParseError(
       `Isto não parece um relatório de vendas da OneRPM. Faltam as colunas: ${faltando.join(', ')}.`
     )
   }
 
-  return raw.map((row) => {
-    const get = makeGetter(row)
-    return {
-      sourceAccount: txt(get('Source Account')),
-      title: txt(get('Title')),
-      albumChannel: txt(get('Album/Channel')),
-      artists: txt(get('Artists')),
-      label: txt(get('Label')),
-      productType: txt(get('Product Type')),
-      parentId: txt(get('Parent ID')),
-      trackId: txt(get('ID')),
-      salesType: txt(get('Sales Type')),
-      transactionMonth: txt(get('Transaction Month')),
-      accountedDate: txt(get('Accounted Date')),
-      quantity: num(get('Quantity')),
-      territory: txt(get('Territory')),
-      store: txt(get('Store')),
-      currency: txt(get('Currency')),
-      gross: num(get('Gross')),
-      net: num(get('Net')),
-    }
-  })
+  const col = (nome: string) => posicao.get(nome.toLowerCase()) ?? -1
+  const iSourceAccount = col('Source Account')
+  const iTitle = col('Title')
+  const iAlbumChannel = col('Album/Channel')
+  const iArtists = col('Artists')
+  const iLabel = col('Label')
+  const iProductType = col('Product Type')
+  const iParentId = col('Parent ID')
+  const iTrackId = col('ID')
+  const iSalesType = col('Sales Type')
+  const iTransactionMonth = col('Transaction Month')
+  const iAccountedDate = col('Accounted Date')
+  const iQuantity = col('Quantity')
+  const iTerritory = col('Territory')
+  const iStore = col('Store')
+  const iCurrency = col('Currency')
+  const iGross = col('Gross')
+  const iNet = col('Net')
+
+  const linhas: OneRpmRawRow[] = []
+  for (let i = 1; i < matriz.length; i++) {
+    const l = matriz[i]
+    if (!l) continue
+    linhas.push({
+      sourceAccount: txt(emCelula(l, iSourceAccount)),
+      title: txt(emCelula(l, iTitle)),
+      albumChannel: txt(emCelula(l, iAlbumChannel)),
+      artists: txt(emCelula(l, iArtists)),
+      label: txt(emCelula(l, iLabel)),
+      productType: txt(emCelula(l, iProductType)),
+      parentId: txt(emCelula(l, iParentId)),
+      trackId: txt(emCelula(l, iTrackId)),
+      salesType: txt(emCelula(l, iSalesType)),
+      transactionMonth: txt(emCelula(l, iTransactionMonth)),
+      accountedDate: txt(emCelula(l, iAccountedDate)),
+      quantity: num(emCelula(l, iQuantity)),
+      territory: txt(emCelula(l, iTerritory)),
+      store: txt(emCelula(l, iStore)),
+      currency: txt(emCelula(l, iCurrency)),
+      gross: num(emCelula(l, iGross)),
+      net: num(emCelula(l, iNet)),
+    })
+  }
+  if (!linhas.length) throw new OneRpmParseError('A planilha não tem linhas de dados.')
+  return linhas
 }
 
-/** Pipeline completo: buffer do XLSX -> agregado pronto pra gravar/exibir. */
-export function parseOneRpm(buf: Buffer | ArrayBuffer | Uint8Array): OneRpmAggregate {
-  return agregar(lerLinhasOneRpm(buf))
+/**
+ * Aba de repasses. É OPCIONAL: exports de um artista só não a trazem, e nesse caso
+ * o lote simplesmente não tem split. Cabeçalho estranho também vira lista vazia —
+ * um repasse ausente não pode impedir a importação da receita.
+ */
+function lerRepasses(wb: XLSX.WorkBook): OneRpmShareRow[] {
+  const ws = wb.Sheets[ABA_REPASSES]
+  if (!ws) return []
+
+  const { matriz, posicao } = tabela(ws)
+  if (matriz.length < 2) return []
+  if (COLUNAS_REPASSE.some((c) => !posicao.has(c.toLowerCase()))) return []
+
+  const col = (nome: string) => posicao.get(nome.toLowerCase()) ?? -1
+  const iShareType = col('Share Type')
+  const iPayer = col('Payer Name')
+  const iReceiver = col('Receiver Name')
+  const iCurrency = col('Currency')
+  const iNet = col('Net')
+
+  const linhas: OneRpmShareRow[] = []
+  for (let i = 1; i < matriz.length; i++) {
+    const l = matriz[i]
+    if (!l) continue
+    linhas.push({
+      shareType: txt(emCelula(l, iShareType)),
+      payerName: txt(emCelula(l, iPayer)),
+      receiverName: txt(emCelula(l, iReceiver)),
+      currency: txt(emCelula(l, iCurrency)),
+      net: num(emCelula(l, iNet)),
+    })
+  }
+  return linhas
+}
+
+/** Pipeline completo: buffer do XLSX -> lote fatiado por artista (com repasses). */
+export function parseOneRpm(buf: Buffer | ArrayBuffer | Uint8Array): OneRpmLote {
+  const { vendas, repasses } = lerOneRpm(buf)
+  return agregarPorArtista(vendas, repasses)
 }

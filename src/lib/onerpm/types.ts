@@ -43,6 +43,8 @@ export interface PlataformaAgregada {
   streams: number
   grossPorMoeda: MoneyByCurrency
   netPorMoeda: MoneyByCurrency
+  /** Top faixas dentro desta plataforma. Limitado antes de persistir no Firestore. */
+  porFaixa?: FaixaAgregada[]
 }
 
 export interface FaixaAgregada {
@@ -164,7 +166,7 @@ export interface ReceitaArtistaDoc {
   fonte: 'onerpm'
   receitaPorPlataforma: ReceitaPlataforma[]
   totais: OneRpmAggregate['totais']
-  totalBRL: number
+  totalBRL?: number
   streams: number
   moedas: string[]
   periodo: OneRpmAggregate['periodo']
@@ -173,5 +175,20 @@ export interface ReceitaArtistaDoc {
   /** Agregado por moeda (fonte da receita por plataforma na exibição). */
   agregado?: OneRpmAggregate
   ultimaImportacaoId?: string
+  periodoKey?: string
+  arquivoNome?: string
+  tamanhoBytes?: number
+  criadoEmISO?: string | null
+  criadoPorEmail?: string
+}
+
+/** Uma versão importada de receita de um artista, pronta para seleção no card. */
+export interface ReceitaArtistaHistoricoItem extends ReceitaArtistaDoc {
+  importacaoId: string
+  periodoKey: string
+  arquivoNome: string
+  tamanhoBytes: number
+  criadoEmISO: string | null
+  criadoPorEmail: string
 }
 

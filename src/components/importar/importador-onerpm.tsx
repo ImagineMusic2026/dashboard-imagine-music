@@ -5,18 +5,21 @@ import type { DragEvent } from 'react'
 import Link from 'next/link'
 import {
   AlertTriangle,
+  ChevronDown,
   CheckCircle2,
   DollarSign,
   FileSpreadsheet,
   Loader2,
   Lock,
   Music2,
+  Trash2,
   UploadCloud,
   UserPlus,
   Users,
   X,
 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
+import { ConfirmarAcaoDialog } from '@/components/configuracoes/confirmar-acao-dialog'
 import { auth } from '@/lib/firebase'
 import { enxugarLote } from '@/lib/onerpm/aggregate'
 import { formatarMoedas, formatarMoedasCompacto } from '@/lib/onerpm/display'
@@ -37,6 +40,7 @@ type Resumo = {
 
 type Recente = {
   id: string
+  periodoKey: string
   arquivoNome: string
   tamanhoBytes: number
   label: string
@@ -47,6 +51,10 @@ type Recente = {
   streams: number
   netPorMoeda: MoneyByCurrency
   periodo: OneRpmAggregate['periodo']
+  artistasDetalhes: ArtistaImportado[]
+  pagoTerceirosPorMoeda: MoneyByCurrency
+  naoAtribuido: { linhas: number; streams: number; netPorMoeda: MoneyByCurrency } | null
+  avisos: string[]
   criadoEmISO: string | null
   criadoPorEmail: string
 }
@@ -80,8 +88,17 @@ const fmtTamanho = (bytes: number) => {
   return `${bytes}B`
 }
 
+function periodoLabel(periodo: OneRpmAggregate['periodo']): string {
+  const meses = periodo.transactionMonths ?? []
+  if (meses.length) return meses.length === 1 ? meses[0] : `${meses[0]} → ${meses[meses.length - 1]}`
+  if (periodo.accountedFrom || periodo.accountedTo) {
+    return `${formatarDataCurta(periodo.accountedFrom)}–${formatarDataCurta(periodo.accountedTo)}`
+  }
+  return 'sem mês identificado'
+}
+
 export function ImportadorOneRpm() {
-  const { role, loading } = useAuth()
+  const { loading, pode } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const workerRef = useRef<Worker | null>(null)
   const [etapa, setEtapa] = useState<Etapa | null>(null)
@@ -90,8 +107,10 @@ export function ImportadorOneRpm() {
   const [nomeArquivo, setNomeArquivo] = useState<string | null>(null)
   const [recentes, setRecentes] = useState<Recente[]>([])
   const [arrastando, setArrastando] = useState(false)
+  const [abertoId, setAbertoId] = useState<string | null>(null)
+  const [confirmarExclusao, setConfirmarExclusao] = useState<Recente | null>(null)
 
-  const ehAdmin = role === 'admin'
+  const podeImportar = pode('importar')
   const enviando = etapa !== null
 
   const carregarRecentes = useCallback(async () => {
@@ -107,8 +126,8 @@ export function ImportadorOneRpm() {
   }, [])
 
   useEffect(() => {
-    if (ehAdmin) void carregarRecentes()
-  }, [ehAdmin, carregarRecentes])
+    if (podeImportar) void carregarRecentes()
+  }, [podeImportar, carregarRecentes])
 
   useEffect(() => () => workerRef.current?.terminate(), [])
 
@@ -195,6 +214,24 @@ export function ImportadorOneRpm() {
     if (file) void enviar(file)
   }
 
+  const excluirImportacao = useCallback(
+    async (imp: Recente) => {
+      const token = await auth.currentUser?.getIdToken()
+      if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+      const res = await fetch('/api/importar/onerpm', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: imp.id }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error ?? 'Não foi possível excluir a importação.')
+      setConfirmarExclusao(null)
+      setAbertoId((atual) => (atual === imp.id ? null : atual))
+      await carregarRecentes()
+    },
+    [carregarRecentes]
+  )
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-ink-400 text-sm py-8">
@@ -203,7 +240,7 @@ export function ImportadorOneRpm() {
     )
   }
 
-  if (!ehAdmin) {
+  if (!podeImportar) {
     return (
       <div className="bg-bg-900 border border-bg-700/40 rounded-xl p-8 flex flex-col items-center text-center">
         <Lock className="w-6 h-6 text-ink-600 mb-3" />
@@ -324,34 +361,134 @@ export function ImportadorOneRpm() {
           </div>
         ) : (
           <div className="divide-y divide-bg-700/30">
-            {recentes.map((imp) => (
-              <div key={imp.id} className="flex items-center gap-4 p-4 hover:bg-bg-800/30 transition-colors">
-                <div className="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-amber-500/15 text-amber-400">
-                  <FileSpreadsheet className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm text-ink-100 truncate">{imp.arquivoNome}</span>
-                    <span className="text-[10px] tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
-                      {imp.status.toUpperCase()}
-                    </span>
+            {recentes.map((imp) => {
+              const aberto = abertoId === imp.id
+              const artistas = imp.artistasDetalhes ?? []
+              const artistasVisiveis = artistas.slice(0, 12)
+              return (
+                <div key={imp.id} className="hover:bg-bg-800/20 transition-colors">
+                  <div className="flex items-center gap-3 p-4">
+                    <button
+                      type="button"
+                      onClick={() => setAbertoId((id) => (id === imp.id ? null : imp.id))}
+                      aria-expanded={aberto}
+                      className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                    >
+                      <div className="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-amber-500/15 text-amber-400">
+                        <FileSpreadsheet className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-ink-100 truncate">{imp.arquivoNome}</span>
+                          <span className="text-[10px] tracking-wider font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                            {imp.status.toUpperCase()}
+                          </span>
+                          <span className="text-[10px] tracking-wider font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300">
+                            {periodoLabel(imp.periodo)}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-ink-500 num mt-0.5">
+                          {fmtInt(imp.artistas)} {imp.artistas === 1 ? 'artista' : 'artistas'}
+                          {imp.artistasCriados > 0 && ` (${fmtInt(imp.artistasCriados)} novos)`} ·{' '}
+                          {fmtTamanho(imp.tamanhoBytes)} · {fmtInt(imp.streams)} streams · {fmtInt(imp.linhas)} linhas
+                        </div>
+                      </div>
+                    </button>
+
+                    <div className="text-right shrink-0 hidden sm:block">
+                      <div className="num text-[13px] font-bold text-emerald-400">{formatarMoedasCompacto(imp.netPorMoeda)}</div>
+                      <div className="text-[11px] text-ink-500 num">{formatarData(imp.criadoEmISO)}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmarExclusao(imp)}
+                      aria-label={`Excluir importação ${imp.arquivoNome}`}
+                      className="w-8 h-8 grid place-items-center rounded-lg text-red-400/70 hover:text-red-300 hover:bg-red-500/10 transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <ChevronDown className={cn('w-4 h-4 text-ink-500 transition-transform shrink-0', aberto && 'rotate-180')} />
                   </div>
-                  <div className="text-[11px] text-ink-500 num mt-0.5">
-                    {fmtInt(imp.artistas)} {imp.artistas === 1 ? 'artista' : 'artistas'}
-                    {imp.artistasCriados > 0 && ` (${fmtInt(imp.artistasCriados)} novos)`} ·{' '}
-                    {fmtTamanho(imp.tamanhoBytes)} · {fmtInt(imp.streams)} streams ·{' '}
-                    {fmtInt(imp.linhas)} linhas
-                  </div>
+
+                  {aberto && (
+                    <div className="px-4 pb-4 pl-16 space-y-4">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                        <MiniKpi label="Mês" valor={periodoLabel(imp.periodo)} />
+                        <MiniKpi label="Lançado" valor={`${formatarDataCurta(imp.periodo.accountedFrom)}–${formatarDataCurta(imp.periodo.accountedTo)}`} />
+                        <MiniKpi label="Líquido" valor={formatarMoedasCompacto(imp.netPorMoeda)} destaque />
+                        <MiniKpi label="Enviado por" valor={imp.criadoPorEmail || '—'} />
+                      </div>
+
+                      {imp.naoAtribuido && (
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-[12px] text-red-200/90">
+                          {fmtInt(imp.naoAtribuido.linhas)} linhas ({fmtInt(imp.naoAtribuido.streams)} streams) ficaram sem artista.
+                        </div>
+                      )}
+
+                      {imp.avisos?.length > 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-[12px] text-amber-200/90 space-y-1">
+                          {imp.avisos.map((aviso, i) => (
+                            <div key={i}>{aviso}</div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase mb-2">
+                          Artistas nesta importação
+                        </div>
+                        {artistas.length ? (
+                          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                            {artistasVisiveis.map((a) => (
+                              <Link
+                                key={a.slug}
+                                href={`/artistas/${a.slug}`}
+                                className="flex items-center justify-between gap-3 rounded-lg bg-bg-950/50 border border-bg-700/35 px-3 py-2 hover:border-violet-500/35 transition-colors"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block text-sm text-ink-100 truncate">{a.nome}</span>
+                                  <span className="block text-[11px] text-ink-500 num">
+                                    {fmtInt(a.streams)} streams
+                                  </span>
+                                </span>
+                                <span className="num text-[12px] text-emerald-400 shrink-0">
+                                  {formatarMoedasCompacto(a.netPorMoeda)}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-ink-500">Detalhe por artista indisponível nesta importação antiga.</div>
+                        )}
+                        {artistas.length > artistasVisiveis.length && (
+                          <div className="text-[12px] text-ink-500 mt-2">
+                            + {fmtInt(artistas.length - artistasVisiveis.length)} artistas no arquivo.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="num text-[13px] font-bold text-emerald-400">{formatarMoedasCompacto(imp.netPorMoeda)}</div>
-                  <div className="text-[11px] text-ink-500 num">{formatarData(imp.criadoEmISO)}</div>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
+
+      {confirmarExclusao && (
+        <ConfirmarAcaoDialog
+          titulo="Excluir importação OneRPM?"
+          descricao={
+            <>
+              Isto remove <b>{confirmarExclusao.arquivoNome}</b> e restaura automaticamente a importação anterior dos artistas afetados,
+              quando existir.
+            </>
+          }
+          labelConfirmar="Excluir importação"
+          onConfirmar={() => excluirImportacao(confirmarExclusao)}
+          onFechar={() => setConfirmarExclusao(null)}
+        />
+      )}
     </div>
   )
 }
@@ -537,6 +674,17 @@ function ResultadoImportacao({ resumo, onFechar }: { resumo: Resumo; onFechar: (
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function MiniKpi({ label, valor, destaque }: { label: string; valor: string; destaque?: boolean }) {
+  return (
+    <div className="rounded-lg bg-bg-950/50 border border-bg-700/35 px-3 py-2 min-w-0">
+      <div className="text-[10px] tracking-wider text-ink-500 font-semibold uppercase">{label}</div>
+      <div className={cn('num text-[12px] truncate mt-0.5', destaque ? 'text-emerald-400 font-bold' : 'text-ink-200')}>
+        {valor}
+      </div>
     </div>
   )
 }

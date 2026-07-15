@@ -216,6 +216,7 @@ export function agregar(rows: OneRpmRawRow[], artistaNome?: string): OneRpmAggre
   const contagemArtista = new Map<string, number>()
   const labels = new Map<string, number>()
   const plataformas = new Map<string, PlataformaAgregada>()
+  const faixasPorPlataforma = new Map<string, Map<string, FaixaAgregada>>()
   const faixas = new Map<string, FaixaAgregada>()
   const territorios = new Map<string, TerritorioAgregado>()
   const meses = new Map<string, MesAgregado>()
@@ -268,6 +269,22 @@ export function agregar(rows: OneRpmRawRow[], artistaNome?: string): OneRpmAggre
     f.streams += r.quantity
     bump(f.grossPorMoeda, moeda, r.gross)
     bump(f.netPorMoeda, moeda, r.net)
+
+    // Faixa dentro da plataforma: permite expandir Spotify/YouTube/etc. por música.
+    let pfMap = faixasPorPlataforma.get(canon.plataforma)
+    if (!pfMap) {
+      pfMap = new Map<string, FaixaAgregada>()
+      faixasPorPlataforma.set(canon.plataforma, pfMap)
+    }
+    let pf = pfMap.get(fkey)
+    if (!pf) {
+      pf = { titulo: r.title, trackId: r.trackId, linhas: 0, streams: 0, grossPorMoeda: {}, netPorMoeda: {} }
+      pfMap.set(fkey, pf)
+    }
+    pf.linhas++
+    pf.streams += r.quantity
+    bump(pf.grossPorMoeda, moeda, r.gross)
+    bump(pf.netPorMoeda, moeda, r.net)
 
     // Território
     const tkey = r.territory || '—'
@@ -354,7 +371,12 @@ export function agregar(rows: OneRpmRawRow[], artistaNome?: string): OneRpmAggre
       grossPorMoeda: totGross,
       netPorMoeda: totNet,
     },
-    porPlataforma: Array.from(plataformas.values()).sort(porNetDesc),
+    porPlataforma: Array.from(plataformas.values())
+      .map((p) => ({
+        ...p,
+        porFaixa: Array.from(faixasPorPlataforma.get(p.plataforma)?.values() ?? []).sort(porNetDesc),
+      }))
+      .sort(porNetDesc),
     porFaixa: Array.from(faixas.values()).sort(porNetDesc),
     porTerritorio: Array.from(territorios.values()).sort(porNetDesc),
     porMes: Array.from(meses.values()).sort((a, b) => a.mes.localeCompare(b.mes)),
@@ -367,6 +389,7 @@ export const NAO_ATRIBUIDO = 'Não atribuído'
 
 /** Um doc do Firestore morre em 1MB, e faixas/países viram cauda longa. */
 const MAX_FAIXAS = 300
+const MAX_FAIXAS_POR_PLATAFORMA = 120
 const MAX_TERRITORIOS = 100
 
 /**
@@ -377,6 +400,10 @@ const MAX_TERRITORIOS = 100
 export function enxugarAgregado<T extends OneRpmAggregate>(agg: T): T {
   return {
     ...agg,
+    porPlataforma: agg.porPlataforma.map((p) => ({
+      ...p,
+      porFaixa: p.porFaixa?.slice(0, MAX_FAIXAS_POR_PLATAFORMA),
+    })),
     porFaixa: agg.porFaixa.slice(0, MAX_FAIXAS),
     porTerritorio: agg.porTerritorio.slice(0, MAX_TERRITORIOS),
   }

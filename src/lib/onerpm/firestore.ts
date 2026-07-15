@@ -3,7 +3,15 @@ import { adminDb } from '@/lib/firebase-admin'
 import { enxugarAgregado, loteIdDe, reconciliarArtistas, type ArtistaRoster } from './aggregate'
 import { onerpmConfig } from './config'
 import { receitaPorPlataformaDisplay } from './display'
-import type { ArtistaImportado, MoneyByCurrency, OneRpmAggregate, OneRpmLote } from './types'
+import type {
+  ArtistaAgregado,
+  ArtistaImportado,
+  MoneyByCurrency,
+  OneRpmAggregate,
+  OneRpmLote,
+  ReceitaArtistaDoc,
+  ReceitaArtistaHistoricoItem,
+} from './types'
 
 /** Líquido por moeda na base configurada (net/gross). Nunca soma moedas. */
 function netExibicao(totais: OneRpmAggregate['totais']): MoneyByCurrency {
@@ -29,6 +37,7 @@ function netExibicao(totais: OneRpmAggregate['totais']): MoneyByCurrency {
 const IMPORTACOES = 'importacoes'
 const ARTISTAS = 'artistas'
 const RECEITAS = 'receitas'
+const RECEITAS_IMPORTADAS = 'receitas-importadas'
 
 /** Limite real do batch é 500 operações; folga pra não estourar. */
 const OPS_POR_BATCH = 400
@@ -42,6 +51,7 @@ export interface ImportMeta {
 
 export interface ImportacaoResumo {
   id: string
+  periodoKey: string
   arquivoNome: string
   tamanhoBytes: number
   fonte: 'onerpm'
@@ -55,9 +65,89 @@ export interface ImportacaoResumo {
   netPorMoeda: MoneyByCurrency
   moedas: string[]
   periodo: OneRpmAggregate['periodo']
+  artistasDetalhes: ArtistaImportado[]
+  pagoTerceirosPorMoeda: MoneyByCurrency
+  naoAtribuido: { linhas: number; streams: number; netPorMoeda: MoneyByCurrency } | null
   avisos: string[]
   criadoEmISO: string | null
   criadoPorEmail: string
+}
+
+export class OneRpmImportacaoError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'OneRpmImportacaoError'
+  }
+}
+
+function tsParaISO(ts: unknown): string | null {
+  return ts instanceof admin.firestore.Timestamp ? ts.toDate().toISOString() : null
+}
+
+function periodoKeyDe(periodo: OneRpmAggregate['periodo']): string {
+  return loteIdDe(periodo)
+}
+
+function novoImportacaoId(periodo: OneRpmAggregate['periodo'], criadoEmMs: number): string {
+  return `${periodoKeyDe(periodo)}_${criadoEmMs}`
+}
+
+function receitaImportadaId(importacaoId: string, slug: string): string {
+  return `${importacaoId}__${slug}`
+}
+
+function receitaDocDe(
+  agg: ArtistaAgregado,
+  rec: { slug: string },
+  meta: ImportMeta,
+  importacaoId: string,
+  periodoKey: string,
+  criadoEmMs: number
+) {
+  return {
+    slug: rec.slug,
+    nome: agg.artistaNome,
+    label: agg.label,
+    fonte: 'onerpm' as const,
+    receitaPorPlataforma: receitaPorPlataformaDisplay(agg),
+    totais: agg.totais,
+    streams: agg.totais.streams,
+    moedas: agg.moedas,
+    periodo: agg.periodo,
+    origens: agg.origens,
+    repassePorMoeda: agg.repassePorMoeda,
+    agregado: enxugarAgregado(agg),
+    configUsada: onerpmConfig,
+    ultimaImportacaoId: importacaoId,
+    periodoKey,
+    arquivoNome: meta.arquivoNome,
+    tamanhoBytes: meta.tamanhoBytes,
+    criadoEmMs,
+    criadoEmISO: new Date(criadoEmMs).toISOString(),
+    criadoPorEmail: meta.email,
+  }
+}
+
+async function rematerializarReceitaAtual(slug: string): Promise<void> {
+  const snap = await adminDb.collection(RECEITAS_IMPORTADAS).where('slug', '==', slug).get()
+  const docs = snap.docs.sort((a, b) => Number(b.data().criadoEmMs ?? 0) - Number(a.data().criadoEmMs ?? 0))
+
+  const receitaRef = adminDb.collection(RECEITAS).doc(slug)
+  if (!docs.length) {
+    await receitaRef.delete()
+    return
+  }
+
+  const receita = docs[0].data().receita
+  if (!receita) {
+    await receitaRef.delete()
+    return
+  }
+
+  await receitaRef.set({
+    ...receita,
+    atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  })
 }
 
 export async function salvarLote(
@@ -66,7 +156,8 @@ export async function salvarLote(
 ): Promise<{ loteId: string; artistas: ArtistaImportado[]; avisos: string[] }> {
   const agora = admin.firestore.FieldValue.serverTimestamp()
   const agoraMs = Date.now()
-  const loteId = loteIdDe(lote.periodo)
+  const periodoKey = periodoKeyDe(lote.periodo)
+  const loteId = novoImportacaoId(lote.periodo, agoraMs)
   const avisos: string[] = []
 
   // O slug da OneRPM pode não ser o slug do roster (o roster tem "Netto Brito"
@@ -118,26 +209,34 @@ export async function salvarLote(
   for (const agg of lote.artistas) {
     const rec = reconciliacao.get(agg.artistaSlug)!
     const receitaRef = adminDb.collection(RECEITAS).doc(rec.slug)
+    const historicoRef = adminDb.collection(RECEITAS_IMPORTADAS).doc(receitaImportadaId(loteId, rec.slug))
     const artistaRef = adminDb.collection(ARTISTAS).doc(rec.slug)
+    const receita = receitaDocDe(agg, rec, meta, loteId, periodoKey, agoraMs)
 
     // Receita (SENSÍVEL): coleção separada, admin-only.
     operacoes.push((b) =>
       b.set(receitaRef, {
-        slug: rec.slug,
-        nome: agg.artistaNome,
-        label: agg.label,
-        fonte: 'onerpm',
-        receitaPorPlataforma: receitaPorPlataformaDisplay(agg), // já no formato que o painel exibe
-        totais: agg.totais,
-        streams: agg.totais.streams,
-        moedas: agg.moedas,
-        periodo: agg.periodo,
-        origens: agg.origens,
-        repassePorMoeda: agg.repassePorMoeda, // fatia do selo, por moeda; JÁ dentro de totais
-        agregado: enxugarAgregado(agg), // p/ recálculo sem reimportar (o cliente já enxuga; aqui é garantia)
-        configUsada: onerpmConfig,
-        ultimaImportacaoId: loteId,
+        ...receita,
         atualizadoEm: agora,
+      })
+    )
+    operacoes.push((b) =>
+      b.set(historicoRef, {
+        importacaoId: loteId,
+        periodoKey,
+        slug: rec.slug,
+        artistaNome: agg.artistaNome,
+        arquivoNome: meta.arquivoNome,
+        tamanhoBytes: meta.tamanhoBytes,
+        label: agg.label,
+        periodo: agg.periodo,
+        netPorMoeda: netExibicao(agg.totais),
+        streams: agg.totais.streams,
+        receita,
+        criadoEm: agora,
+        criadoEmMs: agoraMs,
+        criadoPorUid: meta.uid,
+        criadoPorEmail: meta.email,
       })
     )
 
@@ -171,7 +270,9 @@ export async function salvarLote(
   const importRef = adminDb.collection(IMPORTACOES).doc(loteId)
   operacoes.push((b) =>
     b.set(importRef, {
+      id: loteId,
       fonte: 'onerpm',
+      periodoKey,
       arquivoNome: meta.arquivoNome,
       tamanhoBytes: meta.tamanhoBytes,
       label: lote.label,
@@ -194,6 +295,7 @@ export async function salvarLote(
       avisos: [...lote.avisos, ...avisos],
       configUsada: onerpmConfig,
       criadoEm: agora,
+      criadoEmMs: agoraMs,
       criadoPorUid: meta.uid,
       criadoPorEmail: meta.email,
     })
@@ -214,9 +316,11 @@ export async function listarImportacoes(max = 20): Promise<ImportacaoResumo[]> {
     const x = d.data()
     const ts = x.criadoEm as admin.firestore.Timestamp | undefined
     // Docs antigos eram de um artista só e não tinham `artistas`/`label`.
-    const artistas = Array.isArray(x.artistas) ? x.artistas.length : 1
+    const artistasDetalhes = Array.isArray(x.artistas) ? (x.artistas as ArtistaImportado[]) : []
+    const artistas = artistasDetalhes.length || 1
     return {
       id: d.id,
+      periodoKey: x.periodoKey ?? d.id,
       arquivoNome: x.arquivoNome ?? '',
       tamanhoBytes: x.tamanhoBytes ?? 0,
       fonte: 'onerpm',
@@ -230,9 +334,107 @@ export async function listarImportacoes(max = 20): Promise<ImportacaoResumo[]> {
       netPorMoeda: x.totais?.netPorMoeda ?? {},
       moedas: x.moedas ?? [],
       periodo: x.periodo ?? { transactionMonths: [], accountedFrom: null, accountedTo: null },
+      artistasDetalhes,
+      pagoTerceirosPorMoeda: x.pagoTerceirosPorMoeda ?? {},
+      naoAtribuido: x.naoAtribuido ?? null,
       avisos: x.avisos ?? [],
-      criadoEmISO: ts ? ts.toDate().toISOString() : null,
+      criadoEmISO: ts ? ts.toDate().toISOString() : x.criadoEmMs ? new Date(Number(x.criadoEmMs)).toISOString() : null,
       criadoPorEmail: x.criadoPorEmail ?? '',
     }
   })
+}
+
+function historicoItemDeDoc(d: admin.firestore.QueryDocumentSnapshot): ReceitaArtistaHistoricoItem | null {
+  const x = d.data()
+  const receita = x.receita as ReceitaArtistaDoc | undefined
+  if (!receita) return null
+  const ts = x.criadoEm as admin.firestore.Timestamp | undefined
+  return {
+    ...receita,
+    importacaoId: String(x.importacaoId ?? receita.ultimaImportacaoId ?? d.id),
+    periodoKey: String(x.periodoKey ?? receita.periodoKey ?? ''),
+    arquivoNome: String(x.arquivoNome ?? receita.arquivoNome ?? ''),
+    tamanhoBytes: Number(x.tamanhoBytes ?? receita.tamanhoBytes ?? 0),
+    criadoEmISO: tsParaISO(ts) ?? (x.criadoEmMs ? new Date(Number(x.criadoEmMs)).toISOString() : receita.criadoEmISO ?? null),
+    criadoPorEmail: String(x.criadoPorEmail ?? receita.criadoPorEmail ?? ''),
+  }
+}
+
+export async function listarReceitasArtista(slug: string): Promise<ReceitaArtistaHistoricoItem[]> {
+  const s = (slug ?? '').trim()
+  if (!s) throw new OneRpmImportacaoError('Artista inválido.')
+
+  const snap = await adminDb.collection(RECEITAS_IMPORTADAS).where('slug', '==', s).get()
+  const historico = snap.docs
+    .map(historicoItemDeDoc)
+    .filter((x): x is ReceitaArtistaHistoricoItem => Boolean(x))
+    .sort((a, b) => {
+      const at = a.criadoEmISO ? new Date(a.criadoEmISO).getTime() : 0
+      const bt = b.criadoEmISO ? new Date(b.criadoEmISO).getTime() : 0
+      return bt - at
+    })
+
+  if (historico.length) return historico
+
+  // Compatibilidade: docs antigos só têm o snapshot em `receitas/{slug}`.
+  const atual = await adminDb.collection(RECEITAS).doc(s).get()
+  if (!atual.exists) return []
+  const data = atual.data() as ReceitaArtistaDoc
+  if (!data?.receitaPorPlataforma?.length) return []
+  return [
+    {
+      ...data,
+      importacaoId: data.ultimaImportacaoId ?? 'snapshot-atual',
+      periodoKey: data.periodoKey ?? data.ultimaImportacaoId ?? 'snapshot-atual',
+      arquivoNome: data.arquivoNome ?? 'Importação antiga',
+      tamanhoBytes: data.tamanhoBytes ?? 0,
+      criadoEmISO: data.criadoEmISO ?? tsParaISO(atual.data()?.atualizadoEm),
+      criadoPorEmail: data.criadoPorEmail ?? '',
+    },
+  ]
+}
+
+export async function excluirImportacao(
+  importacaoId: string,
+  meta: { uid: string; email: string }
+): Promise<{ id: string; artistasAfetados: number }> {
+  const id = (importacaoId ?? '').trim()
+  if (!id) throw new OneRpmImportacaoError('Importação inválida.')
+
+  const importRef = adminDb.collection(IMPORTACOES).doc(id)
+  const importSnap = await importRef.get()
+  if (!importSnap.exists) throw new OneRpmImportacaoError('Importação não encontrada.')
+
+  const importData = importSnap.data() ?? {}
+  const artistasDoResumo = Array.isArray(importData.artistas) ? (importData.artistas as ArtistaImportado[]) : []
+  const histSnap = await adminDb.collection(RECEITAS_IMPORTADAS).where('importacaoId', '==', id).get()
+  const slugs = new Set<string>()
+  for (const a of artistasDoResumo) if (a.slug) slugs.add(a.slug)
+  for (const d of histSnap.docs) {
+    const slug = String(d.data().slug ?? '')
+    if (slug) slugs.add(slug)
+  }
+
+  const batch = adminDb.batch()
+  for (const d of histSnap.docs) batch.delete(d.ref)
+  batch.delete(importRef)
+  await batch.commit()
+
+  for (const slug of Array.from(slugs)) {
+    const atual = await adminDb.collection(RECEITAS).doc(slug).get()
+    if (!atual.exists || atual.data()?.ultimaImportacaoId === id) {
+      await rematerializarReceitaAtual(slug)
+    }
+  }
+
+  await adminDb.collection('cadastros').add({
+    fonte: 'exclusao-importacao-onerpm',
+    importacaoId: id,
+    artistasAfetados: slugs.size,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    criadoPorUid: meta.uid,
+    criadoPorEmail: meta.email,
+  })
+
+  return { id, artistasAfetados: slugs.size }
 }

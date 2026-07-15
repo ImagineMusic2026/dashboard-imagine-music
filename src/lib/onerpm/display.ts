@@ -1,6 +1,6 @@
 import type { ReceitaPlataforma } from '@/types'
 import { onerpmConfig, type OneRpmConfig } from './config'
-import type { MoneyByCurrency, OneRpmAggregate } from './types'
+import type { FaixaAgregada, MoneyByCurrency, OneRpmAggregate } from './types'
 
 /**
  * Exibição da receita da OneRPM — SEMPRE na moeda original, nunca convertida nem
@@ -63,12 +63,19 @@ function magnitude(m: MoneyByCurrency): number {
  * a magnitude acima; a receita ao lado sai em cada moeda, exata.
  */
 export function receitaPorPlataformaDisplay(
-  agg: Pick<OneRpmAggregate, 'porPlataforma'>,
+  agg: Pick<OneRpmAggregate, 'porPlataforma'> & Partial<Pick<OneRpmAggregate, 'artistaNome'>>,
   cfg: OneRpmConfig = onerpmConfig
 ): ReceitaPlataforma[] {
   const items = agg.porPlataforma.map((p) => {
     const receitaPorMoeda = valorBase(p.grossPorMoeda, p.netPorMoeda, cfg)
-    return { plataforma: p.plataforma, cor: p.corKey, streams: p.streams, receitaPorMoeda, mag: magnitude(receitaPorMoeda) }
+    return {
+      plataforma: p.plataforma,
+      cor: p.corKey,
+      streams: p.streams,
+      receitaPorMoeda,
+      faixas: receitaPorFaixasAgregadasDisplay(p.porFaixa ?? [], agg.artistaNome ?? '', cfg),
+      mag: magnitude(receitaPorMoeda),
+    }
   })
 
   const totalMag = items.reduce((a, i) => a + i.mag, 0)
@@ -77,6 +84,7 @@ export function receitaPorPlataformaDisplay(
     cor: i.cor,
     streams: i.streams,
     receitaPorMoeda: i.receitaPorMoeda,
+    faixas: i.faixas,
     percentualTotal: totalMag > 0 ? Math.round((i.mag / totalMag) * 100) : 0,
   }))
   out.sort((a, b) => magnitude(b.receitaPorMoeda) - magnitude(a.receitaPorMoeda))
@@ -118,19 +126,14 @@ function chaveMusica(titulo: string, artistaNome: string): string {
   return semAcentoLower(base).replace(/\s+/g, ' ').trim()
 }
 
-/**
- * Receita por MÚSICA (agrupa lançamentos), na moeda original, ordenada por receita.
- * Lê `agg.porFaixa` — que já vem por moeda; some se o artista não tiver faixas.
- * `artistaNome` desgruda o título-longo dos vídeos do nome do artista.
- */
-export function receitaPorFaixaDisplay(
-  agg: Pick<OneRpmAggregate, 'porFaixa'>,
+function receitaPorFaixasAgregadasDisplay(
+  faixas: FaixaAgregada[],
   artistaNome = '',
   cfg: OneRpmConfig = onerpmConfig
 ): FaixaReceita[] {
   const grupos = new Map<string, FaixaReceita>()
 
-  for (const f of agg.porFaixa) {
+  for (const f of faixas) {
     const titulo = (f.titulo ?? '').trim() || '(sem título)'
     const key = chaveMusica(titulo, artistaNome) || semAcentoLower(titulo)
     let g = grupos.get(key)
@@ -151,4 +154,17 @@ export function receitaPorFaixaDisplay(
   return Array.from(grupos.values()).sort(
     (a, b) => magnitude(b.receitaPorMoeda) - magnitude(a.receitaPorMoeda)
   )
+}
+
+/**
+ * Receita por MÚSICA (agrupa lançamentos), na moeda original, ordenada por receita.
+ * Lê `agg.porFaixa` — que já vem por moeda; some se o artista não tiver faixas.
+ * `artistaNome` desgruda o título-longo dos vídeos do nome do artista.
+ */
+export function receitaPorFaixaDisplay(
+  agg: Pick<OneRpmAggregate, 'porFaixa'>,
+  artistaNome = '',
+  cfg: OneRpmConfig = onerpmConfig
+): FaixaReceita[] {
+  return receitaPorFaixasAgregadasDisplay(agg.porFaixa, artistaNome, cfg)
 }

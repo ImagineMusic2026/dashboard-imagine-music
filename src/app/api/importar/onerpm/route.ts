@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { exigirPermissao } from '@/lib/server-auth'
 import { NAO_ATRIBUIDO } from '@/lib/onerpm/aggregate'
-import { listarImportacoes, salvarLote } from '@/lib/onerpm/firestore'
+import { excluirImportacao, listarImportacoes, OneRpmImportacaoError, salvarLote } from '@/lib/onerpm/firestore'
 import type { OneRpmLote } from '@/lib/onerpm/types'
 
 // firebase-admin precisa do runtime Node (não funciona no Edge).
@@ -136,5 +136,28 @@ export async function POST(req: Request) {
       { error: 'A planilha foi lida, mas falhou ao salvar no banco. Tente de novo.' },
       { status: 500 }
     )
+  }
+}
+
+export async function DELETE(req: Request) {
+  const auth = await exigirPermissao(req, 'importar')
+  if (auth instanceof NextResponse) return auth
+
+  let body: { id?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Envio inválido.' }, { status: 400 })
+  }
+
+  try {
+    const res = await excluirImportacao(body.id ?? '', { uid: auth.uid, email: auth.email })
+    return NextResponse.json({ ok: true, ...res })
+  } catch (e) {
+    if (e instanceof OneRpmImportacaoError) {
+      return NextResponse.json({ error: e.message }, { status: 422 })
+    }
+    console.error('[api/importar/onerpm DELETE]', e)
+    return NextResponse.json({ error: 'Não foi possível excluir a importação.' }, { status: 500 })
   }
 }

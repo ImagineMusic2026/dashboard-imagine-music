@@ -115,6 +115,23 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Questionário de estruturação (diagnóstico). Quem RESPONDE é o artista, no
+    // portal — por isso é a única coleção com escrita pelo client fora da agenda.
+    //
+    // O slug vem do CAMINHO, não de um campo do doc: o cliente escreve o corpo, e
+    // confiar num `slug` de dentro dele deixaria o artista gravar no diagnóstico
+    // alheio. `hasOnly` trava o formato — ninguém inventa campo.
+    match /diagnosticos/{slug}/questionarios/{tipo} {
+      allow read: if isStaff() || isArtistaDe(slug);
+      allow create, update: if isArtistaDe(slug)
+        && request.resource.data.keys().hasOnly(
+             ['slug', 'tipo', 'respostas', 'status', 'atualizadoEm', 'enviadoEm'])
+        && request.resource.data.slug == slug
+        && request.resource.data.tipo == tipo
+        && request.resource.data.respostas is map;
+      allow delete: if false;
+    }
+
     // Receita (SENSÍVEL): só quem tem a permissão `verReceita` (admin por padrão;
     // o admin pode conceder a um membro). Escrita só servidor.
     match /receitas/{slug} {

@@ -20,6 +20,7 @@ import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
+import { DiagnosticoArtistaCard } from '@/components/artistas/diagnostico-artista-card'
 import { useAuth } from '@/components/auth/auth-provider'
 import {
   corAvatarDe,
@@ -199,6 +200,9 @@ export function PerfilArtistaReal({
       {/* Projeto — cadastro comercial, SÓ staff (o portal do artista renderiza este
           mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
       <ProjetoArtistaCard slug={a.slug} />
+
+      {/* Diagnóstico — o que o artista respondeu no portal. Também só staff. */}
+      <DiagnosticoArtistaCard slug={a.slug} />
 
       {/* Redes cadastradas */}
       <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">

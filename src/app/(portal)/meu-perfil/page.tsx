@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { getArtista } from '@/lib/artistas/client'
 import { PerfilArtistaReal } from '@/components/artistas/perfil-artista-real'
 import { VincularRedesCard } from '@/components/portal/vincular-redes-card'
+import { DiagnosticoCard } from '@/components/portal/diagnostico-card'
 
 /**
  * Portal do artista: mostra SOMENTE o perfil dele (o slug vem do próprio login,
@@ -48,6 +49,7 @@ export default function MeuPerfilPage() {
   return (
     <div className="space-y-6">
       <VincularRedesCard nome={nome || appUser?.nome || 'Artista'} igHandle={igHandle} />
+      <DiagnosticoCard slug={slug} />
       <PerfilArtistaReal slug={slug} mostrarVoltar={false} />
     </div>
   )

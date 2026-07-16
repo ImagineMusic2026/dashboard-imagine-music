@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { exigirPermissao } from '@/lib/server-auth'
-import { listarReceitasArtista, OneRpmImportacaoError } from '@/lib/onerpm/firestore'
+import { carregarReceitasArtista, OneRpmImportacaoError } from '@/lib/onerpm/firestore'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,8 +14,8 @@ export async function GET(req: Request, { params }: Props) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const historico = await listarReceitasArtista(params.slug)
-    return NextResponse.json({ historico })
+    const { consolidado, historico } = await carregarReceitasArtista(params.slug)
+    return NextResponse.json({ consolidado, historico })
   } catch (e) {
     if (e instanceof OneRpmImportacaoError) {
       return NextResponse.json({ error: e.message }, { status: 422 })

@@ -22,7 +22,7 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { ConfirmarAcaoDialog } from '@/components/configuracoes/confirmar-acao-dialog'
 import { auth } from '@/lib/firebase'
 import { enxugarLote } from '@/lib/onerpm/aggregate'
-import { formatarMoedas, formatarMoedasCompacto } from '@/lib/onerpm/display'
+import { consumoLabel, formatarMoedas, formatarMoedasCompacto, periodoLabel } from '@/lib/onerpm/display'
 import type { EntradaWorker, SaidaWorker } from '@/lib/onerpm/parse.worker'
 import type { ArtistaImportado, MoneyByCurrency, OneRpmAggregate, OneRpmLote } from '@/lib/onerpm/types'
 import { cn } from '@/lib/utils'
@@ -88,14 +88,10 @@ const fmtTamanho = (bytes: number) => {
   return `${bytes}B`
 }
 
-function periodoLabel(periodo: OneRpmAggregate['periodo']): string {
-  const meses = periodo.transactionMonths ?? []
-  if (meses.length) return meses.length === 1 ? meses[0] : `${meses[0]} → ${meses[meses.length - 1]}`
-  if (periodo.accountedFrom || periodo.accountedTo) {
-    return `${formatarDataCurta(periodo.accountedFrom)}–${formatarDataCurta(periodo.accountedTo)}`
-  }
-  return 'sem mês identificado'
-}
+// `periodoLabel`/`consumoLabel` vêm de `display.ts` — o rótulo de um relatório é o
+// mês de LANÇAMENTO ("abr/2026"), não a faixa de consumo. Rotular pelo consumo fazia
+// o arquivo de abril aparecer como "2024-01 → 2026-03", que não diz nada a quem subiu
+// um arquivo chamado "abril".
 
 export function ImportadorOneRpm() {
   const { loading, pode } = useAuth()
@@ -413,8 +409,8 @@ export function ImportadorOneRpm() {
                   {aberto && (
                     <div className="px-4 pb-4 pl-16 space-y-4">
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                        <MiniKpi label="Mês" valor={periodoLabel(imp.periodo)} />
-                        <MiniKpi label="Lançado" valor={`${formatarDataCurta(imp.periodo.accountedFrom)}–${formatarDataCurta(imp.periodo.accountedTo)}`} />
+                        <MiniKpi label="Mês (lançamento)" valor={periodoLabel(imp.periodo)} />
+                        <MiniKpi label="Consumo coberto" valor={consumoLabel(imp.periodo)} />
                         <MiniKpi label="Líquido" valor={formatarMoedasCompacto(imp.netPorMoeda)} destaque />
                         <MiniKpi label="Enviado por" valor={imp.criadoPorEmail || '—'} />
                       </div>

@@ -1,8 +1,9 @@
 import admin from 'firebase-admin'
 import { adminDb } from '@/lib/firebase-admin'
-import { enxugarAgregado, loteIdDe, reconciliarArtistas, type ArtistaRoster } from './aggregate'
+import { enxugarAgregado, loteIdDe, mesclarAgregados, reconciliarArtistas, type ArtistaRoster } from './aggregate'
 import { onerpmConfig } from './config'
 import { receitaPorPlataformaDisplay } from './display'
+import { ID_CONSOLIDADO } from './types'
 import type {
   ArtistaAgregado,
   ArtistaImportado,
@@ -11,6 +12,7 @@ import type {
   OneRpmLote,
   ReceitaArtistaDoc,
   ReceitaArtistaHistoricoItem,
+  ReceitaArtistaPayload,
 } from './types'
 
 /** Líquido por moeda na base configurada (net/gross). Nunca soma moedas. */
@@ -41,6 +43,9 @@ const RECEITAS_IMPORTADAS = 'receitas-importadas'
 
 /** Limite real do batch é 500 operações; folga pra não estourar. */
 const OPS_POR_BATCH = 400
+
+/** Rematerializações simultâneas: cada uma é 1 query + 1 write. */
+const REMATERIALIZAR_POR_VEZ = 10
 
 export interface ImportMeta {
   arquivoNome: string
@@ -128,24 +133,74 @@ function receitaDocDe(
   }
 }
 
+/**
+ * Recalcula `receitas/{slug}` como o CONSOLIDADO de todas as importações do artista.
+ *
+ * Cada relatório da OneRPM é um mês de LANÇAMENTO, e o perfil mostra a SOMA dos meses
+ * importados — não o último arquivo que subiu. (O modelo antigo gravava só o último:
+ * quem importasse jan, fev e mar via só mar, e os outros dois sumiam do painel.)
+ *
+ * Se o mesmo mês foi importado duas vezes (re-envio), só a versão mais recente entra
+ * na soma — senão aquele mês contaria dobrado.
+ *
+ * É a ÚNICA porta de escrita de `receitas/{slug}`: tanto importar quanto excluir
+ * passam por aqui, então o consolidado nunca diverge do histórico.
+ */
 async function rematerializarReceitaAtual(slug: string): Promise<void> {
   const snap = await adminDb.collection(RECEITAS_IMPORTADAS).where('slug', '==', slug).get()
-  const docs = snap.docs.sort((a, b) => Number(b.data().criadoEmMs ?? 0) - Number(a.data().criadoEmMs ?? 0))
-
   const receitaRef = adminDb.collection(RECEITAS).doc(slug)
-  if (!docs.length) {
+
+  // Mais recente primeiro: a identidade e os metadados do doc saem daqui.
+  const versoes = snap.docs
+    .map((d) => d.data())
+    .sort((a, b) => Number(b.criadoEmMs ?? 0) - Number(a.criadoEmMs ?? 0))
+
+  const porPeriodo = new Map<string, admin.firestore.DocumentData>()
+  for (const v of versoes) {
+    const key = String(v.periodoKey ?? v.importacaoId ?? '')
+    if (!porPeriodo.has(key)) porPeriodo.set(key, v)
+  }
+
+  const escolhidas = Array.from(porPeriodo.values())
+  const agregados = escolhidas
+    .map((v) => (v.receita as ReceitaArtistaDoc | undefined)?.agregado as ArtistaAgregado | undefined)
+    .filter((a): a is ArtistaAgregado => Array.isArray(a?.porPlataforma))
+
+  // Sem histórico não há o que consolidar: o artista perdeu toda a receita.
+  if (!agregados.length) {
     await receitaRef.delete()
     return
   }
 
-  const receita = docs[0].data().receita
-  if (!receita) {
-    await receitaRef.delete()
-    return
-  }
+  const mesclado = mesclarAgregados(agregados)
+  const recente = escolhidas[0]
+  const base = (recente.receita ?? {}) as ReceitaArtistaDoc
 
   await receitaRef.set({
-    ...receita,
+    slug,
+    nome: base.nome,
+    label: base.label,
+    fonte: 'onerpm' as const,
+    receitaPorPlataforma: receitaPorPlataformaDisplay(mesclado),
+    totais: mesclado.totais,
+    streams: mesclado.totais.streams,
+    moedas: mesclado.moedas,
+    periodo: mesclado.periodo,
+    origens: mesclado.origens,
+    repassePorMoeda: mesclado.repassePorMoeda,
+    agregado: mesclado,
+    configUsada: onerpmConfig,
+    // Este doc é a SOMA destas importações — uma por mês de lançamento.
+    importacoesIds: escolhidas.map((v) => String(v.importacaoId ?? '')),
+    periodoKeys: Array.from(porPeriodo.keys()).sort(),
+    // Metadados do envio mais recente (o consolidado não tem "um" arquivo).
+    ultimaImportacaoId: String(recente.importacaoId ?? ''),
+    periodoKey: String(recente.periodoKey ?? ''),
+    arquivoNome: String(recente.arquivoNome ?? ''),
+    tamanhoBytes: Number(recente.tamanhoBytes ?? 0),
+    criadoEmMs: Number(recente.criadoEmMs ?? 0),
+    criadoEmISO: recente.criadoEmMs ? new Date(Number(recente.criadoEmMs)).toISOString() : null,
+    criadoPorEmail: String(recente.criadoPorEmail ?? ''),
     atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
   })
 }
@@ -203,23 +258,19 @@ export async function salvarLote(
     }
   })
 
-  // Escreve em blocos: são 2 writes por artista + 1 do lote.
+  // Escreve em blocos: 1 write de histórico por artista + 1 do cadastro + 1 do lote.
   const operacoes: Array<(b: admin.firestore.WriteBatch) => void> = []
 
   for (const agg of lote.artistas) {
     const rec = reconciliacao.get(agg.artistaSlug)!
-    const receitaRef = adminDb.collection(RECEITAS).doc(rec.slug)
     const historicoRef = adminDb.collection(RECEITAS_IMPORTADAS).doc(receitaImportadaId(loteId, rec.slug))
     const artistaRef = adminDb.collection(ARTISTAS).doc(rec.slug)
     const receita = receitaDocDe(agg, rec, meta, loteId, periodoKey, agoraMs)
 
-    // Receita (SENSÍVEL): coleção separada, admin-only.
-    operacoes.push((b) =>
-      b.set(receitaRef, {
-        ...receita,
-        atualizadoEm: agora,
-      })
-    )
+    // Só o HISTÓRICO deste mês é gravado aqui (receita é sensível: coleção separada,
+    // admin-only). `receitas/{slug}` é o consolidado de todos os meses e sai da
+    // rematerialização, no fim — gravar o snapshot deste mês direto ali apagaria os
+    // outros meses, que era exatamente o bug do modelo antigo.
     operacoes.push((b) =>
       b.set(historicoRef, {
         importacaoId: loteId,
@@ -307,6 +358,15 @@ export async function salvarLote(
     await batch.commit()
   }
 
+  // Com o histórico deste mês já gravado, recalcula o consolidado de cada artista.
+  // Em blocos: são ~80 artistas, e disparar tudo de uma vez arriscaria o tempo da
+  // função serverless.
+  for (let i = 0; i < artistas.length; i += REMATERIALIZAR_POR_VEZ) {
+    await Promise.all(
+      artistas.slice(i, i + REMATERIALIZAR_POR_VEZ).map((a) => rematerializarReceitaAtual(a.slug))
+    )
+  }
+
   return { loteId, artistas, avisos }
 }
 
@@ -360,12 +420,23 @@ function historicoItemDeDoc(d: admin.firestore.QueryDocumentSnapshot): ReceitaAr
   }
 }
 
-export async function listarReceitasArtista(slug: string): Promise<ReceitaArtistaHistoricoItem[]> {
+/**
+ * O que o perfil do artista lê: o consolidado (soma dos meses) + cada mês separado.
+ *
+ * O consolidado é o doc `receitas/{slug}`, mantido por `rematerializarReceitaAtual`;
+ * os meses são os docs de `receitas-importadas`. Devolver os dois deixa o card abrir
+ * no total e permitir drilar num mês.
+ */
+export async function carregarReceitasArtista(slug: string): Promise<ReceitaArtistaPayload> {
   const s = (slug ?? '').trim()
   if (!s) throw new OneRpmImportacaoError('Artista inválido.')
 
-  const snap = await adminDb.collection(RECEITAS_IMPORTADAS).where('slug', '==', s).get()
-  const historico = snap.docs
+  const [histSnap, atualSnap] = await Promise.all([
+    adminDb.collection(RECEITAS_IMPORTADAS).where('slug', '==', s).get(),
+    adminDb.collection(RECEITAS).doc(s).get(),
+  ])
+
+  const historico = histSnap.docs
     .map(historicoItemDeDoc)
     .filter((x): x is ReceitaArtistaHistoricoItem => Boolean(x))
     .sort((a, b) => {
@@ -374,24 +445,45 @@ export async function listarReceitasArtista(slug: string): Promise<ReceitaArtist
       return bt - at
     })
 
-  if (historico.length) return historico
+  const atual = atualSnap.exists ? (atualSnap.data() as ReceitaArtistaDoc) : null
 
-  // Compatibilidade: docs antigos só têm o snapshot em `receitas/{slug}`.
-  const atual = await adminDb.collection(RECEITAS).doc(s).get()
-  if (!atual.exists) return []
-  const data = atual.data() as ReceitaArtistaDoc
-  if (!data?.receitaPorPlataforma?.length) return []
-  return [
-    {
-      ...data,
-      importacaoId: data.ultimaImportacaoId ?? 'snapshot-atual',
-      periodoKey: data.periodoKey ?? data.ultimaImportacaoId ?? 'snapshot-atual',
-      arquivoNome: data.arquivoNome ?? 'Importação antiga',
-      tamanhoBytes: data.tamanhoBytes ?? 0,
-      criadoEmISO: data.criadoEmISO ?? tsParaISO(atual.data()?.atualizadoEm),
-      criadoPorEmail: data.criadoPorEmail ?? '',
+  // Compatibilidade: importações anteriores ao versionamento só existem como snapshot
+  // em `receitas/{slug}`. Não há o que consolidar — é a única versão que sobrou.
+  if (!historico.length) {
+    if (!atual?.receitaPorPlataforma?.length) return { consolidado: null, historico: [] }
+    return {
+      consolidado: null,
+      historico: [
+        {
+          ...atual,
+          importacaoId: atual.ultimaImportacaoId ?? 'snapshot-atual',
+          periodoKey: atual.periodoKey ?? atual.ultimaImportacaoId ?? 'snapshot-atual',
+          arquivoNome: atual.arquivoNome ?? 'Importação antiga',
+          tamanhoBytes: atual.tamanhoBytes ?? 0,
+          criadoEmISO: atual.criadoEmISO ?? tsParaISO(atualSnap.data()?.atualizadoEm),
+          criadoPorEmail: atual.criadoPorEmail ?? '',
+        },
+      ],
+    }
+  }
+
+  // Um mês só: o consolidado seria uma cópia dele — não polui o seletor.
+  if (historico.length === 1 || !atual?.receitaPorPlataforma?.length) {
+    return { consolidado: null, historico }
+  }
+
+  return {
+    consolidado: {
+      ...atual,
+      importacaoId: ID_CONSOLIDADO,
+      periodoKey: ID_CONSOLIDADO,
+      arquivoNome: '',
+      tamanhoBytes: 0,
+      criadoEmISO: atual.criadoEmISO ?? null,
+      criadoPorEmail: atual.criadoPorEmail ?? '',
     },
-  ]
+    historico,
+  }
 }
 
 export async function excluirImportacao(
@@ -420,11 +512,13 @@ export async function excluirImportacao(
   batch.delete(importRef)
   await batch.commit()
 
-  for (const slug of Array.from(slugs)) {
-    const atual = await adminDb.collection(RECEITAS).doc(slug).get()
-    if (!atual.exists || atual.data()?.ultimaImportacaoId === id) {
-      await rematerializarReceitaAtual(slug)
-    }
+  // TODO artista afetado é rematerializado, sem exceção: o consolidado soma TODOS os
+  // meses, então excluir março muda o total mesmo que o doc aponte para abril como
+  // importação mais recente. (No modelo antigo, que só guardava o último arquivo,
+  // bastava recalcular quando o excluído era justamente o que estava à mostra.)
+  const afetados = Array.from(slugs)
+  for (let i = 0; i < afetados.length; i += REMATERIALIZAR_POR_VEZ) {
+    await Promise.all(afetados.slice(i, i + REMATERIALIZAR_POR_VEZ).map((s) => rematerializarReceitaAtual(s)))
   }
 
   await adminDb.collection('cadastros').add({

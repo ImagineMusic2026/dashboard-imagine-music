@@ -418,6 +418,153 @@ export function enxugarLote(lote: OneRpmLote): OneRpmLote {
   }
 }
 
+/**
+ * Mescla vários agregados do MESMO artista num consolidado.
+ *
+ * Cada relatório da OneRPM é um mês de LANÇAMENTO — "o que ela pagou em abril" —, e
+ * os meses não se sobrepõem (abril vai de 01 a 30/04). Por isso somar é seguro: o
+ * resultado é o total efetivamente pago no período. O que NÃO é seguro é somar o
+ * mesmo mês duas vezes; quem chama tem de deduplicar por `periodoKey` antes (é o que
+ * `rematerializarReceitaAtual` faz), senão um re-envio conta dobrado.
+ *
+ * Cuidado: um mês de consumo aparece em vários relatórios (o consumo de jan/2026 é
+ * pago em tranches ao longo de meses). Isso não é dupla contagem — são pagamentos
+ * diferentes —, e é justamente o que faz `porMes` virar a linha do tempo real.
+ *
+ * A identidade (nome/slug/label) e os avisos vêm do PRIMEIRO da lista: passe o mais
+ * recente primeiro. Os avisos antigos descrevem um arquivo que não está mais em jogo.
+ */
+export function mesclarAgregados(aggs: ArtistaAgregado[]): ArtistaAgregado {
+  if (!aggs.length) throw new Error('mesclarAgregados: nenhum agregado para mesclar.')
+  if (aggs.length === 1) return enxugarAgregado(aggs[0])
+
+  const base = aggs[0]
+  const plataformas = new Map<string, PlataformaAgregada>()
+  const faixasPorPlataforma = new Map<string, Map<string, FaixaAgregada>>()
+  const faixas = new Map<string, FaixaAgregada>()
+  const territorios = new Map<string, TerritorioAgregado>()
+  const meses = new Map<string, MesAgregado>()
+  const moedasSet = new Set<string>()
+  const transMonths = new Set<string>()
+
+  const totGross: MoneyByCurrency = {}
+  const totNet: MoneyByCurrency = {}
+  const repasse: MoneyByCurrency = {}
+  const origens: Record<OrigemAtribuicao, number> = { conta: 0, performer: 0, canal: 0 }
+  let totLinhas = 0
+  let totStreams = 0
+  let accountedFrom: string | null = null
+  let accountedTo: string | null = null
+
+  const somar = (acc: MoneyByCurrency, m: MoneyByCurrency | undefined) => {
+    for (const [moeda, v] of Object.entries(m ?? {})) bump(acc, moeda, v)
+  }
+
+  /** Mesma chave de faixa usada por `agregar`: o ID da OneRPM, com o título de reserva. */
+  const fundirFaixa = (mapa: Map<string, FaixaAgregada>, f: FaixaAgregada) => {
+    const key = f.trackId || f.titulo
+    let alvo = mapa.get(key)
+    if (!alvo) {
+      alvo = { titulo: f.titulo, trackId: f.trackId, linhas: 0, streams: 0, grossPorMoeda: {}, netPorMoeda: {} }
+      mapa.set(key, alvo)
+    }
+    alvo.linhas += f.linhas
+    alvo.streams += f.streams
+    somar(alvo.grossPorMoeda, f.grossPorMoeda)
+    somar(alvo.netPorMoeda, f.netPorMoeda)
+  }
+
+  for (const agg of aggs) {
+    totLinhas += agg.totais?.linhas ?? 0
+    totStreams += agg.totais?.streams ?? 0
+    somar(totGross, agg.totais?.grossPorMoeda)
+    somar(totNet, agg.totais?.netPorMoeda)
+    somar(repasse, agg.repassePorMoeda)
+    for (const k of ['conta', 'performer', 'canal'] as OrigemAtribuicao[]) origens[k] += agg.origens?.[k] ?? 0
+    for (const m of agg.moedas ?? []) moedasSet.add(m)
+    for (const m of agg.periodo?.transactionMonths ?? []) transMonths.add(m)
+
+    const de = agg.periodo?.accountedFrom ?? null
+    const ate = agg.periodo?.accountedTo ?? null
+    if (de && (!accountedFrom || de < accountedFrom)) accountedFrom = de
+    if (ate && (!accountedTo || ate > accountedTo)) accountedTo = ate
+
+    for (const p of agg.porPlataforma ?? []) {
+      let alvo = plataformas.get(p.plataforma)
+      if (!alvo) {
+        alvo = {
+          plataforma: p.plataforma,
+          corKey: p.corKey,
+          iconeTipo: p.iconeTipo,
+          linhas: 0,
+          streams: 0,
+          grossPorMoeda: {},
+          netPorMoeda: {},
+        }
+        plataformas.set(p.plataforma, alvo)
+      }
+      alvo.linhas += p.linhas
+      alvo.streams += p.streams
+      somar(alvo.grossPorMoeda, p.grossPorMoeda)
+      somar(alvo.netPorMoeda, p.netPorMoeda)
+
+      let pfMap = faixasPorPlataforma.get(p.plataforma)
+      if (!pfMap) {
+        pfMap = new Map<string, FaixaAgregada>()
+        faixasPorPlataforma.set(p.plataforma, pfMap)
+      }
+      for (const f of p.porFaixa ?? []) fundirFaixa(pfMap, f)
+    }
+
+    for (const f of agg.porFaixa ?? []) fundirFaixa(faixas, f)
+
+    for (const t of agg.porTerritorio ?? []) {
+      let alvo = territorios.get(t.territorio)
+      if (!alvo) {
+        alvo = { territorio: t.territorio, streams: 0, netPorMoeda: {} }
+        territorios.set(t.territorio, alvo)
+      }
+      alvo.streams += t.streams
+      somar(alvo.netPorMoeda, t.netPorMoeda)
+    }
+
+    for (const ms of agg.porMes ?? []) {
+      let alvo = meses.get(ms.mes)
+      if (!alvo) {
+        alvo = { mes: ms.mes, streams: 0, netPorMoeda: {} }
+        meses.set(ms.mes, alvo)
+      }
+      alvo.streams += ms.streams
+      somar(alvo.netPorMoeda, ms.netPorMoeda)
+    }
+  }
+
+  const porNetDesc = <T extends { netPorMoeda: MoneyByCurrency }>(a: T, b: T) =>
+    somaMoedas(b.netPorMoeda) - somaMoedas(a.netPorMoeda)
+
+  return enxugarAgregado({
+    fonte: 'onerpm',
+    artistaNome: base.artistaNome,
+    artistaSlug: base.artistaSlug,
+    label: base.label,
+    periodo: { transactionMonths: Array.from(transMonths).sort(), accountedFrom, accountedTo },
+    moedas: Array.from(moedasSet).sort(),
+    totais: { linhas: totLinhas, streams: totStreams, grossPorMoeda: totGross, netPorMoeda: totNet },
+    porPlataforma: Array.from(plataformas.values())
+      .map((p) => ({
+        ...p,
+        porFaixa: Array.from(faixasPorPlataforma.get(p.plataforma)?.values() ?? []).sort(porNetDesc),
+      }))
+      .sort(porNetDesc),
+    porFaixa: Array.from(faixas.values()).sort(porNetDesc),
+    porTerritorio: Array.from(territorios.values()).sort(porNetDesc),
+    porMes: Array.from(meses.values()).sort((a, b) => a.mes.localeCompare(b.mes)),
+    avisos: base.avisos ?? [],
+    origens,
+    repassePorMoeda: repasse,
+  })
+}
+
 const fmtInt = (n: number) => n.toLocaleString('pt-BR')
 
 /**

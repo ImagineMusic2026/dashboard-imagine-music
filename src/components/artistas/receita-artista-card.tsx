@@ -4,11 +4,17 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, DollarSign, Music2 } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import type { ReceitaPlataforma } from '@/types'
+import { ID_CONSOLIDADO } from '@/lib/onerpm/types'
 import type { ReceitaArtistaHistoricoItem } from '@/lib/onerpm/types'
 import type { PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { ReceitaPlataformaItem } from '@/components/artistas/receita-plataforma-item'
-import { formatarMoedas, receitaPorFaixaDisplay, receitaPorPlataformaDisplay } from '@/lib/onerpm/display'
+import {
+  formatarMoedas,
+  periodoLabel,
+  receitaPorFaixaDisplay,
+  receitaPorPlataformaDisplay,
+} from '@/lib/onerpm/display'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 
 /** Líquido − repasse, moeda a moeda. O que efetivamente fica com o artista. */
@@ -35,20 +41,25 @@ function iconeDaPlataforma(nome: string): PlataformaTipo {
 
 type Estado =
   | { tipo: 'carregando' }
-  | { tipo: 'real'; historico: ReceitaArtistaHistoricoItem[] }
+  | { tipo: 'real'; versoes: ReceitaArtistaHistoricoItem[] }
   | { tipo: 'mock' }
-
-function periodoLabel(real: ReceitaArtistaHistoricoItem): string {
-  const meses = real.periodo.transactionMonths ?? []
-  if (meses.length) return meses.length === 1 ? meses[0] : `${meses[0]} → ${meses[meses.length - 1]}`
-  return 'período importado'
-}
 
 function dataCurta(iso: string | null | undefined): string {
   if (!iso) return '—'
   const d = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
+const contaMeses = (h: ReceitaArtistaHistoricoItem) => h.periodoKeys?.length ?? 0
+
+/** Opção do seletor: o consolidado se anuncia como soma; um mês, pelo arquivo. */
+function opcaoLabel(h: ReceitaArtistaHistoricoItem): string {
+  if (h.importacaoId === ID_CONSOLIDADO) {
+    const n = contaMeses(h)
+    return `Consolidado · ${periodoLabel(h.periodo)}${n ? ` · ${n} ${n === 1 ? 'mês' : 'meses'}` : ''}`
+  }
+  return `${periodoLabel(h.periodo)} · ${h.arquivoNome || 'relatório'} · ${dataCurta(h.criadoEmISO)}`
 }
 
 /**
@@ -84,9 +95,13 @@ export function ReceitaArtistaCard({
         const data = await res.json().catch(() => null)
         if (!vivo) return
         const historico = Array.isArray(data?.historico) ? (data.historico as ReceitaArtistaHistoricoItem[]) : []
-        if (res.ok && historico.length) {
-          setEstado({ tipo: 'real', historico })
-          setSelecionadoId(historico[0].importacaoId)
+        const consolidado = (data?.consolidado ?? null) as ReceitaArtistaHistoricoItem | null
+        // O consolidado vem primeiro e abre por padrão: a receita do artista é a soma
+        // dos meses, não o último arquivo que alguém subiu.
+        const versoes = consolidado ? [consolidado, ...historico] : historico
+        if (res.ok && versoes.length) {
+          setEstado({ tipo: 'real', versoes })
+          setSelecionadoId(versoes[0].importacaoId)
         } else {
           setEstado({ tipo: 'mock' })
         }
@@ -114,8 +129,8 @@ export function ReceitaArtistaCard({
     )
   }
 
-  const historico = estado.tipo === 'real' ? estado.historico : []
-  const real = historico.find((h) => h.importacaoId === selecionadoId) ?? historico[0] ?? null
+  const versoes = estado.tipo === 'real' ? estado.versoes : []
+  const real = versoes.find((h) => h.importacaoId === selecionadoId) ?? versoes[0] ?? null
   // A receita por plataforma sai do `agregado` (por moeda). O `receitaPorPlataforma`
   // gravado é fallback pra docs antigos — ele trazia um valor único convertido.
   const items = real
@@ -143,7 +158,7 @@ export function ReceitaArtistaCard({
   const faixas = real?.agregado ? receitaPorFaixaDisplay(real.agregado, real.nome) : []
   const faixasVisiveis = verTodasFaixas ? faixas : faixas.slice(0, 10)
 
-  const periodoAtual = real ? periodoLabel(real) : 'abr/2026'
+  const periodoAtual = real ? periodoLabel(real.periodo) : 'abr/2026'
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
@@ -166,19 +181,21 @@ export function ReceitaArtistaCard({
             </div>
             <div className="text-[12px] text-ink-500 mt-0.5">
               {real
-                ? `Importado da OneRPM · ${real.arquivoNome || 'relatório'} · ${dataCurta(real.criadoEmISO)}`
+                ? real.importacaoId === ID_CONSOLIDADO
+                  ? `Soma de ${contaMeses(real)} meses importados da OneRPM · ${periodoLabel(real.periodo)}`
+                  : `Importado da OneRPM · ${real.arquivoNome || 'relatório'} · ${dataCurta(real.criadoEmISO)}`
                 : 'Dados oficiais de streaming · período de referência: abr/2026'}
             </div>
-            {real && historico.length > 1 && (
+            {real && versoes.length > 1 && (
               <select
                 value={real.importacaoId}
                 onChange={(e) => setSelecionadoId(e.target.value)}
                 className="mt-2 max-w-full bg-bg-800/70 border border-bg-700/50 rounded-lg px-2 py-1.5 text-[12px] text-ink-200 focus:outline-none focus:border-amber-500/40"
                 aria-label="Selecionar importação de receita"
               >
-                {historico.map((h) => (
+                {versoes.map((h) => (
                   <option key={h.importacaoId} value={h.importacaoId}>
-                    {periodoLabel(h)} · {h.arquivoNome || 'relatório'} · {dataCurta(h.criadoEmISO)}
+                    {opcaoLabel(h)}
                   </option>
                 ))}
               </select>

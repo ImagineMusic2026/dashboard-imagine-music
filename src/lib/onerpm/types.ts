@@ -174,6 +174,11 @@ export interface ReceitaArtistaDoc {
   repassePorMoeda?: MoneyByCurrency
   /** Agregado por moeda (fonte da receita por plataforma na exibição). */
   agregado?: OneRpmAggregate
+  /** Importações somadas neste doc — uma por mês de lançamento. */
+  importacoesIds?: string[]
+  /** Meses de lançamento que compõem o consolidado, ex.: ["lote_2026-02", …]. */
+  periodoKeys?: string[]
+  /** Metadados do envio mais recente (um consolidado não tem "um" arquivo). */
   ultimaImportacaoId?: string
   periodoKey?: string
   arquivoNome?: string
@@ -190,5 +195,19 @@ export interface ReceitaArtistaHistoricoItem extends ReceitaArtistaDoc {
   tamanhoBytes: number
   criadoEmISO: string | null
   criadoPorEmail: string
+}
+
+/** `importacaoId` sintético da opção "consolidado" (a soma dos meses) no seletor. */
+export const ID_CONSOLIDADO = 'consolidado'
+
+/**
+ * O que o perfil recebe: a soma de todos os meses + cada mês separado.
+ *
+ * `consolidado` é null quando só existe um mês importado (seria uma cópia dele) ou
+ * quando a receita veio de uma importação anterior ao versionamento.
+ */
+export interface ReceitaArtistaPayload {
+  consolidado: ReceitaArtistaHistoricoItem | null
+  historico: ReceitaArtistaHistoricoItem[]
 }
 

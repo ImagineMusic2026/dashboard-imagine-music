@@ -66,7 +66,9 @@ export function receitaPorPlataformaDisplay(
   agg: Pick<OneRpmAggregate, 'porPlataforma'> & Partial<Pick<OneRpmAggregate, 'artistaNome'>>,
   cfg: OneRpmConfig = onerpmConfig
 ): ReceitaPlataforma[] {
-  const items = agg.porPlataforma.map((p) => {
+  // `?? []`: docs gravados por versões antigas do importador não têm o campo, e o
+  // tipo declara ele obrigatório — o TS não avisa, mas o Firestore devolve undefined.
+  const items = (agg.porPlataforma ?? []).map((p) => {
     const receitaPorMoeda = valorBase(p.grossPorMoeda, p.netPorMoeda, cfg)
     return {
       plataforma: p.plataforma,
@@ -166,5 +168,47 @@ export function receitaPorFaixaDisplay(
   artistaNome = '',
   cfg: OneRpmConfig = onerpmConfig
 ): FaixaReceita[] {
-  return receitaPorFaixasAgregadasDisplay(agg.porFaixa, artistaNome, cfg)
+  // `?? []` pelo mesmo motivo de `receitaPorPlataformaDisplay`: sem isto, um doc
+  // antigo com `agregado` mas sem `porFaixa` derruba o card inteiro num TypeError.
+  return receitaPorFaixasAgregadasDisplay(agg.porFaixa ?? [], artistaNome, cfg)
+}
+
+const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+/** "2026-04" -> "abr/2026". Devolve a entrada crua se não for um "YYYY-MM". */
+function mesLabel(ym: string): string {
+  const [ano, mes] = (ym ?? '').split('-')
+  const nome = MESES_CURTOS[Number(mes) - 1]
+  return nome && ano ? `${nome}/${ano}` : ym
+}
+
+function faixaDeMeses(de: string, ate: string): string {
+  return de === ate ? mesLabel(de) : `${mesLabel(de)} – ${mesLabel(ate)}`
+}
+
+/**
+ * Rótulo de um relatório: o mês de LANÇAMENTO — "o que a OneRPM pagou em abril".
+ *
+ * A distinção importa. O relatório de abril traz consumo desde jan/2024, então
+ * rotulá-lo pela faixa de consumo ("2024-01 → 2026-03") não diz nada a quem acabou
+ * de subir um arquivo chamado "abril". O mês de lançamento é o que identifica o
+ * arquivo, e é dele que sai o `periodoKey`.
+ */
+export function periodoLabel(periodo: OneRpmAggregate['periodo'] | undefined): string {
+  const ym = (s: string | null | undefined) => (s ? s.slice(0, 7) : null)
+  const de = ym(periodo?.accountedFrom)
+  const ate = ym(periodo?.accountedTo)
+  if (de && ate) return faixaDeMeses(de, ate)
+
+  // Sem data de lançamento, o consumo é o melhor que temos.
+  const meses = periodo?.transactionMonths ?? []
+  if (meses.length) return faixaDeMeses(meses[0], meses[meses.length - 1])
+  return 'sem período'
+}
+
+/** Faixa de CONSUMO coberta pelo relatório — contexto, não identidade. */
+export function consumoLabel(periodo: OneRpmAggregate['periodo'] | undefined): string {
+  const meses = periodo?.transactionMonths ?? []
+  if (!meses.length) return '—'
+  return faixaDeMeses(meses[0], meses[meses.length - 1])
 }

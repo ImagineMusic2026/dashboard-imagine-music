@@ -21,6 +21,10 @@ export async function POST(req: Request) {
     youtubeUrl?: string
     instagramUrl?: string
     tiktokUrl?: string
+    contaArtistaSelo?: string
+    emailProjeto?: string
+    servicosPrevistos?: unknown
+    anotacoesGerais?: string
   }
   try {
     body = await req.json()
@@ -37,6 +41,14 @@ export async function POST(req: Request) {
         youtubeUrl: body.youtubeUrl,
         instagramUrl: body.instagramUrl,
         tiktokUrl: body.tiktokUrl,
+        contaArtistaSelo: body.contaArtistaSelo,
+        emailProjeto: body.emailProjeto,
+        // Só strings: o corpo vem do cliente e o Admin SDK rejeita o doc inteiro
+        // se um item vier `undefined`.
+        servicosPrevistos: Array.isArray(body.servicosPrevistos)
+          ? body.servicosPrevistos.filter((s): s is string => typeof s === 'string')
+          : undefined,
+        anotacoesGerais: body.anotacoesGerais,
       },
       { uid: auth.uid, email: auth.email }
     )

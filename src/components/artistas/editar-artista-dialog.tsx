@@ -3,7 +3,14 @@
 import { useState, type FormEvent } from 'react'
 import { AlertTriangle, Loader2, Save, Trash2, X } from 'lucide-react'
 import { auth } from '@/lib/firebase'
-import { INPUT, RedeLabel, GeneroCombobox } from '@/components/artistas/artista-form-fields'
+import {
+  INPUT,
+  RedeLabel,
+  GeneroCombobox,
+  CamposProjeto,
+  projetoDeDoc,
+  type DadosProjeto,
+} from '@/components/artistas/artista-form-fields'
 import type { ArtistaDoc, RedeSocialDoc } from '@/lib/artistas/client'
 
 /** URL inicial do campo: a url salva ou, faltando ela, uma reconstruída do handle/id. */
@@ -48,6 +55,7 @@ export function EditarArtistaDialog({
   const [youtubeUrl, setYoutubeUrl] = useState(urlInicial(artista.redes?.youtube, 'youtube'))
   const [instagramUrl, setInstagramUrl] = useState(urlInicial(artista.redes?.instagram, 'instagram'))
   const [tiktokUrl, setTiktokUrl] = useState(urlInicial(artista.redes?.tiktok, 'tiktok'))
+  const [projeto, setProjeto] = useState<DadosProjeto>(() => projetoDeDoc(artista))
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [confirmando, setConfirmando] = useState(false)
@@ -76,6 +84,7 @@ export function EditarArtistaDialog({
           youtubeUrl,
           instagramUrl,
           tiktokUrl,
+          ...projeto,
         }),
       })
       const data = await res.json().catch(() => null)
@@ -114,8 +123,9 @@ export function EditarArtistaDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-bg-950/70 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-md bg-bg-900 border border-bg-700/50 rounded-2xl shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-bg-700/40">
+      {/* `max-h`/`overflow` porque o bloco Projeto deixou o form mais alto que telas baixas. */}
+      <div className="relative w-full max-w-md max-h-[90vh] flex flex-col bg-bg-900 border border-bg-700/50 rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-bg-700/40 shrink-0">
           <div className="min-w-0">
             <div className="font-bold text-ink-100">Editar artista</div>
             <div className="text-[11px] text-ink-500 num truncate">{artista.slug}</div>
@@ -130,7 +140,7 @@ export function EditarArtistaDialog({
           </button>
         </div>
 
-        <form className="p-5 space-y-4" onSubmit={handleSubmit}>
+        <form className="p-5 space-y-4 overflow-y-auto" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="edit-nome" className="block text-sm font-medium text-ink-300 mb-1.5">
               Nome <span className="text-red-400">*</span>
@@ -210,6 +220,8 @@ export function EditarArtistaDialog({
             <strong className="text-ink-300 font-semibold">Esvazie um campo</strong> de rede para removê-lo do artista.
             Trocar a URL refaz a identificação (re-mapeia o canal/perfil).
           </p>
+
+          <CamposProjeto valor={projeto} onChange={setProjeto} idPrefixo="edit" />
 
           {erro && (
             <div

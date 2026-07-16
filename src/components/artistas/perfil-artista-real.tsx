@@ -19,6 +19,7 @@ import { ConectarPlataforma } from '@/components/artistas/conectar-plataforma'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
+import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
 import { useAuth } from '@/components/auth/auth-provider'
 import {
   corAvatarDe,
@@ -194,6 +195,9 @@ export function PerfilArtistaReal({
       <ReceitaGate>
         <ReceitaArtistaCard slug={a.slug} fallbackItems={[]} />
       </ReceitaGate>
+
+      {/* Projeto — lado comercial do cadastro. Some quando nada foi preenchido. */}
+      <ProjetoArtistaCard artista={a} />
 
       {/* Redes cadastradas */}
       <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">

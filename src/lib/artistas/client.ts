@@ -30,6 +30,14 @@ export interface ArtistaDoc {
     instagram?: RedeSocialDoc | null
     tiktok?: RedeSocialDoc | null
   }
+  /**
+   * Lado COMERCIAL do cadastro (a relação do selo com o artista). Todos opcionais:
+   * artista vindo do roster ou de uma importação de receita não tem nenhum deles.
+   */
+  contaArtistaSelo?: string
+  emailProjeto?: string
+  servicosPrevistos?: string[]
+  anotacoesGerais?: string
 }
 
 /** Resumo de receita (coleção `receitas`, admin-only). */

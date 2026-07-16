@@ -4,7 +4,14 @@ import { useState, type FormEvent } from 'react'
 import { AlertTriangle, Check, Loader2, UserPlus, X } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
-import { INPUT, RedeLabel, GeneroCombobox } from '@/components/artistas/artista-form-fields'
+import {
+  INPUT,
+  RedeLabel,
+  GeneroCombobox,
+  CamposProjeto,
+  PROJETO_VAZIO,
+  type DadosProjeto,
+} from '@/components/artistas/artista-form-fields'
 import { cn } from '@/lib/utils'
 
 type RedeRes = { url: string; id: string | null; handle: string | null } | null
@@ -25,6 +32,7 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [instagramUrl, setInstagramUrl] = useState('')
   const [tiktokUrl, setTiktokUrl] = useState('')
+  const [projeto, setProjeto] = useState<DadosProjeto>(PROJETO_VAZIO)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [resultado, setResultado] = useState<Resultado | null>(null)
@@ -44,7 +52,7 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
       const res = await fetch('/api/artistas/criar', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, genero, spotifyUrl, youtubeUrl, instagramUrl, tiktokUrl }),
+        body: JSON.stringify({ nome, genero, spotifyUrl, youtubeUrl, instagramUrl, tiktokUrl, ...projeto }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Não foi possível salvar o artista.')
@@ -64,6 +72,7 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
     setYoutubeUrl('')
     setInstagramUrl('')
     setTiktokUrl('')
+    setProjeto(PROJETO_VAZIO)
     setResultado(null)
     setErro(null)
   }
@@ -71,8 +80,9 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-bg-950/70 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-md bg-bg-900 border border-bg-700/50 rounded-2xl shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-bg-700/40">
+      {/* `max-h`/`overflow` porque o bloco Projeto deixou o form mais alto que telas baixas. */}
+      <div className="relative w-full max-w-md max-h-[90vh] flex flex-col bg-bg-900 border border-bg-700/50 rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-bg-700/40 shrink-0">
           <div className="font-bold text-ink-100">{resultado ? 'Artista salvo' : 'Adicionar artista'}</div>
           <button
             type="button"
@@ -87,7 +97,7 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
         {resultado ? (
           <ResultadoArtista resultado={resultado} onOutro={adicionarOutro} onConcluir={onClose} />
         ) : (
-          <form className="p-5 space-y-4" onSubmit={handleSubmit}>
+          <form className="p-5 space-y-4 overflow-y-auto" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="art-nome" className="block text-sm font-medium text-ink-300 mb-1.5">
                 Nome <span className="text-red-400">*</span>
@@ -164,6 +174,8 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
               Cole o link do perfil — o sistema extrai sozinho o ID do Spotify e os @ de cada rede. Só o nome é
               obrigatório.
             </p>
+
+            <CamposProjeto valor={projeto} onChange={setProjeto} idPrefixo="novo" />
 
             {erro && (
               <div

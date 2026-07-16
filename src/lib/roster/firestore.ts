@@ -197,7 +197,21 @@ export class ArtistaInputError extends Error {
   }
 }
 
-export interface NovoArtistaInput {
+/**
+ * Lado COMERCIAL do cadastro (a relação do selo com o artista). Espelha o card de
+ * estruturação do Pipefy; nada aqui vem das plataformas.
+ *
+ * `undefined` = campo não veio no envio, preserva o que está gravado.
+ * String vazia / lista vazia = o usuário limpou o campo, apaga.
+ */
+export interface DadosProjetoInput {
+  contaArtistaSelo?: string | null
+  emailProjeto?: string | null
+  servicosPrevistos?: string[] | null
+  anotacoesGerais?: string | null
+}
+
+export interface NovoArtistaInput extends DadosProjetoInput {
   nome: string
   genero?: string | null
   spotifyUrl?: string | null
@@ -219,6 +233,36 @@ export interface ArtistaManualResultado {
     tiktok: RedeSocial | null
   }
   avisos: string[]
+}
+
+/**
+ * Campos do projeto prontos pro merge.
+ *
+ * `undefined` nunca entra — preserva o que está gravado (um cliente antigo pode não
+ * mandar o campo). Vazio só vira `delete` quando `apagarVazio`: na EDIÇÃO limpar o
+ * campo é ação deliberada; na criação, vazio é só "não informou".
+ */
+function camposProjeto(input: DadosProjetoInput, apagarVazio: boolean): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const APAGAR = admin.firestore.FieldValue.delete()
+
+  const texto = (chave: 'contaArtistaSelo' | 'emailProjeto' | 'anotacoesGerais') => {
+    const v = input[chave]
+    if (v === undefined) return
+    const s = (v ?? '').trim()
+    if (s) out[chave] = s
+    else if (apagarVazio) out[chave] = APAGAR
+  }
+  texto('contaArtistaSelo')
+  texto('emailProjeto')
+  texto('anotacoesGerais')
+
+  if (input.servicosPrevistos !== undefined) {
+    const lista = (input.servicosPrevistos ?? []).map((s) => s.trim()).filter(Boolean)
+    if (lista.length) out.servicosPrevistos = lista
+    else if (apagarVazio) out.servicosPrevistos = APAGAR
+  }
+  return out
 }
 
 /**
@@ -264,6 +308,7 @@ export async function salvarArtistaManual(
     slug,
     cadastroAtualizadoEm: agora,
     cadastroPorEmail: meta.email,
+    ...camposProjeto(input, false),
   }
   if (genero) data.genero = genero
   if (Object.keys(redesParaSalvar).length) data.redes = redesParaSalvar
@@ -286,7 +331,7 @@ function mesmaIdentidade(a: RedeSocial, b: RedeSocial): boolean {
   return Boolean(a.url && b.url && a.url === b.url)
 }
 
-export interface AtualizarArtistaInput {
+export interface AtualizarArtistaInput extends DadosProjetoInput {
   slug: string
   nome: string
   genero?: string | null
@@ -339,6 +384,8 @@ export async function atualizarArtistaManual(
     genero: genero ?? admin.firestore.FieldValue.delete(),
     cadastroAtualizadoEm: agora,
     cadastroPorEmail: meta.email,
+    // Aqui vazio APAGA: na edição, limpar o campo é deliberado.
+    ...camposProjeto(input, true),
     // Editar o perfil é exatamente o que o alerta de artista criado pela importação
     // da OneRPM pedia. Some daqui em diante.
     pendenteConfiguracao: admin.firestore.FieldValue.delete(),

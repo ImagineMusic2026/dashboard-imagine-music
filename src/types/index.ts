@@ -76,6 +76,13 @@ export interface ReceitaPlataforma {
   streams: number
   /** Receita por moeda original — nunca somamos moedas diferentes. */
   receitaPorMoeda: Record<string, number>
+  /** Top faixas dentro desta plataforma, quando a importação traz o detalhamento. */
+  faixas?: Array<{
+    titulo: string
+    streams: number
+    receitaPorMoeda: Record<string, number>
+    lancamentos: number
+  }>
   /** Participação no total do artista, por STREAMS (base comparável sem câmbio). */
   percentualTotal: number
   /** @deprecated só p/ mocks antigos que passavam um valor único; a exibição usa `receitaPorMoeda`. */

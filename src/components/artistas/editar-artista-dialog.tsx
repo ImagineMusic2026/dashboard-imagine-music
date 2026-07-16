@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { AlertTriangle, Loader2, Save, Trash2, X } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import {
@@ -8,10 +8,11 @@ import {
   RedeLabel,
   GeneroCombobox,
   CamposProjeto,
+  PROJETO_VAZIO,
   projetoDeDoc,
   type DadosProjeto,
 } from '@/components/artistas/artista-form-fields'
-import type { ArtistaDoc, RedeSocialDoc } from '@/lib/artistas/client'
+import { getProjeto, type ArtistaDoc, type RedeSocialDoc } from '@/lib/artistas/client'
 
 /** URL inicial do campo: a url salva ou, faltando ela, uma reconstruída do handle/id. */
 function urlInicial(
@@ -55,11 +56,34 @@ export function EditarArtistaDialog({
   const [youtubeUrl, setYoutubeUrl] = useState(urlInicial(artista.redes?.youtube, 'youtube'))
   const [instagramUrl, setInstagramUrl] = useState(urlInicial(artista.redes?.instagram, 'instagram'))
   const [tiktokUrl, setTiktokUrl] = useState(urlInicial(artista.redes?.tiktok, 'tiktok'))
-  const [projeto, setProjeto] = useState<DadosProjeto>(() => projetoDeDoc(artista))
+  // O cadastro comercial vive em `projetos/{slug}`, fora do doc do artista (ver
+  // firestore.rules), então carrega em separado.
+  const [projeto, setProjeto] = useState<DadosProjeto>(PROJETO_VAZIO)
+  // Enquanto não carregou, os campos NÃO vão no envio: mandar vazio apagaria o que
+  // está gravado (na edição, vazio é deliberado). Sem isto, salvar rápido demais
+  // — antes do fetch responder — zeraria o projeto do artista.
+  const [projetoCarregado, setProjetoCarregado] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [confirmando, setConfirmando] = useState(false)
   const [excluindo, setExcluindo] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    getProjeto(artista.slug)
+      .then((p) => {
+        if (!vivo) return
+        if (p) setProjeto(projetoDeDoc(p))
+        setProjetoCarregado(true)
+      })
+      // Doc inexistente já resolve como null; erro aqui é falta de permissão ou
+      // rede. Marca como carregado mesmo assim: o form fica utilizável e o envio
+      // só manda o que o usuário digitar.
+      .catch(() => vivo && setProjetoCarregado(true))
+    return () => {
+      vivo = false
+    }
+  }, [artista.slug])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -84,7 +108,8 @@ export function EditarArtistaDialog({
           youtubeUrl,
           instagramUrl,
           tiktokUrl,
-          ...projeto,
+          // Só depois de carregado — ver o comentário em `projetoCarregado`.
+          ...(projetoCarregado ? projeto : {}),
         }),
       })
       const data = await res.json().catch(() => null)

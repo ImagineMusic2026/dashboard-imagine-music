@@ -21,6 +21,8 @@ import type {
 
 const ARTISTAS = 'artistas'
 const CADASTROS = 'cadastros'
+/** Cadastro comercial — separado de `artistas` porque o artista lê o próprio doc. */
+const PROJETOS = 'projetos'
 
 export interface RosterMeta {
   arquivoNome: string
@@ -242,7 +244,7 @@ export interface ArtistaManualResultado {
  * mandar o campo). Vazio só vira `delete` quando `apagarVazio`: na EDIÇÃO limpar o
  * campo é ação deliberada; na criação, vazio é só "não informou".
  */
-function camposProjeto(input: DadosProjetoInput, apagarVazio: boolean): Record<string, unknown> {
+function montarCamposProjeto(input: DadosProjetoInput, apagarVazio: boolean): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   const APAGAR = admin.firestore.FieldValue.delete()
 
@@ -263,6 +265,39 @@ function camposProjeto(input: DadosProjetoInput, apagarVazio: boolean): Record<s
     else if (apagarVazio) out.servicosPrevistos = APAGAR
   }
   return out
+}
+
+/**
+ * Grava o cadastro comercial em `projetos/{slug}` — coleção SEPARADA de `artistas`.
+ *
+ * ⚠️ Não mover estes campos pra `artistas/{slug}`: aquele doc é legível pelo PRÓPRIO
+ * artista no portal (ver firestore.rules), e "anotações gerais" são notas da equipe
+ * SOBRE ele. Regra do Firestore é por documento — não dá pra esconder um campo.
+ * É a mesma razão de a receita morar fora de `artistas`.
+ */
+async function salvarProjetoArtista(
+  slug: string,
+  input: DadosProjetoInput,
+  meta: { uid: string; email: string },
+  apagarVazio: boolean
+): Promise<void> {
+  const campos = montarCamposProjeto(input, apagarVazio)
+  // Nenhum campo veio no envio: não cria doc vazio nem carimba data à toa.
+  if (!Object.keys(campos).length) return
+
+  await adminDb
+    .collection(PROJETOS)
+    .doc(slug)
+    .set(
+      {
+        slug,
+        ...campos,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoPorUid: meta.uid,
+        atualizadoPorEmail: meta.email,
+      },
+      { merge: true }
+    )
 }
 
 /**
@@ -308,7 +343,6 @@ export async function salvarArtistaManual(
     slug,
     cadastroAtualizadoEm: agora,
     cadastroPorEmail: meta.email,
-    ...camposProjeto(input, false),
   }
   if (genero) data.genero = genero
   if (Object.keys(redesParaSalvar).length) data.redes = redesParaSalvar
@@ -320,6 +354,8 @@ export async function salvarArtistaManual(
   }
 
   await ref.set(data, { merge: true })
+  // Vazio aqui é só "não informou" — na criação não há o que apagar.
+  await salvarProjetoArtista(slug, input, meta, false)
 
   return { slug, nome, genero, jaExistia, redes: { spotify, youtube, instagram, tiktok }, avisos }
 }
@@ -384,8 +420,6 @@ export async function atualizarArtistaManual(
     genero: genero ?? admin.firestore.FieldValue.delete(),
     cadastroAtualizadoEm: agora,
     cadastroPorEmail: meta.email,
-    // Aqui vazio APAGA: na edição, limpar o campo é deliberado.
-    ...camposProjeto(input, true),
     // Editar o perfil é exatamente o que o alerta de artista criado pela importação
     // da OneRPM pedia. Some daqui em diante.
     pendenteConfiguracao: admin.firestore.FieldValue.delete(),
@@ -422,6 +456,8 @@ export async function atualizarArtistaManual(
   }
 
   await ref.update(updates)
+  // Aqui vazio APAGA: na edição, limpar o campo é deliberado (igual às redes).
+  await salvarProjetoArtista(slug, input, meta, true)
 
   return { slug, nome, genero, jaExistia: true, redes, avisos }
 }
@@ -449,6 +485,7 @@ export async function excluirArtista(
   await adminDb.recursiveDelete(adminDb.doc(`metricas-sociais/${s}`))
   await Promise.all([
     adminDb.doc(`receitas/${s}`).delete(),
+    adminDb.doc(`${PROJETOS}/${s}`).delete(),
     adminDb.doc(`tiktok-tokens/${s}`).delete(),
     adminDb.doc(`youtube-tokens/${s}`).delete(),
   ])

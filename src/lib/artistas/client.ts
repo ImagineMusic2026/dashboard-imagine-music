@@ -30,10 +30,19 @@ export interface ArtistaDoc {
     instagram?: RedeSocialDoc | null
     tiktok?: RedeSocialDoc | null
   }
-  /**
-   * Lado COMERCIAL do cadastro (a relação do selo com o artista). Todos opcionais:
-   * artista vindo do roster ou de uma importação de receita não tem nenhum deles.
-   */
+}
+
+/**
+ * Lado COMERCIAL do cadastro (`projetos/{slug}`) — conta do selo, e-mail do
+ * projeto, serviços contratados e anotações da equipe.
+ *
+ * Mora numa coleção SEPARADA de `artistas` de propósito, pelo mesmo motivo da
+ * receita: o artista lê o próprio `artistas/{slug}` no portal (ver firestore.rules),
+ * e as "anotações gerais" são notas da equipe SOBRE ele. Regra de documento não
+ * esconde campo — só separar resolve.
+ */
+export interface ProjetoDoc {
+  slug: string
   contaArtistaSelo?: string
   emailProjeto?: string
   servicosPrevistos?: string[]
@@ -134,6 +143,16 @@ export async function listarContasVinculadas(plat: PlataformaRede): Promise<Cont
 export async function getArtista(slug: string): Promise<ArtistaDoc | null> {
   const s = await getDoc(doc(db, 'artistas', slug))
   return s.exists() ? { slug: s.id, ...(s.data() as Omit<ArtistaDoc, 'slug'>) } : null
+}
+
+/**
+ * Cadastro comercial. As regras só liberam STAFF — pro artista logado no portal
+ * isto lança permission-denied, que é exatamente o comportamento desejado. Quem
+ * chama trata como "não tem projeto".
+ */
+export async function getProjeto(slug: string): Promise<ProjetoDoc | null> {
+  const s = await getDoc(doc(db, 'projetos', slug))
+  return s.exists() ? { slug: s.id, ...(s.data() as Omit<ProjetoDoc, 'slug'>) } : null
 }
 
 /** Mapa slug -> resumo de receita. Só admin consegue ler (regras). */

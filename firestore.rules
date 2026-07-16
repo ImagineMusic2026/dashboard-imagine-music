@@ -105,6 +105,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Cadastro COMERCIAL do artista (conta do selo, e-mail do projeto, serviços
+    // contratados, anotações). SÓ STAFF — nunca o artista: as "anotações gerais"
+    // são notas da EQUIPE SOBRE ele, e ele lê o próprio `artistas/{slug}` no portal.
+    // Por isso não mora lá: regra é por documento, não esconde campo. Mesmo motivo
+    // da receita. Escrita só servidor.
+    match /projetos/{slug} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
     // Receita (SENSÍVEL): só quem tem a permissão `verReceita` (admin por padrão;
     // o admin pode conceder a um membro). Escrita só servidor.
     match /receitas/{slug} {

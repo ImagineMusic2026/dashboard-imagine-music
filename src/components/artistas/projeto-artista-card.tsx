@@ -1,21 +1,47 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Briefcase } from 'lucide-react'
-import type { ArtistaDoc } from '@/lib/artistas/client'
+import { useAuth } from '@/components/auth/auth-provider'
+import { ehStaff } from '@/lib/permissions'
+import { getProjeto, type ProjetoDoc } from '@/lib/artistas/client'
 
 /**
- * Bloco "Projeto" do perfil: o lado COMERCIAL do cadastro (conta do selo, e-mail do
- * projeto, serviços contratados, anotações) — espelha o card de estruturação do
- * Pipefy. Não é dado de plataforma e não passa por gate de receita: vive em
- * `artistas/{slug}`, que o time inteiro lê.
+ * Bloco "Projeto" do perfil: o lado COMERCIAL do cadastro — conta do selo, e-mail do
+ * projeto, serviços contratados e anotações da equipe. Espelha o card de estruturação
+ * do Pipefy.
+ *
+ * ⚠️ SÓ STAFF. Este componente vive dentro de `PerfilArtistaReal`, que o portal do
+ * artista (/meu-perfil) renderiza igualzinho — e as "anotações gerais" são notas da
+ * equipe SOBRE o artista. Por isso o dado mora em `projetos/{slug}` (coleção que as
+ * regras negam ao artista) e não em `artistas/{slug}`, que ele lê. O gate abaixo é a
+ * camada de UX; a proteção real é a regra do Firestore.
  *
  * Some inteiro quando nada foi preenchido — a maioria dos artistas veio do roster ou
- * de uma importação e não tem nenhum destes campos.
+ * de uma importação de receita e não tem nenhum destes campos.
  */
-export function ProjetoArtistaCard({ artista }: { artista: ArtistaDoc }) {
-  const servicos = artista.servicosPrevistos ?? []
+export function ProjetoArtistaCard({ slug }: { slug: string }) {
+  const { role, loading } = useAuth()
+  const [projeto, setProjeto] = useState<ProjetoDoc | null>(null)
+  const staff = !loading && ehStaff(role)
+
+  useEffect(() => {
+    if (!staff) return
+    let vivo = true
+    getProjeto(slug)
+      .then((p) => vivo && setProjeto(p))
+      // Sem permissão / offline / doc inexistente: o card simplesmente não aparece.
+      .catch(() => {})
+    return () => {
+      vivo = false
+    }
+  }, [slug, staff])
+
+  if (!staff || !projeto) return null
+
+  const servicos = projeto.servicosPrevistos ?? []
   const temAlgo =
-    Boolean(artista.contaArtistaSelo || artista.emailProjeto || artista.anotacoesGerais) || servicos.length > 0
+    Boolean(projeto.contaArtistaSelo || projeto.emailProjeto || projeto.anotacoesGerais) || servicos.length > 0
   if (!temAlgo) return null
 
   return (
@@ -23,13 +49,16 @@ export function ProjetoArtistaCard({ artista }: { artista: ArtistaDoc }) {
       <div className="px-5 py-4 border-b border-bg-700/30 font-bold text-ink-100 flex items-center gap-2">
         <Briefcase className="w-4 h-4 text-violet-400 shrink-0" />
         Projeto
+        <span className="text-[10px] tracking-wider font-bold text-ink-500 px-2 py-0.5 rounded-full bg-bg-800 border border-bg-700/50">
+          INTERNO
+        </span>
       </div>
 
       <div className="p-5 space-y-4">
-        {(artista.contaArtistaSelo || artista.emailProjeto) && (
+        {(projeto.contaArtistaSelo || projeto.emailProjeto) && (
           <div className="grid sm:grid-cols-2 gap-4">
-            <Email rotulo="Conta do artista (selo)" valor={artista.contaArtistaSelo} />
-            <Email rotulo="E-mail do projeto" valor={artista.emailProjeto} />
+            <Email rotulo="Conta do artista (selo)" valor={projeto.contaArtistaSelo} />
+            <Email rotulo="E-mail do projeto" valor={projeto.emailProjeto} />
           </div>
         )}
 
@@ -49,11 +78,11 @@ export function ProjetoArtistaCard({ artista }: { artista: ArtistaDoc }) {
           </div>
         )}
 
-        {artista.anotacoesGerais && (
+        {projeto.anotacoesGerais && (
           <div>
             <Rotulo>Anotações gerais</Rotulo>
             {/* `whitespace-pre-wrap`: é texto livre, as quebras de linha são do autor. */}
-            <p className="text-[13px] text-ink-300 leading-relaxed whitespace-pre-wrap">{artista.anotacoesGerais}</p>
+            <p className="text-[13px] text-ink-300 leading-relaxed whitespace-pre-wrap">{projeto.anotacoesGerais}</p>
           </div>
         )}
       </div>

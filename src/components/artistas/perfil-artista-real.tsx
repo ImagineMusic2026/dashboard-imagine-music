@@ -196,8 +196,9 @@ export function PerfilArtistaReal({
         <ReceitaArtistaCard slug={a.slug} fallbackItems={[]} />
       </ReceitaGate>
 
-      {/* Projeto — lado comercial do cadastro. Some quando nada foi preenchido. */}
-      <ProjetoArtistaCard artista={a} />
+      {/* Projeto — cadastro comercial, SÓ staff (o portal do artista renderiza este
+          mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
+      <ProjetoArtistaCard slug={a.slug} />
 
       {/* Redes cadastradas */}
       <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">

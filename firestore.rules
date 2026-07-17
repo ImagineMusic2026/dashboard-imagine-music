@@ -132,6 +132,14 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // A página de Alertas varre TODOS os questionários de uma vez pra avisar quando
+    // um artista responde. Query de grupo exige uma regra com prefixo curinga — a
+    // do caminho específico acima não autoriza collectionGroup. Só leitura, só staff;
+    // o artista continua alcançando o próprio pela regra de cima.
+    match /{caminho=**}/questionarios/{tipo} {
+      allow read: if isStaff();
+    }
+
     // Receita (SENSÍVEL): só quem tem a permissão `verReceita` (admin por padrão;
     // o admin pode conceder a um membro). Escrita só servidor.
     match /receitas/{slug} {

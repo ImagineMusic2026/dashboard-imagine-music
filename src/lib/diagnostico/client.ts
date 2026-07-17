@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore'
+import { collectionGroup, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { ehTipoValido, idsValidos, type TipoDiagnostico } from './perguntas'
 
@@ -56,6 +56,41 @@ export async function getDiagnostico(slug: string, tipo: TipoDiagnostico): Promi
     atualizadoEmMs: ms(x.atualizadoEm),
     enviadoEmMs: ms(x.enviadoEm),
   }
+}
+
+/**
+ * Todos os questionários que os artistas já ENVIARAM. Alimenta o alerta que avisa a
+ * equipe — sem isto, o questionário respondido ficava parado no perfil esperando
+ * alguém abrir por acaso.
+ *
+ * Query de GRUPO (varre `questionarios` de todos os slugs): as regras só liberam pra
+ * staff, e pro artista lança permission-denied — que é o esperado, ele nunca chama.
+ * Quem usa trata a falha como lista vazia.
+ *
+ * O filtro de `status` é feito na MEMÓRIA de propósito: `where('status','==',…)` num
+ * collectionGroup exige um índice COLLECTION_GROUP explícito, que não dá pra criar
+ * pelo código (a service account não tem permissão) — e sem ele a query falha, o
+ * `.catch` do chamador engole, e o alerta nunca dispara sem ninguém perceber. Sem o
+ * `where` não há índice a criar, e o custo é ler ~2 docs por artista. Se um dia isso
+ * pesar, o caminho é criar o índice pelo Console e devolver o filtro pra query.
+ */
+export async function listarDiagnosticosEnviados(): Promise<DiagnosticoDoc[]> {
+  const snap = await getDocs(collectionGroup(db, 'questionarios'))
+  return snap.docs
+    .filter((d) => d.data().status === 'enviado')
+    .map((d) => {
+      const x = d.data()
+      return {
+        // O slug é o id do doc-pai (`diagnosticos/{slug}/questionarios/{tipo}`); o
+        // campo `slug` existe e a regra o valida, mas o caminho é a fonte da verdade.
+        slug: d.ref.parent.parent?.id ?? String(x.slug ?? ''),
+        tipo: (x.tipo === 'projeto' ? 'projeto' : 'artista') as TipoDiagnostico,
+        respostas: (x.respostas ?? {}) as Record<string, string>,
+        status: 'enviado' as const,
+        atualizadoEmMs: ms(x.atualizadoEm),
+        enviadoEmMs: ms(x.enviadoEm),
+      }
+    })
 }
 
 /**

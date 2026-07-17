@@ -378,6 +378,48 @@ export function derivarAlertasCadastro(artistas: ArtistaCadastro[]): AlertaDeriv
     )
 }
 
+/** Quanto tempo um questionário enviado fica valendo como alerta. */
+const JANELA_DIAGNOSTICO_DIAS = 14
+
+export interface DiagnosticoEnviado {
+  slug: string
+  tipo: 'projeto' | 'artista'
+  enviadoEmMs: number | null
+}
+
+/**
+ * Avisa a equipe quando um artista ENVIA um questionário de estruturação — é o que
+ * transforma "o dado está lá" em "alguém vai ler".
+ *
+ * Só conta `enviado`: rascunho dispararia alerta enquanto o artista ainda digita.
+ * E só nos últimos 14 dias — este alerta não tem como ser "resolvido" (ler não deixa
+ * marca), então sem janela ele viraria permanente e ensinaria a equipe a ignorar a
+ * tela. Passada a janela, a resposta continua no perfil do artista, onde é o lugar
+ * dela; o que expira é o aviso, não o dado.
+ */
+export function derivarAlertasDiagnostico(
+  enviados: DiagnosticoEnviado[],
+  nomePorSlug: Map<string, string>,
+  agora = Date.now(),
+): AlertaDerivado[] {
+  const rotulo = { projeto: 'Projeto', artista: 'Artista' } as const
+  return enviados
+    .filter((d) => d.enviadoEmMs && agora - d.enviadoEmMs <= JANELA_DIAGNOSTICO_DIAS * DIA)
+    .map((d) =>
+      mk(
+        `diagnostico-${d.slug}-${d.tipo}`,
+        d.slug,
+        nomePorSlug.get(d.slug) ?? d.slug,
+        'oportunidade',
+        'diagnostico_enviado',
+        `Respondeu o questionário de estruturação (${rotulo[d.tipo]}) — as respostas já estão no perfil`,
+        'Ler as respostas',
+        `/artistas/${d.slug}`,
+        d.enviadoEmMs as number,
+      ),
+    )
+}
+
 /** Alerta de SISTEMA (sem artista): a fonte vira o "nome" e o slug é estável. */
 function mkSistema(
   id: string,

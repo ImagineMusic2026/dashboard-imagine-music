@@ -45,12 +45,12 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
   const [link, setLink] = useState<string | null>(null)
   const [copiado, setCopiado] = useState(false)
   /**
-   * O e-mail é OPCIONAL: o convite sempre gera o link, e mandar por e-mail só
-   * queima cota do EmailJS. Padrão desligado para ARTISTA — o combinado com eles é
-   * pelo WhatsApp, que é como o questionário já circulava no Pipefy. Para a equipe
-   * segue ligado, que é o caminho natural de quem tem e-mail corporativo.
+   * O e-mail é OPCIONAL — o convite sempre gera o link —, mas o padrão é ENVIAR,
+   * para qualquer papel: o convite dá acesso ao painel e passa por definir senha,
+   * então o e-mail é o caminho esperado. Desmarcar é a saída pra quem quer só o
+   * link (e não gastar envio do EmailJS).
    */
-  const [porEmail, setPorEmail] = useState(roleInicial !== 'artista')
+  const [porEmail, setPorEmail] = useState(true)
   const [resultadoEmail, setResultadoEmail] = useState<'nao-pedido' | 'enviado' | 'falhou'>('nao-pedido')
 
   async function handleSubmit(e: FormEvent) {
@@ -222,12 +222,7 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
                   <button
                     key={r}
                     type="button"
-                    onClick={() => {
-                      setRole(r)
-                      // O meio de entrega acompanha o papel: artista é WhatsApp,
-                      // equipe é e-mail. Fica visível no checkbox abaixo.
-                      setPorEmail(r !== 'artista')
-                    }}
+                    onClick={() => setRole(r)}
                     className={cn(
                       'px-3 py-2 rounded-lg text-sm font-semibold border transition-colors',
                       role === r

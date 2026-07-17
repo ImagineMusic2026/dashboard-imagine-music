@@ -202,7 +202,7 @@ export function PerfilArtistaReal({
       <ProjetoArtistaCard slug={a.slug} />
 
       {/* Diagnóstico — o que o artista respondeu no portal. Também só staff. */}
-      <DiagnosticoArtistaCard slug={a.slug} />
+      <DiagnosticoArtistaCard slug={a.slug} nome={a.nome} />
 
       {/* Redes cadastradas */}
       <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">

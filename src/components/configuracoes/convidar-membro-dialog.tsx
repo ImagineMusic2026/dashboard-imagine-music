@@ -43,8 +43,15 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
   }, [])
 
   const [link, setLink] = useState<string | null>(null)
-  const [emailEnviado, setEmailEnviado] = useState(false)
   const [copiado, setCopiado] = useState(false)
+  /**
+   * O e-mail é OPCIONAL: o convite sempre gera o link, e mandar por e-mail só
+   * queima cota do EmailJS. Padrão desligado para ARTISTA — o combinado com eles é
+   * pelo WhatsApp, que é como o questionário já circulava no Pipefy. Para a equipe
+   * segue ligado, que é o caminho natural de quem tem e-mail corporativo.
+   */
+  const [porEmail, setPorEmail] = useState(roleInicial !== 'artista')
+  const [resultadoEmail, setResultadoEmail] = useState<'nao-pedido' | 'enviado' | 'falhou'>('nao-pedido')
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -66,19 +73,24 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
       const url = `${window.location.origin}/aceitar-convite?token=${convite.token}`
       setLink(url)
 
-      try {
-        await enviarEmailConvite({
-          toEmail: convite.email,
-          toNome: convite.nome,
-          inviteLink: url,
-          role: convite.role,
-          fromNome: appUser?.nome ?? user.email ?? 'Equipe Imagine',
-        })
-        setEmailEnviado(true)
-      } catch (emailErr) {
-        // Convite já existe; só não conseguimos mandar o e-mail (EmailJS ainda não configurado, etc.)
-        console.warn('[convite] e-mail não enviado:', emailErr)
-        setEmailEnviado(false)
+      // O convite já existe e o link já vale — o e-mail é só um meio de entrega.
+      // Falhar aqui não invalida nada: o link continua na tela pra copiar.
+      if (!porEmail) {
+        setResultadoEmail('nao-pedido')
+      } else {
+        try {
+          await enviarEmailConvite({
+            toEmail: convite.email,
+            toNome: convite.nome,
+            inviteLink: url,
+            role: convite.role,
+            fromNome: appUser?.nome ?? user.email ?? 'Equipe Imagine',
+          })
+          setResultadoEmail('enviado')
+        } catch (emailErr) {
+          console.warn('[convite] e-mail não enviado:', emailErr)
+          setResultadoEmail('falhou')
+        }
       }
     } catch (err) {
       console.error(err)
@@ -122,17 +134,24 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
 
         {sucesso ? (
           <div className="p-5 space-y-4">
+            {/* Três estados distintos: enviado, não pedido (o link é o plano) e
+                falhou (aí sim é aviso). Tratar "não pedido" como falha faria a tela
+                gritar erro numa escolha deliberada. */}
             <div
               className={cn(
                 'text-sm rounded-lg px-4 py-2.5 border',
-                emailEnviado
+                resultadoEmail === 'enviado'
                   ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                  : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                  : resultadoEmail === 'nao-pedido'
+                    ? 'text-ink-300 bg-bg-800/60 border-bg-700/50'
+                    : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
               )}
             >
-              {emailEnviado
-                ? `E-mail de convite enviado para ${email}.`
-                : 'Convite criado, mas não consegui enviar o e-mail automaticamente. Copie o link abaixo e envie manualmente.'}
+              {resultadoEmail === 'enviado' && `E-mail de convite enviado para ${email}.`}
+              {resultadoEmail === 'nao-pedido' &&
+                'Convite pronto. Copie o link abaixo e mande pra pessoa como preferir — WhatsApp, Telegram, o que for.'}
+              {resultadoEmail === 'falhou' &&
+                'Convite criado, mas não consegui enviar o e-mail automaticamente. Copie o link abaixo e envie manualmente.'}
             </div>
 
             <div>
@@ -203,7 +222,12 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
                   <button
                     key={r}
                     type="button"
-                    onClick={() => setRole(r)}
+                    onClick={() => {
+                      setRole(r)
+                      // O meio de entrega acompanha o papel: artista é WhatsApp,
+                      // equipe é e-mail. Fica visível no checkbox abaixo.
+                      setPorEmail(r !== 'artista')
+                    }}
                     className={cn(
                       'px-3 py-2 rounded-lg text-sm font-semibold border transition-colors',
                       role === r
@@ -254,6 +278,35 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
               </div>
             )}
 
+            <div className="rounded-lg border border-bg-700/50 bg-bg-950/60 px-4 py-3">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none group">
+                <input
+                  type="checkbox"
+                  checked={porEmail}
+                  onChange={(e) => setPorEmail(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <span
+                  aria-hidden
+                  className={cn(
+                    'w-4 h-4 rounded border grid place-items-center shrink-0 mt-0.5 transition-colors',
+                    'peer-focus-visible:ring-2 peer-focus-visible:ring-violet-500/40',
+                    porEmail ? 'bg-violet-500 border-violet-500' : 'border-bg-700 group-hover:border-bg-600'
+                  )}
+                >
+                  {porEmail && <Check className="w-3 h-3 text-white" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm text-ink-200">Enviar convite por e-mail</span>
+                  <span className="block text-[11px] text-ink-500 mt-0.5 leading-relaxed">
+                    {porEmail
+                      ? 'O convite chega no e-mail informado. O link também aparece aqui pra copiar.'
+                      : 'Só gera o link — você copia e manda por WhatsApp ou onde preferir. Não consome o envio de e-mail.'}
+                  </span>
+                </span>
+              </label>
+            </div>
+
             {erro && (
               <div
                 role="alert"
@@ -270,7 +323,8 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
               className="w-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
             >
               {enviando && <RefreshCw className="w-4 h-4 animate-spin" />}
-              {enviando ? 'Criando convite...' : 'Criar convite e enviar'}
+              {/* "e enviar" só quando de fato envia — senão o botão promete o que não faz. */}
+              {enviando ? 'Criando convite...' : porEmail ? 'Criar convite e enviar' : 'Criar link do convite'}
             </button>
           </form>
         )}

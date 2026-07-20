@@ -18,12 +18,17 @@ function moedasRelevantes(m: MoneyByCurrency): Array<[string, number]> {
     .sort((a, b) => b[1] - a[1])
 }
 
-/** "US$ 24.432,85  +  R$ 5.275,36". Vazio vira "—". */
-export function formatarMoedas(m: MoneyByCurrency): string {
-  const partes = moedasRelevantes(m).map(
+/** Cada moeda relevante já formatada: ["US$ 24.432,85", "R$ 5.275,36"]. Vazio → []. */
+export function formatarMoedasPartes(m: MoneyByCurrency): string[] {
+  return moedasRelevantes(m).map(
     ([moeda, v]) =>
       `${simbolo(moeda)} ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   )
+}
+
+/** "US$ 24.432,85  +  R$ 5.275,36". Vazio vira "—". */
+export function formatarMoedas(m: MoneyByCurrency): string {
+  const partes = formatarMoedasPartes(m)
   return partes.length ? partes.join('  +  ') : '—'
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown, DollarSign, Music2 } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import type { ReceitaPlataforma } from '@/types'
@@ -9,8 +9,8 @@ import type { ReceitaArtistaHistoricoItem } from '@/lib/onerpm/types'
 import type { PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { ReceitaPlataformaItem } from '@/components/artistas/receita-plataforma-item'
+import { Moedas } from '@/components/artistas/moedas'
 import {
-  formatarMoedas,
   periodoLabel,
   receitaPorFaixaDisplay,
   receitaPorPlataformaDisplay,
@@ -162,8 +162,8 @@ export function ReceitaArtistaCard({
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-      <div className="p-5 flex items-center justify-between border-b border-bg-700/30 gap-4">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-bg-700/30 gap-3 sm:gap-4">
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-lg bg-amber-500/15 grid place-items-center shrink-0">
             <DollarSign className="w-5 h-5 text-amber-400" />
           </div>
@@ -202,14 +202,15 @@ export function ReceitaArtistaCard({
             )}
           </div>
         </div>
-        <div className="text-right shrink-0">
+        <div className="text-left sm:text-right shrink-0">
           <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
             {real ? `Total ${periodoAtual}` : 'Total 30D'}
           </div>
           {real ? (
-            <div className="num text-lg font-bold text-emerald-400 leading-tight">
-              {formatarMoedas(netPorMoeda)}
-            </div>
+            <Moedas
+              m={netPorMoeda}
+              className="block num text-lg font-bold text-emerald-400 leading-tight"
+            />
           ) : (
             <>
               <div className="num text-2xl font-bold text-emerald-400">
@@ -272,9 +273,10 @@ export function ReceitaArtistaCard({
                         {f.lancamentos > 1 && ` · ${f.lancamentos} lançamentos`}
                       </div>
                     </div>
-                    <div className="num text-[13px] font-semibold text-ink-200 shrink-0 text-right">
-                      {formatarMoedas(f.receitaPorMoeda)}
-                    </div>
+                    <Moedas
+                      m={f.receitaPorMoeda}
+                      className="num text-[13px] font-semibold text-ink-200 shrink-0 text-right"
+                    />
                   </div>
                 ))}
               </div>
@@ -298,12 +300,12 @@ export function ReceitaArtistaCard({
           <div className="text-[11px] tracking-wider text-ink-400 font-semibold uppercase">
             Divisão com o selo
           </div>
-          <Linha rotulo="Receita gerada" valor={formatarMoedas(netPorMoeda)} />
-          <Linha rotulo="Repasse à Imagine" valor={`− ${formatarMoedas(repassePorMoeda)}`} sutil />
+          <Linha rotulo="Receita gerada" valor={<Moedas m={netPorMoeda} />} />
+          <Linha rotulo="Repasse à Imagine" valor={<Moedas m={repassePorMoeda} prefixo="− " />} sutil />
           <div className="pt-2 border-t border-bg-700/30">
             <Linha
               rotulo="Fica com o artista"
-              valor={formatarMoedas(subtrairMoedas(netPorMoeda, repassePorMoeda))}
+              valor={<Moedas m={subtrairMoedas(netPorMoeda, repassePorMoeda)} />}
               destaque
             />
           </div>
@@ -329,21 +331,18 @@ function Linha({
   destaque,
 }: {
   rotulo: string
-  valor: string
+  valor: ReactNode
   sutil?: boolean
   destaque?: boolean
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="flex items-start justify-between gap-3 text-sm">
       <span className={destaque ? 'font-semibold text-ink-100' : 'text-ink-400'}>{rotulo}</span>
       <span
-        className={
-          destaque
-            ? 'num font-bold text-emerald-400'
-            : sutil
-              ? 'num text-amber-400/90'
-              : 'num text-ink-200'
-        }
+        className={cn(
+          'num text-right',
+          destaque ? 'font-bold text-emerald-400' : sutil ? 'text-amber-400/90' : 'text-ink-200',
+        )}
       >
         {valor}
       </span>

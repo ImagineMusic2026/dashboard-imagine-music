@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { ReceitaPlataforma } from '@/types'
-import { formatarMoedas } from '@/lib/onerpm/display'
+import { Moedas } from '@/components/artistas/moedas'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 
 type CorMap = {
@@ -73,8 +73,6 @@ export function ReceitaPlataformaItem({ item, icone }: ReceitaPlataformaItemProp
   const [aberto, setAberto] = useState(false)
   const [verTodas, setVerTodas] = useState(false)
   const cores = corMap[item.cor] ?? corMap.gray
-  // Receita por moeda (novo) ou o valor único em R$ dos mocks antigos (fallback).
-  const valor = item.receitaPorMoeda ? formatarMoedas(item.receitaPorMoeda) : formatCurrency(item.receita ?? 0)
   const faixas = item.faixas ?? []
   const faixasVisiveis = verTodas ? faixas : faixas.slice(0, 8)
   const expansivel = faixas.length > 0
@@ -83,7 +81,7 @@ export function ReceitaPlataformaItem({ item, icone }: ReceitaPlataformaItemProp
     <div>
       <div
         className={cn(
-          'flex items-center gap-4 p-4 hover:bg-bg-800/30 transition-colors',
+          'flex items-center gap-3 sm:gap-4 p-4 hover:bg-bg-800/30 transition-colors',
           expansivel && 'cursor-pointer'
         )}
         role={expansivel ? 'button' : undefined}
@@ -112,13 +110,12 @@ export function ReceitaPlataformaItem({ item, icone }: ReceitaPlataformaItemProp
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold text-ink-100">{item.plataforma}</span>
-            <span className="text-ink-500">·</span>
-            <span className="text-[11px] num text-ink-400">
-              {formatNumber(item.streams)} streams
+          <div className="flex items-baseline gap-1.5 text-sm min-w-0">
+            <span className="font-semibold text-ink-100 shrink-0">{item.plataforma}</span>
+            <span className="text-[11px] num text-ink-400 truncate">
+              · {formatNumber(item.streams)} streams
+              {expansivel && ` · ${faixas.length} faixas`}
             </span>
-            {expansivel && <span className="text-[11px] text-ink-500">· {faixas.length} faixas</span>}
           </div>
           <div className="flex items-center gap-2 mt-1.5">
             <div className="flex-1 h-1.5 bg-bg-700 rounded-full overflow-hidden">
@@ -133,8 +130,14 @@ export function ReceitaPlataformaItem({ item, icone }: ReceitaPlataformaItemProp
           </div>
         </div>
 
-        <div className="shrink-0 w-40 text-right">
-          <div className="num text-sm font-bold text-ink-100 leading-tight">{valor}</div>
+        <div className="shrink-0 w-28 sm:w-40 text-right">
+          <div className="num text-sm font-bold text-ink-100 leading-tight">
+            {item.receitaPorMoeda ? (
+              <Moedas m={item.receitaPorMoeda} />
+            ) : (
+              formatCurrency(item.receita ?? 0)
+            )}
+          </div>
         </div>
         {expansivel && (
           <ChevronDown className={cn('w-4 h-4 text-ink-500 transition-transform shrink-0', aberto && 'rotate-180')} />
@@ -153,9 +156,10 @@ export function ReceitaPlataformaItem({ item, icone }: ReceitaPlataformaItemProp
                     {f.lancamentos > 1 && ` · ${f.lancamentos} lançamentos`}
                   </div>
                 </div>
-                <div className="num text-[13px] font-semibold text-ink-200 shrink-0 text-right">
-                  {formatarMoedas(f.receitaPorMoeda)}
-                </div>
+                <Moedas
+                  m={f.receitaPorMoeda}
+                  className="num text-[13px] font-semibold text-ink-200 shrink-0 text-right"
+                />
               </div>
             ))}
           </div>

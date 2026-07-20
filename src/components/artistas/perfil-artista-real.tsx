@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, Loader2, Pencil, Plug } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Loader2, Pencil } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
@@ -231,21 +231,6 @@ export function PerfilArtistaReal({
               </div>
             )
           })}
-        </div>
-      </div>
-
-      {/* Pendente de integração */}
-      <div className="bg-bg-900 border border-dashed border-bg-700/50 rounded-xl p-5 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-bg-800 grid place-items-center shrink-0">
-          <Plug className="w-5 h-5 text-ink-500" />
-        </div>
-        <div>
-          <div className="font-semibold text-ink-200 text-sm">Demais métricas aguardando integração</div>
-          <p className="text-[13px] text-ink-400 mt-0.5 max-w-2xl">
-            Instagram (via Meta), TikTok e YouTube já são coletados (cards acima) e alimentam o
-            Health Score. Spotify entra conforme as próximas integrações forem conectadas. O
-            cadastro de redes acima é a chave pra buscar esses números.
-          </p>
         </div>
       </div>
 

@@ -417,7 +417,7 @@ Template em `.env.example`. `.env.local` é gitignored. Variáveis `NEXT_PUBLIC_
 | `NEXT_PUBLIC_EMAILJS_SERVICE_ID` | EmailJS — convites | Público (cliente) |
 | `NEXT_PUBLIC_EMAILJS_TEMPLATE_ID` | EmailJS template | Público |
 | `NEXT_PUBLIC_EMAILJS_PUBLIC_KEY` | EmailJS public key | Público |
-| `NEXT_PUBLIC_IMAGINE_WHATSAPP` | WhatsApp do portal (formato internacional, só dígitos) | Público |
+| ~~`NEXT_PUBLIC_IMAGINE_WHATSAPP`~~ | Descontinuado — o WhatsApp do portal agora vive no Firestore (`configuracoes/geral`) e o admin edita em Configurações > Perfil | — |
 | `FIREBASE_SERVICE_ACCOUNT` | Admin SDK (JSON inline) | Server-only. **JSON em UMA LINHA** na Vercel. Em dev local: deixar em branco e usar `serviceAccountKey.json` na raiz |
 | `CRON_SECRET` | Bearer auth dos crons | Server-only. String aleatória (ex.: `openssl rand -hex 32`) |
 | `META_APP_ID` | Meta Business app ID | Server-only (Graph API) |

@@ -1,21 +1,36 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
+import { WHATSAPP_VINCULO_PADRAO, getWhatsappVinculo } from '@/lib/configuracoes/client'
 
 /**
  * CTA do portal: o artista solicita a vinculação das redes. Abre o WhatsApp da
  * Imagine (link wa.me) com a mensagem já preenchida — a Imagine recebe e orienta
  * o artista a conceder o acesso. Não envia nada sozinho; é o artista que dispara.
  *
- * O número vem de NEXT_PUBLIC_IMAGINE_WHATSAPP no formato internacional só com
- * dígitos (ex.: 5575991094793). Sem ele, o botão aparece desabilitado.
+ * O número vive no painel (configuracoes/geral, editável pelo admin na aba
+ * Perfil). Começa no padrão de fábrica e, ao ler o Firestore, adota o que o admin
+ * configurou. Sempre há um número — o botão nunca fica sem destino.
  */
-const WHATSAPP = (process.env.NEXT_PUBLIC_IMAGINE_WHATSAPP ?? '').replace(/\D/g, '')
-
 export function VincularRedesCard({ nome, igHandle }: { nome: string; igHandle?: string | null }) {
+  const [whatsapp, setWhatsapp] = useState(WHATSAPP_VINCULO_PADRAO)
+
+  useEffect(() => {
+    let vivo = true
+    getWhatsappVinculo()
+      .then((n) => {
+        if (vivo && n) setWhatsapp(n)
+      })
+      .catch(() => {})
+    return () => {
+      vivo = false
+    }
+  }, [])
+
   const msg = `Olá! Sou ${nome}${igHandle ? ` (@${igHandle})` : ''} e quero vincular minhas redes sociais ao painel da Imagine.`
-  const href = WHATSAPP ? `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}` : null
+  const href = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}` : null
 
   return (
     <div className="bg-gradient-to-br from-fuchsia-500/10 to-bg-900 border border-fuchsia-500/30 rounded-xl p-5">

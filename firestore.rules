@@ -207,6 +207,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Configurações gerais do painel (ex.: `configuracoes/geral` com o WhatsApp
+    // que recebe as solicitações de vínculo do portal). Legível por QUALQUER
+    // membro ativo — o artista precisa do número no portal. Escrita só ADMIN,
+    // direto do painel (aba Perfil das Configurações).
+    match /configuracoes/{doc} {
+      allow read: if isAtivo();
+      allow write: if isAdmin();
+    }
+
     // Agenda (eventos: releases, shows, contratos, reuniões). Dado manual da
     // equipe — quem tem a permissão `agenda` (staff por padrão) lê e escreve
     // direto do client (CRUD do painel). O admin pode tirar de um membro.

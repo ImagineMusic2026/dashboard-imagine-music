@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
-import { Eye, EyeOff, Info, RefreshCw } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Eye, EyeOff, Info, MessageCircle, RefreshCw } from 'lucide-react'
 import { FirebaseError } from 'firebase/app'
 import {
   EmailAuthProvider,
@@ -11,6 +11,12 @@ import {
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { roleMeta } from '@/lib/users'
+import {
+  WHATSAPP_VINCULO_PADRAO,
+  apenasDigitos,
+  getWhatsappVinculo,
+  setWhatsappVinculo,
+} from '@/lib/configuracoes/client'
 import { cn } from '@/lib/utils'
 
 function mensagemErro(err: unknown): string {
@@ -195,6 +201,137 @@ export function PerfilTab() {
           </button>
         </form>
       </div>
+
+      {role === 'admin' && <WhatsappPortalCard />}
+    </div>
+  )
+}
+
+/**
+ * Card SÓ do admin geral: define o WhatsApp que recebe as solicitações de
+ * "Vincular redes" do portal do artista. O número é global (vale pra todo o
+ * painel), por isso mora nas configurações e não no perfil pessoal. Grava em
+ * `configuracoes/geral` — as regras do Firestore garantem que só admin escreve.
+ */
+function WhatsappPortalCard() {
+  const [numero, setNumero] = useState('')
+  const [carregando, setCarregando] = useState(true)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [sucesso, setSucesso] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    getWhatsappVinculo()
+      .then((n) => {
+        if (vivo) setNumero(n ?? WHATSAPP_VINCULO_PADRAO)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (vivo) setCarregando(false)
+      })
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  const digitos = apenasDigitos(numero)
+  const valido = digitos.length >= 12 && digitos.length <= 13
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (salvando || carregando) return
+    setErro(null)
+    setSucesso(false)
+
+    if (!valido) {
+      setErro('Informe o número no formato internacional só com dígitos. Ex.: 5575992101600.')
+      return
+    }
+
+    setSalvando(true)
+    try {
+      await setWhatsappVinculo(digitos)
+      setNumero(digitos)
+      setSucesso(true)
+    } catch {
+      setErro('Não foi possível salvar o número. Tente novamente.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-bg-700/30 flex items-start justify-between gap-3">
+        <div>
+          <div className="font-bold text-ink-100">WhatsApp do portal</div>
+          <div className="text-[12px] text-ink-500">
+            Número que recebe as solicitações de “Vincular redes” enviadas pelos artistas.
+          </div>
+        </div>
+        <span className="shrink-0 text-[10px] tracking-wider font-bold px-2 py-0.5 rounded border bg-violet-500/15 text-violet-300 border-violet-500/30">
+          ADMIN
+        </span>
+      </div>
+
+      <form className="p-5 space-y-4" onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="whatsapp-portal" className="block text-sm font-medium text-ink-300 mb-1.5">
+            Número do WhatsApp
+          </label>
+          <div className="relative">
+            <MessageCircle className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              id="whatsapp-portal"
+              name="whatsapp-portal"
+              type="tel"
+              inputMode="tel"
+              value={numero}
+              onChange={(e) => {
+                setNumero(e.target.value)
+                setSucesso(false)
+              }}
+              disabled={carregando}
+              placeholder="5575992101600"
+              className="w-full bg-bg-950 border border-bg-700/50 rounded-lg pl-10 pr-4 py-2.5 text-sm text-ink-100 num placeholder:text-ink-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:opacity-60"
+            />
+          </div>
+        </div>
+
+        {erro && (
+          <div
+            role="alert"
+            className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5"
+          >
+            {erro}
+          </div>
+        )}
+        {sucesso && (
+          <div
+            role="status"
+            className="text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2.5"
+          >
+            Número salvo. O portal já passa a usar este WhatsApp.
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={salvando || carregando || !valido}
+          aria-busy={salvando}
+          className="w-full sm:w-auto bg-violet-500 hover:bg-violet-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
+        >
+          {salvando ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            'Salvar número'
+          )}
+        </button>
+      </form>
     </div>
   )
 }

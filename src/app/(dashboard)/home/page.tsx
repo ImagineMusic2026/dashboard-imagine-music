@@ -164,30 +164,30 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Saudacao />
-          <p className="text-ink-400 mt-1">
-            Aqui está como o portfólio está hoje.{' '}
-            {alertas.length > 0 ? (
-              <>
-                <span className="text-amber-400 font-semibold num">
-                  {alertas.length} {alertas.length === 1 ? 'alerta' : 'alertas'}
-                </span>{' '}
-                {alertas.length === 1 ? 'precisa' : 'precisam'} da sua atenção.
-              </>
-            ) : (
-              <span className="text-emerald-400 font-semibold">Nenhum alerta aberto.</span>
-            )}
-          </p>
-        </div>
-
-        {atualizadoEm > 0 && (
-          <div className="flex items-center gap-2 shrink-0 text-[12px] text-ink-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Atualizado {tempoRelativo(atualizadoEm)}
-          </div>
-        )}
+      <div>
+        <Saudacao
+          right={
+            atualizadoEm > 0 ? (
+              <div className="flex items-center gap-2 shrink-0 text-[12px] text-ink-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="whitespace-nowrap">Atualizado {tempoRelativo(atualizadoEm)}</span>
+              </div>
+            ) : null
+          }
+        />
+        <p className="text-sm sm:text-base text-ink-400 mt-1">
+          Aqui está como o portfólio está hoje.{' '}
+          {alertas.length > 0 ? (
+            <>
+              <span className="text-amber-400 font-semibold num">
+                {alertas.length} {alertas.length === 1 ? 'alerta' : 'alertas'}
+              </span>{' '}
+              {alertas.length === 1 ? 'precisa' : 'precisam'} da sua atenção.
+            </>
+          ) : (
+            <span className="text-emerald-400 font-semibold">Nenhum alerta aberto.</span>
+          )}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

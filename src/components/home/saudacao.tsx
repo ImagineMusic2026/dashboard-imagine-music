@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
 
 function saudacaoPorHora(h: number): string {
@@ -25,7 +25,7 @@ const MESES = [
   'DEZEMBRO',
 ]
 
-export function Saudacao() {
+export function Saudacao({ right }: { right?: ReactNode }) {
   const { user, appUser } = useAuth()
   // `agora` só é definido no cliente (evita mismatch de hidratação com a hora/data do servidor).
   const [agora, setAgora] = useState<Date | null>(null)
@@ -52,10 +52,13 @@ export function Saudacao() {
 
   return (
     <>
-      <div className="text-[11px] tracking-[0.18em] text-ink-400 font-semibold mb-2">
-        {dataLabel}
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="text-[11px] tracking-[0.18em] text-ink-400 font-semibold min-w-0 truncate">
+          {dataLabel}
+        </div>
+        {right}
       </div>
-      <h1 className="text-3xl font-bold text-ink-100">
+      <h1 className="text-2xl sm:text-3xl font-bold text-ink-100">
         {saudacao}
         {primeiroNome ? `, ${primeiroNome}` : ''}.
       </h1>

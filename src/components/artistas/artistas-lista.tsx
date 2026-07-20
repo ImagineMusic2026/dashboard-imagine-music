@@ -6,7 +6,6 @@ import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRig
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { CriarArtistaDialog } from '@/components/artistas/criar-artista-dialog'
-import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import {
   corAvatarDe,
@@ -23,6 +22,7 @@ import { derivarAlertas } from '@/lib/alertas/derivar'
 import { Sparkline } from '@/components/artistas/sparkline'
 import { MarqueeValor } from '@/components/artistas/marquee-valor'
 import { formatarMoedasCompacto, periodoLabel } from '@/lib/onerpm/display'
+import { corBarraAcesso, nivelAcesso, type NivelAcesso } from '@/lib/artistas/acesso'
 import { cn, formatNumber, getHealthColor, getHealthGradient } from '@/lib/utils'
 
 /**
@@ -40,14 +40,30 @@ function dadosReceita(r: ReceitaResumo | undefined) {
   }
 }
 
-const REDES: { tipo: PlataformaTipo; cor: string; get: (a: ArtistaDoc) => boolean }[] = [
-  { tipo: 'spotify', cor: 'text-emerald-400', get: (a) => !!a.redes?.spotify?.url },
-  { tipo: 'youtube', cor: 'text-red-400', get: (a) => !!a.redes?.youtube?.url },
-  { tipo: 'instagram', cor: 'text-fuchsia-400', get: (a) => !!a.redes?.instagram?.url },
-  { tipo: 'tiktok', cor: 'text-cyan-400', get: (a) => !!a.redes?.tiktok?.url },
-]
-
 const TH = 'text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-4'
+
+/**
+ * Nível de acesso/integração do artista, compacto pra célula da lista: mini-barra
+ * + "conectadas/integráveis" + tooltip com o status de cada rede. A régua vive em
+ * `@/lib/artistas/acesso` (mesma do card do perfil).
+ */
+function AcessoCelula({ nivel }: { nivel: NivelAcesso }) {
+  const pct = Math.round(nivel.pct * 100)
+  const titulo = nivel.canais.map((c) => `${c.nome}: ${c.rotulo}`).join(' · ')
+  return (
+    <div className="flex items-center gap-2" title={titulo}>
+      <div className="w-16 h-1.5 rounded-full bg-bg-700/60 overflow-hidden shrink-0">
+        <div
+          className={cn('h-full rounded-full bg-gradient-to-r', corBarraAcesso(nivel.pct, nivel.totalIntegravel))}
+          style={{ width: `${nivel.totalIntegravel ? Math.max(6, pct) : 0}%` }}
+        />
+      </div>
+      <span className="text-[10px] num text-ink-500 shrink-0">
+        {nivel.totalIntegravel ? `${nivel.conectados}/${nivel.totalIntegravel}` : '—'}
+      </span>
+    </div>
+  )
+}
 
 const POR_PAGINA = 15
 
@@ -381,7 +397,7 @@ export function ArtistasLista() {
                   <ThOrdenavel coluna="health" label="Health" sort={sort} onOrdenar={aoOrdenar} />
                   <th className={cn(TH, 'text-left')}>Tendência</th>
                   <ThOrdenavel coluna="audiencia" label="Audiência" align="right" sort={sort} onOrdenar={aoOrdenar} />
-                  <th className={cn(TH, 'text-left')}>Redes</th>
+                  <th className={cn(TH, 'text-left')}>Acesso</th>
                   <ReceitaGate>
                     <ThOrdenavel coluna="receita" label="Receita" align="right" sort={sort} onOrdenar={aoOrdenar} />
                   </ReceitaGate>
@@ -441,20 +457,7 @@ export function ArtistasLista() {
                       </td>
 
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          {REDES.map(({ tipo, cor, get }) => {
-                            const tem = get(a)
-                            return (
-                              <span
-                                key={tipo}
-                                title={`${tipo}${tem ? '' : ' (sem link)'}`}
-                                className={cn('w-4 h-4 block', tem ? cor : 'text-ink-700')}
-                              >
-                                <PlataformaIcon tipo={tipo} />
-                              </span>
-                            )
-                          })}
-                        </div>
+                        <AcessoCelula nivel={nivelAcesso(a.redes, metricas.get(a.slug))} />
                       </td>
 
                       <ReceitaGate>
@@ -590,12 +593,8 @@ export function ArtistasLista() {
                         {nAlertas} {nAlertas === 1 ? 'alerta' : 'alertas'}
                       </span>
                     )}
-                    <span className="flex items-center gap-2 ml-auto">
-                      {REDES.map(({ tipo, cor, get }) => (
-                        <span key={tipo} className={cn('w-4 h-4 block', get(a) ? cor : 'text-ink-700')}>
-                          <PlataformaIcon tipo={tipo} />
-                        </span>
-                      ))}
+                    <span className="ml-auto">
+                      <AcessoCelula nivel={nivelAcesso(a.redes, metricas.get(a.slug))} />
                     </span>
                   </div>
                   {ehAdmin &&

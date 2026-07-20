@@ -21,6 +21,7 @@ import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
 import { DiagnosticoArtistaCard } from '@/components/artistas/diagnostico-artista-card'
+import { AcessoIntegracoesCard } from '@/components/artistas/acesso-integracoes-card'
 import { useAuth } from '@/components/auth/auth-provider'
 import {
   corAvatarDe,
@@ -204,35 +205,9 @@ export function PerfilArtistaReal({
       {/* Diagnóstico — o que o artista respondeu no portal. Também só staff. */}
       <DiagnosticoArtistaCard slug={a.slug} nome={a.nome} />
 
-      {/* Redes cadastradas */}
-      <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-bg-700/30 font-bold text-ink-100">Redes sociais</div>
-        <div className="divide-y divide-bg-700/30">
-          {LINKS.map((l) => {
-            const rede = l.get(a)
-            return (
-              <div key={l.tipo} className="flex items-center gap-3 px-5 py-3">
-                <span className={cn('w-5 h-5 block shrink-0', rede?.url ? l.cor : 'text-ink-700')}>
-                  <PlataformaIcon tipo={l.tipo} />
-                </span>
-                <span className="text-sm text-ink-200 w-24 shrink-0">{l.nome}</span>
-                {rede?.url ? (
-                  <a
-                    href={rede.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[12px] num text-violet-400 hover:text-violet-300 truncate"
-                  >
-                    {rede.handle ? `@${rede.handle}` : rede.id ? `id: ${rede.id}` : rede.url}
-                  </a>
-                ) : (
-                  <span className="text-[12px] text-ink-600">— sem link</span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      {/* Acesso & integrações — substitui o antigo "Redes sociais": nível de
+          integração (barra) + status por rede, mantendo os @handles/links. */}
+      <AcessoIntegracoesCard artista={a} />
 
       {editando && ehAdmin && (
         <EditarArtistaDialog

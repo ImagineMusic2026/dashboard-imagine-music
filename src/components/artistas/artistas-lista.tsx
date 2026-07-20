@@ -148,7 +148,8 @@ export function ArtistasLista() {
   const [metricas, setMetricas] = useState<Map<string, MetricasSociaisDoc>>(new Map())
   const [erro, setErro] = useState(false)
   const [busca, setBusca] = useState('')
-  const [sort, setSort] = useState<EstadoSort>({ coluna: null, dir: 'asc' })
+  // Padrão: maior audiência primeiro (a cliente pediu o roster ordenado por alcance).
+  const [sort, setSort] = useState<EstadoSort>({ coluna: 'audiencia', dir: 'desc' })
   const [pagina, setPagina] = useState(1)
   const [dialogAberto, setDialogAberto] = useState(false)
   const [histHealth, setHistHealth] = useState<Map<string, number[]>>(new Map())

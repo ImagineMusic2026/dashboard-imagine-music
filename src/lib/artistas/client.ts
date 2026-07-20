@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import type { OneRpmAggregate } from '@/lib/onerpm/types'
 
 /**
  * Leitura client (Firestore) dos artistas REAIS — o que veio das planilhas.
@@ -55,6 +56,16 @@ export interface ReceitaResumo {
   /** Líquido por moeda original — não somamos moedas; a lista ordena por streams. */
   netPorMoeda: Record<string, number>
   streams: number
+  /**
+   * Receita do mês de lançamento mais recente (a lista mostra o MÊS, não o total).
+   * Ausente em docs ainda não migrados pelo backfill — a lista cai no total nesse caso.
+   */
+  ultimoMes?: {
+    periodoKey: string
+    periodo: OneRpmAggregate['periodo']
+    netPorMoeda: Record<string, number>
+    streams: number
+  } | null
 }
 
 const PALETA = [
@@ -161,10 +172,19 @@ export async function listarReceitas(): Promise<Map<string, ReceitaResumo>> {
   const m = new Map<string, ReceitaResumo>()
   snap.docs.forEach((d) => {
     const x = d.data()
+    const um = x.ultimoMes
     m.set(d.id, {
       slug: d.id,
       netPorMoeda: (x.totais?.netPorMoeda ?? {}) as Record<string, number>,
       streams: Number(x.streams ?? 0),
+      ultimoMes: um
+        ? {
+            periodoKey: String(um.periodoKey ?? ''),
+            periodo: um.periodo ?? { transactionMonths: [], accountedFrom: null, accountedTo: null },
+            netPorMoeda: (um.netPorMoeda ?? {}) as Record<string, number>,
+            streams: Number(um.streams ?? 0),
+          }
+        : null,
     })
   })
   return m

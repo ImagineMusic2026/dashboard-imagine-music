@@ -22,8 +22,23 @@ import { derivarHealthScores } from '@/lib/health/score'
 import { derivarAlertas } from '@/lib/alertas/derivar'
 import { Sparkline } from '@/components/artistas/sparkline'
 import { MarqueeValor } from '@/components/artistas/marquee-valor'
-import { formatarMoedasCompacto } from '@/lib/onerpm/display'
+import { formatarMoedasCompacto, periodoLabel } from '@/lib/onerpm/display'
 import { cn, formatNumber, getHealthColor, getHealthGradient } from '@/lib/utils'
+
+/**
+ * O que a coluna de receita mostra: a receita do MÊS mais recente (pedido da
+ * cliente). Docs ainda não migrados pelo backfill não têm `ultimoMes` — aí cai no
+ * total consolidado, sem rótulo de mês.
+ */
+function dadosReceita(r: ReceitaResumo | undefined) {
+  if (!r) return null
+  const mes = r.ultimoMes
+  return {
+    valor: mes?.netPorMoeda ?? r.netPorMoeda,
+    streams: mes?.streams ?? r.streams,
+    mesLabel: mes?.periodo ? periodoLabel(mes.periodo) : null,
+  }
+}
 
 const REDES: { tipo: PlataformaTipo; cor: string; get: (a: ArtistaDoc) => boolean }[] = [
   { tipo: 'spotify', cor: 'text-emerald-400', get: (a) => !!a.redes?.spotify?.url },
@@ -215,9 +230,12 @@ export function ArtistasLista() {
           return saude?.score ?? null
         case 'audiencia':
           return saude && saude.seguidoresTotal > 0 ? saude.seguidoresTotal : null
-        case 'receita':
+        case 'receita': {
           // Sem câmbio no painel (moedas não somam) — ordena por streams, que é comparável.
-          return receitas.get(a.slug)?.streams ?? null
+          // Pelo MÊS mais recente quando existe (migrado); senão pelo total.
+          const rr = receitas.get(a.slug)
+          return rr?.ultimoMes?.streams ?? rr?.streams ?? null
+        }
         case 'alertas':
           return alertasPorSlug.get(a.slug) ?? 0
       }
@@ -441,17 +459,24 @@ export function ArtistasLista() {
 
                       <ReceitaGate>
                         <td className="px-4 py-3 text-right">
-                          {r ? (
-                            <div>
-                              <MarqueeValor
-                                texto={formatarMoedasCompacto(r.netPorMoeda)}
-                                className="num text-sm font-semibold text-emerald-400 max-w-[8rem] ml-auto"
-                              />
-                              <div className="text-[11px] num text-ink-500">{formatNumber(r.streams)} streams</div>
-                            </div>
-                          ) : (
-                            <span className="text-ink-600 num text-sm">—</span>
-                          )}
+                          {(() => {
+                            const rec = dadosReceita(r)
+                            return rec ? (
+                              <div>
+                                <MarqueeValor
+                                  texto={formatarMoedasCompacto(rec.valor)}
+                                  className="num text-sm font-semibold text-emerald-400 max-w-[8rem] ml-auto"
+                                />
+                                <div className="text-[11px] num text-ink-500">
+                                  {rec.mesLabel && <span className="text-ink-400">{rec.mesLabel}</span>}
+                                  {rec.mesLabel ? ' · ' : ''}
+                                  {formatNumber(rec.streams)} streams
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-ink-600 num text-sm">—</span>
+                            )
+                          })()}
                         </td>
                       </ReceitaGate>
 
@@ -573,12 +598,19 @@ export function ArtistasLista() {
                       ))}
                     </span>
                   </div>
-                  {ehAdmin && r && (
-                    <div className="mt-2 text-[12px] num text-emerald-400">
-                      {formatarMoedasCompacto(r.netPorMoeda)}{' '}
-                      <span className="text-ink-500">· {formatNumber(r.streams)} streams</span>
-                    </div>
-                  )}
+                  {ehAdmin &&
+                    (() => {
+                      const rec = dadosReceita(r)
+                      return rec ? (
+                        <div className="mt-2 text-[12px] num text-emerald-400">
+                          {formatarMoedasCompacto(rec.valor)}{' '}
+                          <span className="text-ink-500">
+                            · {rec.mesLabel ? `${rec.mesLabel} · ` : ''}
+                            {formatNumber(rec.streams)} streams
+                          </span>
+                        </div>
+                      ) : null
+                    })()}
                 </Link>
               )
             })}
@@ -650,8 +682,9 @@ export function ArtistasLista() {
         <span>
           <b className="text-ink-400">Health, audiência e alertas</b> são reais, derivados das métricas
           de Instagram, YouTube e TikTok. <b className="text-ink-400">Tendência</b> aparece conforme os
-          syncs diários acumulam. <b className="text-ink-400">Receita</b> (só pro financeiro) vem da OneRPM
-          e <b className="text-ink-400">gênero</b> é cadastro manual.
+          syncs diários acumulam. <b className="text-ink-400">Receita</b> (só pro financeiro) é a do
+          <b className="text-ink-400"> mês mais recente</b> da OneRPM e <b className="text-ink-400">gênero</b> é
+          cadastro manual.
         </span>
       </div>
 

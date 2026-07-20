@@ -176,6 +176,22 @@ async function rematerializarReceitaAtual(slug: string): Promise<void> {
   const recente = escolhidas[0]
   const base = (recente.receita ?? {}) as ReceitaArtistaDoc
 
+  // Receita do mês de LANÇAMENTO mais recente (maior `periodoKey`), NÃO do arquivo
+  // subido por último — a lista de artistas mostra o último mês, não o total. `escolhidas`
+  // já vem sem mês duplicado (re-envio: fica a versão mais recente daquele mês).
+  const doUltimoMes = [...escolhidas].sort((a, b) =>
+    String(b.periodoKey ?? '').localeCompare(String(a.periodoKey ?? '')),
+  )[0]
+  const recUltimoMes = (doUltimoMes?.receita ?? null) as ReceitaArtistaDoc | null
+  const ultimoMes = recUltimoMes
+    ? {
+        periodoKey: String(doUltimoMes.periodoKey ?? ''),
+        periodo: recUltimoMes.periodo ?? mesclado.periodo,
+        netPorMoeda: recUltimoMes.totais?.netPorMoeda ?? {},
+        streams: Number(recUltimoMes.totais?.streams ?? 0),
+      }
+    : null
+
   await receitaRef.set({
     slug,
     nome: base.nome,
@@ -193,6 +209,8 @@ async function rematerializarReceitaAtual(slug: string): Promise<void> {
     // Este doc é a SOMA destas importações — uma por mês de lançamento.
     importacoesIds: escolhidas.map((v) => String(v.importacaoId ?? '')),
     periodoKeys: Array.from(porPeriodo.keys()).sort(),
+    // Receita do último mês de lançamento (a lista mostra o mês, não o total).
+    ultimoMes,
     // Metadados do envio mais recente (o consolidado não tem "um" arquivo).
     ultimaImportacaoId: String(recente.importacaoId ?? ''),
     periodoKey: String(recente.periodoKey ?? ''),

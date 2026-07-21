@@ -460,7 +460,7 @@ export function ArtistasLista() {
                       </td>
                       <td className="pr-4 py-3">
                         <Link href={`/artistas/${a.slug}`} className="flex items-center gap-3 group">
-                          <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" />
+                          <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" fotoUrl={a.fotoUrl} />
                           <div className="min-w-0">
                             <div className="font-semibold text-sm text-ink-100 group-hover:text-violet-300 transition-colors truncate">
                               {a.nome}
@@ -610,7 +610,7 @@ export function ArtistasLista() {
                   className="block p-4 hover:bg-bg-800/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" />
+                    <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" fotoUrl={a.fotoUrl} />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-ink-100 truncate">{a.nome}</div>
                       <div className="text-[11px] text-ink-500 num truncate">

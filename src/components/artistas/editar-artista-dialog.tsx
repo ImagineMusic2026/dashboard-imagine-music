@@ -12,7 +12,8 @@ import {
   projetoDeDoc,
   type DadosProjeto,
 } from '@/components/artistas/artista-form-fields'
-import { getProjeto, type ArtistaDoc, type RedeSocialDoc } from '@/lib/artistas/client'
+import { corAvatarDe, getProjeto, iniciaisDe, type ArtistaDoc, type RedeSocialDoc } from '@/lib/artistas/client'
+import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 
 /** URL inicial do campo: a url salva ou, faltando ela, uma reconstruída do handle/id. */
 function urlInicial(
@@ -52,6 +53,7 @@ export function EditarArtistaDialog({
 }) {
   const [nome, setNome] = useState(artista.nome ?? '')
   const [genero, setGenero] = useState(artista.genero ?? '')
+  const [fotoUrl, setFotoUrl] = useState(artista.fotoUrl ?? '')
   const [spotifyUrl, setSpotifyUrl] = useState(urlInicial(artista.redes?.spotify, 'spotify'))
   const [youtubeUrl, setYoutubeUrl] = useState(urlInicial(artista.redes?.youtube, 'youtube'))
   const [instagramUrl, setInstagramUrl] = useState(urlInicial(artista.redes?.instagram, 'instagram'))
@@ -104,6 +106,7 @@ export function EditarArtistaDialog({
           slug: artista.slug,
           nome,
           genero,
+          fotoUrl,
           spotifyUrl,
           youtubeUrl,
           instagramUrl,
@@ -190,6 +193,33 @@ export function EditarArtistaDialog({
               Gênero <span className="text-ink-500 font-normal text-xs">· opcional</span>
             </label>
             <GeneroCombobox value={genero} onChange={setGenero} />
+          </div>
+
+          <div>
+            <label htmlFor="edit-foto" className="block text-sm font-medium text-ink-300 mb-1.5">
+              Foto <span className="text-ink-500 font-normal text-xs">· opcional</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <AvatarFallback
+                iniciais={iniciaisDe(nome || artista.nome)}
+                gradient={corAvatarDe(artista.slug)}
+                size="lg"
+                fotoUrl={fotoUrl.trim() || null}
+              />
+              <div className="flex-1 min-w-0">
+                <input
+                  id="edit-foto"
+                  type="url"
+                  value={fotoUrl}
+                  onChange={(e) => setFotoUrl(e.target.value)}
+                  placeholder="https://…/foto.jpg"
+                  className={INPUT}
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-ink-500 mt-1">
+              Cole o link de uma imagem pública (JPG/PNG). Vazio volta pras iniciais.
+            </p>
           </div>
 
           <div>

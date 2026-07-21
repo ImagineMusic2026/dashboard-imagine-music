@@ -121,6 +121,7 @@ export default function HomePage() {
       streamsMax: topStreaming[0]?.streams28d ?? 0,
       movers,
       streams28dPorSlug,
+      fotoPorSlug: new Map(arts.map((a) => [a.slug, a.fotoUrl ?? null])),
       atualizadoEm: ultimaColeta(mapa),
     }
   }, [arts, mapa, integ])
@@ -158,6 +159,7 @@ export default function HomePage() {
     streamsMax,
     movers,
     streams28dPorSlug,
+    fotoPorSlug,
     atualizadoEm,
   } = dados
   const nCriticos = counts.critico + counts.atencao
@@ -295,7 +297,7 @@ export default function HomePage() {
           ) : (
             <div className="divide-y divide-bg-700/30">
               {topStreaming.map((s, idx) => (
-                <StreamingItem key={s.slug} s={s} idx={idx} max={streamsMax} />
+                <StreamingItem key={s.slug} s={s} idx={idx} max={streamsMax} foto={fotoPorSlug.get(s.slug)} />
               ))}
             </div>
           )}
@@ -373,7 +375,13 @@ export default function HomePage() {
               <p className="text-[13px] text-ink-500 py-4">Sem scores ainda.</p>
             ) : (
               topSaude.map((s, idx) => (
-                <RankItem key={s.slug} s={s} idx={idx} streams={streams28dPorSlug.get(s.slug) ?? 0} />
+                <RankItem
+                  key={s.slug}
+                  s={s}
+                  idx={idx}
+                  streams={streams28dPorSlug.get(s.slug) ?? 0}
+                  foto={fotoPorSlug.get(s.slug)}
+                />
               ))
             )}
           </div>
@@ -406,7 +414,7 @@ export default function HomePage() {
           ) : (
             <div className="px-5 py-3 space-y-3">
               {risco.slice(0, 6).map((s) => (
-                <RiscoItem key={s.slug} s={s} />
+                <RiscoItem key={s.slug} s={s} foto={fotoPorSlug.get(s.slug)} />
               ))}
             </div>
           )}
@@ -431,7 +439,7 @@ export default function HomePage() {
 
 /* ── linhas dos rankings ─────────────────────────────────────────────────── */
 
-function StreamingItem({ s, idx, max }: { s: StreamingResumo; idx: number; max: number }) {
+function StreamingItem({ s, idx, max, foto }: { s: StreamingResumo; idx: number; max: number; foto?: string | null }) {
   const pct = max > 0 ? Math.max(3, Math.round((s.streams28d / max) * 100)) : 0
   return (
     <Link
@@ -439,7 +447,7 @@ function StreamingItem({ s, idx, max }: { s: StreamingResumo; idx: number; max: 
       className="flex items-center gap-3 px-5 py-3 hover:bg-bg-800/30 transition-colors group"
     >
       <span className="w-4 text-ink-500 text-sm num text-center shrink-0">{idx + 1}</span>
-      <AvatarFallback iniciais={iniciaisDe(s.nome)} gradient={corAvatarDe(s.slug)} size="sm" />
+      <AvatarFallback iniciais={iniciaisDe(s.nome)} gradient={corAvatarDe(s.slug)} size="sm" fotoUrl={foto} />
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-sm text-ink-100 truncate group-hover:text-violet-300 transition-colors">
           {s.nome}
@@ -472,11 +480,11 @@ function MoverItem({ m }: { m: StreamingResumo }) {
   )
 }
 
-function RankItem({ s, idx, streams }: { s: ArtistaSaude; idx: number; streams: number }) {
+function RankItem({ s, idx, streams, foto }: { s: ArtistaSaude; idx: number; streams: number; foto?: string | null }) {
   return (
     <Link href={`/artistas/${s.slug}`} className="flex items-center gap-3 group">
       <span className="w-4 text-ink-500 text-sm num text-center shrink-0">{idx + 1}</span>
-      <AvatarFallback iniciais={iniciaisDe(s.nome)} gradient={corAvatarDe(s.slug)} size="sm" />
+      <AvatarFallback iniciais={iniciaisDe(s.nome)} gradient={corAvatarDe(s.slug)} size="sm" fotoUrl={foto} />
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-sm text-ink-100 truncate group-hover:text-violet-300 transition-colors">
           {s.nome}
@@ -493,10 +501,10 @@ function RankItem({ s, idx, streams }: { s: ArtistaSaude; idx: number; streams: 
   )
 }
 
-function RiscoItem({ s }: { s: ArtistaSaude }) {
+function RiscoItem({ s, foto }: { s: ArtistaSaude; foto?: string | null }) {
   return (
     <Link href={`/artistas/${s.slug}`} className="flex items-center gap-3 group">
-      <AvatarFallback iniciais={iniciaisDe(s.nome)} gradient={corAvatarDe(s.slug)} size="sm" />
+      <AvatarFallback iniciais={iniciaisDe(s.nome)} gradient={corAvatarDe(s.slug)} size="sm" fotoUrl={foto} />
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-sm text-ink-100 truncate group-hover:text-violet-300 transition-colors">
           {s.nome}

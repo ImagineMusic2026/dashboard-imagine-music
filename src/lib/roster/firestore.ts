@@ -371,6 +371,8 @@ export interface AtualizarArtistaInput extends DadosProjetoInput {
   slug: string
   nome: string
   genero?: string | null
+  /** Foto do artista (URL http(s)). Vazio remove; `undefined` preserva. */
+  fotoUrl?: string | null
   spotifyUrl?: string | null
   youtubeUrl?: string | null
   instagramUrl?: string | null
@@ -448,6 +450,14 @@ export async function atualizarArtistaManual(
     }
     updates[`redes.${key}`] = nova
     redes[key] = nova
+  }
+
+  // Foto (URL): `undefined` preserva; vazio remove; senão exige http(s).
+  const foto = input.fotoUrl === undefined ? undefined : (input.fotoUrl ?? '').trim()
+  if (foto !== undefined) {
+    if (!foto) updates.fotoUrl = admin.firestore.FieldValue.delete()
+    else if (/^https?:\/\//i.test(foto)) updates.fotoUrl = foto
+    else throw new ArtistaInputError('A foto precisa ser uma URL http(s) válida.')
   }
 
   const avisos: string[] = []

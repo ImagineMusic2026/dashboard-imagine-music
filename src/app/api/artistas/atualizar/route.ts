@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     slug?: string
     nome?: string
     genero?: string
+    fotoUrl?: string
     spotifyUrl?: string
     youtubeUrl?: string
     instagramUrl?: string
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
         slug: body.slug,
         nome: body.nome ?? '',
         genero: body.genero,
+        fotoUrl: body.fotoUrl,
         spotifyUrl: body.spotifyUrl,
         youtubeUrl: body.youtubeUrl,
         instagramUrl: body.instagramUrl,

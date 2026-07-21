@@ -109,7 +109,7 @@ export function PerfilArtistaReal({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
         <div className="flex items-start gap-4 sm:gap-5 min-w-0 flex-1">
-          <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="xl" />
+          <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="xl" fotoUrl={a.fotoUrl} />
           <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[10px] tracking-wider font-semibold uppercase text-ink-400 mb-1">
             <span>{a.label ?? 'Imagine Music'}</span>

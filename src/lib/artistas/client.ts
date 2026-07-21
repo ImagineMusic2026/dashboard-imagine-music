@@ -21,6 +21,8 @@ export interface ArtistaDoc {
   nome: string
   genero?: string
   label?: string
+  /** Foto do artista (URL) — mostrada no avatar no lugar das iniciais. */
+  fotoUrl?: string
   fonteCadastro?: string
   /** Criado por uma importação de receita, sem redes sociais. Limpo ao editar o perfil. */
   pendenteConfiguracao?: boolean

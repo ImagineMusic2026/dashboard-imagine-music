@@ -79,7 +79,16 @@ service cloud.firestore {
                == convite(request.resource.data.conviteToken).get('artistaSlug', '')
         );
 
-      allow update, delete: if isAdmin();
+      // Admin gerencia o perfil; a PRÓPRIA pessoa pode mexer só no seu `favoritos`
+      // (lista pessoal de artistas) — o `diff().hasOnly` trava pra não tocar role,
+      // ativo, permissoes etc. (sem escalonamento de privilégio).
+      allow update: if isAdmin()
+        || (
+          request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoritos'])
+          && request.resource.data.favoritos is list
+        );
+      allow delete: if isAdmin();
     }
 
     // Convites

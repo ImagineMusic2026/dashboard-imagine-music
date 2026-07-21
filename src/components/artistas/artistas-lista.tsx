@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, UserPlus, Users } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, DollarSign, Loader2, Search, Star, UserPlus, Users } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { CriarArtistaDialog } from '@/components/artistas/criar-artista-dialog'
@@ -62,6 +62,27 @@ function AcessoCelula({ nivel }: { nivel: NivelAcesso }) {
         {nivel.totalIntegravel ? `${nivel.conectados}/${nivel.totalIntegravel}` : '—'}
       </span>
     </div>
+  )
+}
+
+/** Estrela de favoritar (lista pessoal). Não navega ao clicar (a linha é um link). */
+function FavStar({ slug, nome }: { slug: string; nome: string }) {
+  const { ehFavorito, alternarFavorito } = useAuth()
+  const fav = ehFavorito(slug)
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        alternarFavorito(slug)
+      }}
+      aria-label={fav ? `Desfavoritar ${nome}` : `Favoritar ${nome}`}
+      aria-pressed={fav}
+      className="shrink-0 p-1.5 rounded-md text-ink-600 hover:text-amber-400 hover:bg-bg-800/60 transition-colors"
+    >
+      <Star className={cn('w-4 h-4', fav && 'fill-amber-400 text-amber-400')} />
+    </button>
   )
 }
 
@@ -173,12 +194,13 @@ function ThOrdenavel({
 }
 
 export function ArtistasLista() {
-  const { role, loading } = useAuth()
+  const { role, loading, favoritos } = useAuth()
   const [artistas, setArtistas] = useState<ArtistaDoc[] | null>(null)
   const [receitas, setReceitas] = useState<Map<string, ReceitaResumo>>(new Map())
   const [metricas, setMetricas] = useState<Map<string, MetricasSociaisDoc>>(new Map())
   const [erro, setErro] = useState(false)
   const [busca, setBusca] = useState('')
+  const [soFavoritos, setSoFavoritos] = useState(false)
   // Padrão: maior audiência primeiro (a cliente pediu o roster ordenado por alcance).
   const [sort, setSort] = useState<EstadoSort>({ coluna: 'audiencia', dir: 'desc' })
   const [pagina, setPagina] = useState(1)
@@ -217,8 +239,10 @@ export function ArtistasLista() {
   const filtrados = useMemo(() => {
     if (!artistas) return []
     const q = busca.trim().toLowerCase()
-    return q ? artistas.filter((a) => a.nome.toLowerCase().includes(q)) : artistas
-  }, [artistas, busca])
+    let arr = q ? artistas.filter((a) => a.nome.toLowerCase().includes(q)) : artistas
+    if (soFavoritos) arr = arr.filter((a) => favoritos.has(a.slug))
+    return arr
+  }, [artistas, busca, soFavoritos, favoritos])
 
   // Health Score + alertas por artista — derivados das métricas (mesma lib da home).
   const { saudePorSlug, alertasPorSlug } = useMemo(() => {
@@ -324,7 +348,7 @@ export function ArtistasLista() {
     )
   }
 
-  const colSpan = ehAdmin ? 9 : 8
+  const colSpan = ehAdmin ? 10 : 9
 
   return (
     <div className="space-y-4">
@@ -347,7 +371,7 @@ export function ArtistasLista() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {ehAdmin && (
             <button
               type="button"
@@ -358,6 +382,24 @@ export function ArtistasLista() {
               Novo artista
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              setSoFavoritos((v) => !v)
+              setPagina(1)
+            }}
+            aria-pressed={soFavoritos}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold whitespace-nowrap transition-colors',
+              soFavoritos
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                : 'text-ink-300 border-bg-700/50 hover:bg-bg-800',
+            )}
+          >
+            <Star className={cn('w-4 h-4', soFavoritos && 'fill-amber-400 text-amber-400')} />
+            Favoritos
+            {favoritos.size > 0 && <span className="num text-[12px]">{favoritos.size}</span>}
+          </button>
           <div className="relative w-full max-w-xs">
             <Search className="w-4 h-4 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -392,6 +434,7 @@ export function ArtistasLista() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-bg-700/40">
+                  <th className="py-3 pl-4 pr-1" />
                   <ThOrdenavel coluna="nome" label="Artista" sort={sort} onOrdenar={aoOrdenar} />
                   <ThOrdenavel coluna="genero" label="Gênero" sort={sort} onOrdenar={aoOrdenar} />
                   <ThOrdenavel coluna="health" label="Health" sort={sort} onOrdenar={aoOrdenar} />
@@ -412,7 +455,10 @@ export function ArtistasLista() {
                   const nAlertas = alertasPorSlug.get(a.slug) ?? 0
                   return (
                     <tr key={a.slug} className="hover:bg-bg-800/40 transition-colors">
-                      <td className="px-4 py-3">
+                      <td className="pl-4 pr-1 py-3">
+                        <FavStar slug={a.slug} nome={a.nome} />
+                      </td>
+                      <td className="pr-4 py-3">
                         <Link href={`/artistas/${a.slug}`} className="flex items-center gap-3 group">
                           <AvatarFallback iniciais={iniciaisDe(a.nome)} gradient={corAvatarDe(a.slug)} size="md" />
                           <div className="min-w-0">
@@ -507,7 +553,9 @@ export function ArtistasLista() {
                 {filtrados.length === 0 && (
                   <tr>
                     <td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-ink-500">
-                      Nenhum artista encontrado para “{busca}”.
+                      {soFavoritos
+                        ? 'Você ainda não favoritou nenhum artista.'
+                        : `Nenhum artista encontrado para “${busca}”.`}
                     </td>
                   </tr>
                 )}
@@ -570,6 +618,7 @@ export function ArtistasLista() {
                         {a.genero ? ` · ${a.genero}` : ''}
                       </div>
                     </div>
+                    <FavStar slug={a.slug} nome={a.nome} />
                     {saude ? (
                       <div className="text-right shrink-0">
                         <div className={cn('num font-bold text-lg leading-none', getHealthColor(saude.score))}>
@@ -615,7 +664,9 @@ export function ArtistasLista() {
             })}
             {filtrados.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-ink-500">
-                Nenhum artista encontrado para “{busca}”.
+                {soFavoritos
+                  ? 'Você ainda não favoritou nenhum artista.'
+                  : `Nenhum artista encontrado para “${busca}”.`}
               </div>
             )}
           </div>

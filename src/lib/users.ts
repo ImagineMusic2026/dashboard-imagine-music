@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore'
+import { arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 
 /**
@@ -27,6 +27,8 @@ export type AppUser = {
   artistaSlug?: string
   /** Exceções de permissão por pessoa (override do padrão do papel). */
   permissoes?: Partial<Record<Capacidade, boolean>>
+  /** Artistas favoritados por ESTA pessoa (slugs). Lista pessoal, não do time. */
+  favoritos?: string[]
 }
 
 export const roleMeta: Record<Role, { label: string; classe: string; gradient: string }> = {
@@ -67,6 +69,16 @@ export async function listAppUsers(): Promise<AppUser[]> {
 /** Altera o papel de um membro (admin/marketing). */
 export async function updateUserRole(uid: string, role: Role): Promise<void> {
   await updateDoc(doc(db, USERS, uid), { role })
+}
+
+/**
+ * Adiciona/remove um artista dos favoritos da PRÓPRIA pessoa (`users/{uid}.favoritos`).
+ * As regras do Firestore deixam cada um editar só o seu campo `favoritos`.
+ */
+export async function setFavorito(uid: string, slug: string, favoritar: boolean): Promise<void> {
+  await updateDoc(doc(db, USERS, uid), {
+    favoritos: favoritar ? arrayUnion(slug) : arrayRemove(slug),
+  })
 }
 
 /** Salva o mapa de exceções de permissão de um membro (admin). */

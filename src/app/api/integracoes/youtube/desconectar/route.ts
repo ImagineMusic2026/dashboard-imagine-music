@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { exigirSessaoAtiva } from '@/lib/server-auth'
+import { exigirSessaoAtiva, sessaoPode } from '@/lib/server-auth'
 import {
   gravarStatusYouTube,
   limparAnalyticsYouTube,
@@ -14,16 +14,20 @@ export const dynamic = 'force-dynamic'
 /**
  * Remove a camada Analytics (tokens OAuth) de um artista. A base PÚBLICA do
  * canal continua sendo coletada normalmente — só os dados privados de Analytics
- * param. Admin desconecta qualquer artista (`?slug=`); o artista só o próprio.
+ * param. Quem tem `conexoesArtista` desconecta qualquer artista (`?slug=`); o
+ * artista só o próprio.
  */
 export async function POST(req: Request) {
   const sessao = await exigirSessaoAtiva(req)
   if (sessao instanceof NextResponse) return sessao
 
-  const ehAdmin = sessao.role === 'admin'
   const ehArtista = sessao.role === 'artista'
-  if (!ehAdmin && !ehArtista) {
-    return NextResponse.json({ error: 'Apenas admin ou o próprio artista podem desconectar.' }, { status: 403 })
+  const ehEquipe = !ehArtista && sessaoPode(sessao, 'conexoesArtista')
+  if (!ehEquipe && !ehArtista) {
+    return NextResponse.json(
+      { error: 'Você não tem permissão para gerenciar as conexões dos artistas.' },
+      { status: 403 },
+    )
   }
 
   const slugQuery = new URL(req.url).searchParams.get('slug')?.trim() || null

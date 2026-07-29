@@ -15,9 +15,32 @@ import type { AppUser, Capacidade, Role } from '@/lib/users'
 
 /** Padrão de cada capacidade por papel (o que vale sem override). */
 const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
-  admin: { verReceita: true, agenda: true, integracoes: true, importar: true },
-  marketing: { verReceita: false, agenda: true, integracoes: false, importar: false },
-  artista: { verReceita: false, agenda: false, integracoes: false, importar: false },
+  admin: {
+    verReceita: true,
+    agenda: true,
+    integracoes: true,
+    importar: true,
+    editarArtistas: true,
+    conexoesArtista: true,
+  },
+  marketing: {
+    verReceita: false,
+    agenda: true,
+    integracoes: false,
+    importar: false,
+    // O time de marketing é quem mantém o cadastro e cobra a conexão do artista
+    // no dia a dia — por isso estas duas vêm ligadas (o admin pode tirar de alguém).
+    editarArtistas: true,
+    conexoesArtista: true,
+  },
+  artista: {
+    verReceita: false,
+    agenda: false,
+    integracoes: false,
+    importar: false,
+    editarArtistas: false,
+    conexoesArtista: false,
+  },
 }
 
 /** Registro das capacidades editáveis (rótulo + descrição) — alimenta a matriz. */
@@ -26,6 +49,16 @@ export const CAPACIDADES: { cap: Capacidade; label: string; descricao: string }[
   { cap: 'agenda', label: 'Agenda', descricao: 'Criar e editar eventos (releases, shows, contratos).' },
   { cap: 'integracoes', label: 'Integrações', descricao: 'Descobrir contas e sincronizar métricas.' },
   { cap: 'importar', label: 'Importar dados', descricao: 'Subir planilhas de OneRPM e roster.' },
+  {
+    cap: 'editarArtistas',
+    label: 'Editar artistas',
+    descricao: 'Alterar o cadastro do artista (nome, gênero, foto, redes e projeto).',
+  },
+  {
+    cap: 'conexoesArtista',
+    label: 'Conexões do artista',
+    descricao: 'Gerar e revogar os links de autorização do YouTube e do TikTok.',
+  },
 ]
 
 /** O padrão do papel para uma capacidade (sem considerar override). */

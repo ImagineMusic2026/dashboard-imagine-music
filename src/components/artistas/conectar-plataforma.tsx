@@ -16,9 +16,10 @@ import { cn } from '@/lib/utils'
  * no painel da equipe quanto no portal do artista:
  *  - Artista: "Conectar minha conta" → busca a URL e redireciona pro consentimento
  *    (autoriza a PRÓPRIA conta).
- *  - Admin: "Gerar link" → busca a URL e copia, pra enviar ao artista (o admin NÃO
- *    completa o OAuth, senão vincularia a conta dele).
- *  - Marketing: não gerencia conexões → não renderiza nada.
+ *  - Equipe com a permissão `conexoesArtista` (admin e marketing por padrão):
+ *    "Gerar link" → busca a URL e copia, pra enviar ao artista (quem é da equipe
+ *    NÃO completa o OAuth, senão vincularia a conta dele).
+ *  - Sem a permissão: não renderiza nada.
  */
 type Msg = { tipo: 'ok' | 'erro' | 'info'; texto: string }
 
@@ -30,7 +31,7 @@ type ConectarConfig = {
   apiBase: string
   /** Parâmetro de retorno do OAuth na URL (?<param>=ok|negado|erro). */
   returnParam: string
-  admin: Textos
+  equipe: Textos
   artista: Textos
   desconectarLabel: string
   msg: { conectado: string; negado: string; erro: string; desconectado: string }
@@ -49,7 +50,7 @@ const CONFIG: Record<'tiktok' | 'youtube', ConectarConfig> = {
     tipo: 'tiktok',
     apiBase: '/api/integracoes/tiktok',
     returnParam: 'tiktok',
-    admin: {
+    equipe: {
       titulo: 'Conectar TikTok do artista',
       descricao:
         'Gere um link de autorização e envie ao artista. Ele abre o link e autoriza com a conta dele — você não precisa da senha do TikTok.',
@@ -80,7 +81,7 @@ const CONFIG: Record<'tiktok' | 'youtube', ConectarConfig> = {
     tipo: 'youtube',
     apiBase: '/api/integracoes/youtube',
     returnParam: 'youtube',
-    admin: {
+    equipe: {
       titulo: 'Conectar Analytics do YouTube',
       descricao:
         'A base pública do canal já é coletada. Isto adiciona o Analytics (privado): gere o link e envie ao artista — ele autoriza com a conta dele, sem precisar da senha.',
@@ -117,9 +118,10 @@ export function ConectarPlataforma({
   plataforma: 'tiktok' | 'youtube'
 }) {
   const cfg = CONFIG[plataforma]
-  const { role } = useAuth()
+  const { role, pode } = useAuth()
   const ehArtista = role === 'artista'
-  const ehAdmin = role === 'admin'
+  // Equipe que gerencia a conexão DE OUTRA pessoa (gera o link e envia ao artista).
+  const ehEquipe = !ehArtista && pode('conexoesArtista')
 
   const [carregando, setCarregando] = useState<null | 'conectar' | 'desconectar'>(null)
   const [msg, setMsg] = useState<Msg | null>(null)
@@ -137,9 +139,9 @@ export function ConectarPlataforma({
     setAberto(true)
   }, [cfg])
 
-  if (!ehArtista && !ehAdmin) return null
+  if (!ehArtista && !ehEquipe) return null
 
-  const txt = ehArtista ? cfg.artista : cfg.admin
+  const txt = ehArtista ? cfg.artista : cfg.equipe
 
   async function token() {
     const t = await auth.currentUser?.getIdToken()
@@ -152,7 +154,7 @@ export function ConectarPlataforma({
     setMsg(null)
     setLink(null)
     try {
-      const qs = ehAdmin ? `?slug=${encodeURIComponent(slug)}` : ''
+      const qs = ehEquipe ? `?slug=${encodeURIComponent(slug)}` : ''
       const res = await fetch(`${cfg.apiBase}/conectar${qs}`, {
         headers: { Authorization: `Bearer ${await token()}` },
       })
@@ -163,7 +165,7 @@ export function ConectarPlataforma({
         window.location.href = data.url as string // vai para o consentimento
         return
       }
-      // Admin: copia o link para enviar ao artista.
+      // Equipe: copia o link para enviar ao artista.
       setLink(data.url as string)
       const ok = await copiarTexto(data.url as string)
       setMsg({
@@ -187,7 +189,7 @@ export function ConectarPlataforma({
     setCarregando('desconectar')
     setMsg(null)
     try {
-      const qs = ehAdmin ? `?slug=${encodeURIComponent(slug)}` : ''
+      const qs = ehEquipe ? `?slug=${encodeURIComponent(slug)}` : ''
       const res = await fetch(`${cfg.apiBase}/desconectar${qs}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${await token()}` },

@@ -84,6 +84,15 @@ export async function exigirSessaoAtiva(req: Request): Promise<SessaoAtiva | Nex
   }
 }
 
+/**
+ * Permissão efetiva de uma sessão já carregada. Para rotas que NÃO podem exigir a
+ * capacidade logo na entrada — conectar/desconectar, onde o artista age sobre o
+ * próprio slug por ser artista, e a equipe age sobre qualquer um por permissão.
+ */
+export function sessaoPode(sessao: SessaoAtiva, cap: Capacidade): boolean {
+  return temPermissao({ role: sessao.role as Role, permissoes: sessao.permissoes }, cap)
+}
+
 export type CronAuth = { cron: true }
 
 /**

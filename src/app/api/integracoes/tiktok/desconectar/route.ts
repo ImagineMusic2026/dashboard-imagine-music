@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { exigirSessaoAtiva } from '@/lib/server-auth'
+import { exigirSessaoAtiva, sessaoPode } from '@/lib/server-auth'
 import {
   gravarStatusTikTok,
   listarArtistasTikTok,
@@ -11,18 +11,21 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * Remove o vínculo (tokens) do TikTok de um artista, parando a coleta. Admin
- * desconecta qualquer artista (`?slug=`); o artista desconecta só o próprio (o
- * slug vem da sessão). O histórico já coletado permanece.
+ * Remove o vínculo (tokens) do TikTok de um artista, parando a coleta. Quem tem
+ * `conexoesArtista` desconecta qualquer artista (`?slug=`); o artista desconecta
+ * só o próprio (o slug vem da sessão). O histórico já coletado permanece.
  */
 export async function POST(req: Request) {
   const sessao = await exigirSessaoAtiva(req)
   if (sessao instanceof NextResponse) return sessao
 
-  const ehAdmin = sessao.role === 'admin'
   const ehArtista = sessao.role === 'artista'
-  if (!ehAdmin && !ehArtista) {
-    return NextResponse.json({ error: 'Apenas admin ou o próprio artista podem desconectar.' }, { status: 403 })
+  const ehEquipe = !ehArtista && sessaoPode(sessao, 'conexoesArtista')
+  if (!ehEquipe && !ehArtista) {
+    return NextResponse.json(
+      { error: 'Você não tem permissão para gerenciar as conexões dos artistas.' },
+      { status: 403 },
+    )
   }
 
   const slugQuery = new URL(req.url).searchParams.get('slug')?.trim() || null

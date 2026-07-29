@@ -36,7 +36,7 @@ Cada pessoa tem **um papel**, que decide o que ela enxerga:
 | Papel | O que enxerga |
 |-------|---------------|
 | **Admin** | Acesso total ao painel. Gerencia o time, convida pessoas, define permissões, cadastra artistas, conecta integrações, importa planilhas e vê a receita. |
-| **Marketing** | Acesso ao painel da equipe (home, artistas, alertas, conteúdo, agenda), **sem ver a receita** por padrão e **sem gerenciar integrações** por padrão. |
+| **Marketing** | Acesso ao painel da equipe (home, artistas, alertas, conteúdo, agenda). Edita o cadastro dos artistas e gera os links de conexão de YouTube/TikTok. **Sem ver a receita** e **sem gerenciar integrações** por padrão; criar e excluir artista continuam só com o admin. |
 | **Artista** | Vê **somente o próprio perfil**, numa área separada chamada portal. Não navega pelo painel da equipe. |
 
 Pontos importantes:
@@ -101,7 +101,7 @@ A página **Artistas** lista todos os artistas do roster, com busca e paginaçã
 2. Clique em **Novo artista** e preencha os dados: **nome, descrição e redes sociais** (Spotify, YouTube, Instagram, TikTok).
 3. Salve. O artista passa a aparecer na lista.
 
-### Editar um artista *(admin)*
+### Editar um artista *(admin e marketing)*
 
 1. Abra o perfil do artista.
 2. Use a opção de **editar** para atualizar nome, descrição ou redes.
@@ -113,7 +113,7 @@ A página **Artistas** lista todos os artistas do roster, com busca e paginaçã
 2. Use a opção de **excluir**.
 3. Confirme. O cadastro e as redes vinculadas são removidos.
 
-> **Quem pode:** criar, editar e excluir artistas é função de **admin**. O botão "Novo artista" e as ações de edição só aparecem para admin.
+> **Quem pode:** **editar** exige a permissão de **editar artistas** — por padrão liberada para a **equipe (admin e marketing)**; o admin pode tirar de uma pessoa em Configurações → Permissões. **Criar** e **excluir** continuam só com o **admin**: o botão "Novo artista" e a exclusão dentro do formulário não aparecem para os demais.
 
 ---
 
@@ -219,7 +219,7 @@ Cada card mostra o status (**conectado**, **não configurado** ou **erro**), a �
 1. Acesse **Integrações**.
 2. Abra o "Ver mais" do card da fonte desejada e clique em **"Sincronizar agora"** (ou **"Descobrir contas/canais"** no caso de Meta e YouTube).
 
-> **Quem pode:** gerenciar integrações (descobrir/sincronizar) exige a permissão de **integrações** — por padrão, só **admin**. Para quem não tem essa permissão, os cards aparecem com a nota "Apenas administradores gerenciam a conexão". **Marketing não gerencia integrações** por padrão. Conectar/desconectar a própria conta é possível para o **artista** (TikTok e YouTube Analytics).
+> **Quem pode:** gerenciar integrações (descobrir/sincronizar) exige a permissão de **integrações** — por padrão, só **admin**. Para quem não tem essa permissão, os cards aparecem com a nota "Apenas administradores gerenciam a conexão". **Marketing não gerencia integrações** por padrão. Conectar/desconectar a própria conta é possível para o **artista** (TikTok e YouTube Analytics). Já **gerar o link de conexão de um artista** (os ícones de TikTok/YouTube no topo do perfil dele) é outra permissão, **conexões do artista** — essa vem liberada para admin **e marketing**.
 
 > Lembrete: as integrações também rodam **sozinhas, uma vez por dia** — você só precisa acionar manualmente em casos pontuais.
 
@@ -293,7 +293,7 @@ No menu de ações (•••) de cada membro o admin pode:
 
 ### Matriz de permissões *(admin)*
 
-Na aba **Permissões**, o admin vê uma tabela de **pessoas × capacidades** e pode liberar ou bloquear, pessoa a pessoa, quatro capacidades:
+Na aba **Permissões**, o admin vê uma tabela de **pessoas × capacidades** e pode liberar ou bloquear, pessoa a pessoa, seis capacidades:
 
 | Capacidade | O que libera |
 |------------|--------------|
@@ -301,8 +301,12 @@ Na aba **Permissões**, o admin vê uma tabela de **pessoas × capacidades** e p
 | **Agenda** | Acessar e editar eventos (releases, shows, contratos). |
 | **Integrações** | Descobrir contas e sincronizar métricas. |
 | **Importar dados** | Subir planilhas (OneRPM e roster). |
+| **Editar artistas** | Botão **Editar** no perfil do artista: nome, gênero, foto, redes e projeto. |
+| **Conexões do artista** | Gerar e revogar os links de autorização de YouTube e TikTok. |
 
-Cada capacidade tem um **padrão por papel**; ao ajustar para uma pessoa, você cria um **override** (uma exceção). Há um botão para **restaurar o padrão** do papel quando quiser. Os padrões são: **admin** tem as quatro; **marketing** tem só agenda; **artista** não tem nenhuma.
+Cada capacidade tem um **padrão por papel**; ao ajustar para uma pessoa, você cria um **override** (uma exceção). Há um botão para **restaurar o padrão** do papel quando quiser. Os padrões são: **admin** tem as seis; **marketing** tem agenda, editar artistas e conexões do artista; **artista** não tem nenhuma.
+
+> **Excluir artista não é delegável:** o botão de exclusão só aparece para o admin, e a rota também recusa qualquer outro papel. Cadastrar um artista novo também segue só com o admin.
 
 ### Artistas
 

@@ -35,17 +35,20 @@ function urlInicial(
 }
 
 /**
- * Edição de um artista já cadastrado (admin). Pré-preenche com os dados atuais.
- * Esvaziar um campo de rede REMOVE aquele vínculo no salvar; trocar a URL
- * re-mapeia. O slug não muda — renomear preserva os vínculos.
+ * Edição de um artista já cadastrado (quem tem `editarArtistas`). Pré-preenche com
+ * os dados atuais. Esvaziar um campo de rede REMOVE aquele vínculo no salvar;
+ * trocar a URL re-mapeia. O slug não muda — renomear preserva os vínculos.
  */
 export function EditarArtistaDialog({
   artista,
+  podeExcluir = false,
   onClose,
   onSaved,
   onDeleted,
 }: {
   artista: ArtistaDoc
+  /** Mostra a zona de perigo. Excluir é ação de admin — a API também exige isso. */
+  podeExcluir?: boolean
   onClose: () => void
   onSaved: () => void
   /** Chamado após excluir o artista (ex.: sair do perfil que deixou de existir). */
@@ -306,53 +309,55 @@ export function EditarArtistaDialog({
             </button>
           </div>
 
-          {/* Zona de perigo — exclusão definitiva (confirmação em 2 passos). */}
-          <div className="pt-3 mt-1 border-t border-bg-700/40">
-            {!confirmando ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setErro(null)
-                  setConfirmando(true)
-                }}
-                className="w-full flex items-center justify-center gap-2 text-[13px] text-red-400/80 hover:text-red-300 hover:bg-red-500/5 py-2 rounded-lg transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Excluir artista
-              </button>
-            ) : (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 space-y-3">
-                <div className="flex items-start gap-2 text-[13px] text-red-200/90">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <span>
-                    Excluir <strong className="font-semibold">{artista.nome}</strong> remove o cadastro,
-                    as métricas e todo o histórico.{' '}
-                    <strong className="font-semibold">Não dá pra desfazer.</strong>
-                  </span>
+          {/* Zona de perigo — exclusão definitiva (confirmação em 2 passos), só admin. */}
+          {podeExcluir && (
+            <div className="pt-3 mt-1 border-t border-bg-700/40">
+              {!confirmando ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErro(null)
+                    setConfirmando(true)
+                  }}
+                  className="w-full flex items-center justify-center gap-2 text-[13px] text-red-400/80 hover:text-red-300 hover:bg-red-500/5 py-2 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Excluir artista
+                </button>
+              ) : (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 space-y-3">
+                  <div className="flex items-start gap-2 text-[13px] text-red-200/90">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <span>
+                      Excluir <strong className="font-semibold">{artista.nome}</strong> remove o cadastro,
+                      as métricas e todo o histórico.{' '}
+                      <strong className="font-semibold">Não dá pra desfazer.</strong>
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmando(false)}
+                      disabled={excluindo}
+                      className="flex-1 bg-bg-800 hover:bg-bg-700 text-ink-100 font-semibold py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExcluir}
+                      disabled={excluindo}
+                      aria-busy={excluindo}
+                      className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
+                    >
+                      {excluindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      {excluindo ? 'Excluindo…' : 'Excluir definitivamente'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmando(false)}
-                    disabled={excluindo}
-                    className="flex-1 bg-bg-800 hover:bg-bg-700 text-ink-100 font-semibold py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExcluir}
-                    disabled={excluindo}
-                    aria-busy={excluindo}
-                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
-                  >
-                    {excluindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    {excluindo ? 'Excluindo…' : 'Excluir definitivamente'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </form>
       </div>
     </div>

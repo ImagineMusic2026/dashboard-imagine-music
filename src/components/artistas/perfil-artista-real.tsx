@@ -49,9 +49,10 @@ export function PerfilArtistaReal({
   /** Esconde o link "← Artistas" (usado no portal do artista, que não tem roster). */
   mostrarVoltar?: boolean
 }) {
-  const { role } = useAuth()
+  const { role, pode } = useAuth()
   const router = useRouter()
-  const ehAdmin = role === 'admin'
+  // Editar é permissão (admin e marketing por padrão); excluir continua só admin.
+  const podeEditar = role !== 'artista' && pode('editarArtistas')
   const [estado, setEstado] = useState<EstadoReal>({ st: 'load' })
   const [editando, setEditando] = useState(false)
   const [nonce, setNonce] = useState(0)
@@ -141,12 +142,13 @@ export function PerfilArtistaReal({
         </div>
         </div>
 
-        {/* Conexões — gera link de autorização (admin) ou o próprio artista conecta.
-            Cada ícone abre um popover com a explicação e o botão. Some pra marketing. */}
+        {/* Conexões — gera link de autorização (equipe com `conexoesArtista`) ou o
+            próprio artista conecta. Cada ícone abre um popover com a explicação e o
+            botão; some pra quem não tem a permissão. */}
         <div className="flex items-center gap-2 shrink-0">
           <ConectarPlataforma plataforma="tiktok" slug={a.slug} />
           <ConectarPlataforma plataforma="youtube" slug={a.slug} />
-          {ehAdmin && (
+          {podeEditar && (
             <button
               type="button"
               onClick={() => setEditando(true)}
@@ -209,9 +211,10 @@ export function PerfilArtistaReal({
           integração (barra) + status por rede, mantendo os @handles/links. */}
       <AcessoIntegracoesCard artista={a} />
 
-      {editando && ehAdmin && (
+      {editando && podeEditar && (
         <EditarArtistaDialog
           artista={a}
+          podeExcluir={role === 'admin'}
           onClose={() => setEditando(false)}
           onSaved={() => setNonce((n) => n + 1)}
           onDeleted={() => router.push('/artistas')}

@@ -14,7 +14,13 @@ export type Role = 'admin' | 'marketing' | 'artista'
  * padrão do papel (lógica em `@/lib/permissions`). Capacidades estruturais do
  * papel (ex.: portal do artista, ver o próprio perfil) não entram aqui.
  */
-export type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar'
+export type Capacidade =
+  | 'verReceita'
+  | 'agenda'
+  | 'integracoes'
+  | 'importar'
+  | 'editarArtistas'
+  | 'conexoesArtista'
 
 /** Perfil do usuário armazenado em Firestore na coleção `users` (id = UID do Auth). */
 export type AppUser = {

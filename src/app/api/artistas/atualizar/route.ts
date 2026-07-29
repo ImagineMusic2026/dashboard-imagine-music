@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
-import { exigirAdmin } from '@/lib/server-auth'
+import { exigirPermissao } from '@/lib/server-auth'
 import { ArtistaInputError, atualizarArtistaManual } from '@/lib/roster/firestore'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * Edição de 1 artista já cadastrado. Só admin. Ao contrário de `/criar`, uma rede
- * enviada vazia é REMOVIDA do artista (e trocar a URL re-extrai o id, pra o
+ * Edição de 1 artista já cadastrado. Exige a permissão `editarArtistas` (admin e
+ * marketing por padrão; criar e excluir seguem só admin). Ao contrário de `/criar`,
+ * uma rede enviada vazia é REMOVIDA do artista (e trocar a URL re-extrai o id, pra o
  * "descobrir" re-mapear). O slug é estável — editar o nome não muda o slug.
  */
 export async function POST(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'editarArtistas')
   if (auth instanceof NextResponse) return auth
 
   let body: {

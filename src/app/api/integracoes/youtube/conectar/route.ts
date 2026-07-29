@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { exigirSessaoAtiva } from '@/lib/server-auth'
+import { exigirSessaoAtiva, sessaoPode } from '@/lib/server-auth'
 import { resolverRedirectUriYT, youtubeOAuthConfigurado, YouTubeConfigError } from '@/lib/youtube/config'
 import { montarUrlAutorizacao } from '@/lib/youtube/oauth'
 
@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic'
  * NÃO completa o OAuth — devolve o link. Quem autoriza é o ARTISTA, com a conta
  * Google/YouTube dele:
  *  - Artista (portal): autoriza só o próprio slug (vem da sessão).
- *  - Admin: gera o link de qualquer artista (`?slug=`) para enviar a ele.
- * Marketing não gerencia conexões (403).
+ *  - Equipe com `conexoesArtista` (admin e marketing por padrão): gera o link de
+ *    qualquer artista (`?slug=`) para enviar a ele.
+ * Quem não tem a permissão leva 403.
  */
 export async function GET(req: Request) {
   const sessao = await exigirSessaoAtiva(req)
@@ -26,10 +27,13 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url)
-  const ehAdmin = sessao.role === 'admin'
   const ehArtista = sessao.role === 'artista'
-  if (!ehAdmin && !ehArtista) {
-    return NextResponse.json({ error: 'Apenas admin ou o próprio artista podem conectar uma conta.' }, { status: 403 })
+  const ehEquipe = !ehArtista && sessaoPode(sessao, 'conexoesArtista')
+  if (!ehEquipe && !ehArtista) {
+    return NextResponse.json(
+      { error: 'Você não tem permissão para gerenciar as conexões dos artistas.' },
+      { status: 403 },
+    )
   }
 
   const slug = ehArtista ? sessao.artistaSlug : searchParams.get('slug')?.trim() || null

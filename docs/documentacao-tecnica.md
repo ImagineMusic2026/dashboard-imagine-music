@@ -12,7 +12,7 @@ O **Painel de Acompanhamento de Artistas — Imagine Group** é uma aplicação 
 
 - **Frontend:** Next.js 14 (App Router), TypeScript 5, React 18, Tailwind CSS 3 + shadcn/ui (sobre Base UI), tema dark.
 - **Banco de dados:** Firebase **Firestore** (projeto `painel-imagine-music`) é o banco central. Leitura via Web SDK (cliente, respeitando regras), escrita exclusiva via **Admin SDK** (servidor).
-- **Autenticação:** Firebase Auth com RBAC de 3 papéis (`admin`, `marketing`, `artista`) e 4 capacidades delegáveis.
+- **Autenticação:** Firebase Auth com RBAC de 3 papéis (`admin`, `marketing`, `artista`) e 6 capacidades delegáveis.
 - **Integrações:** Meta/Instagram (Graph API), TikTok (Login Kit + Display API), YouTube (Data API pública + Analytics API privada), OneRPM (streaming via SFTP + receita via XLSX).
 - **Jobs agendados:** 5 crons diários da Vercel (`vercel.json`).
 - **Deploy:** Vercel, auto-deploy da branch `main` para `painel.imaginegroup.com.br` (produção com SSL).
@@ -223,7 +223,7 @@ Metadados (label, classe, gradiente CSS) em `roleMeta` (`src/lib/users.ts`).
 
 ### Capacidades delegáveis
 
-`type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar'` (`src/lib/users.ts`; padrões em `src/lib/permissions.ts`). **Não existe uma capacidade `gerenciarTime`** — a gestão de membros é admin-only e é imposta diretamente por `exigirAdmin` nas rotas e por `isAdmin()` nas regras.
+`type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar' | 'editarArtistas' | 'conexoesArtista'` (`src/lib/users.ts`; padrões em `src/lib/permissions.ts`). **Não existe uma capacidade `gerenciarTime`** — a gestão de membros é admin-only e é imposta diretamente por `exigirAdmin` nas rotas e por `isAdmin()` nas regras. **Criar e excluir artista também não são delegáveis** (`/api/artistas/criar` e `/api/artistas/excluir` seguem em `exigirAdmin`).
 
 Padrão por papel (`PADRAO` em `permissions.ts`):
 
@@ -233,8 +233,12 @@ Padrão por papel (`PADRAO` em `permissions.ts`):
 | `agenda` | ✓ | ✓ | ✗ |
 | `integracoes` | ✓ | ✗ | ✗ |
 | `importar` | ✓ | ✗ | ✗ |
+| `editarArtistas` | ✓ | ✓ | ✗ |
+| `conexoesArtista` | ✓ | ✓ | ✗ |
 
-**Permissão efetiva** (`temPermissao(user, cap)`): `user.permissoes?.[cap] ?? PADRAO[role]?.[cap] ?? false`. Ou seja, o **override por pessoa** (em `users/{uid}.permissoes`) sobrescreve o padrão do papel; papel desconhecido nunca passa. Papéis estruturais (`ehStaff`, `ehArtista`) não são editáveis — só as 4 capacidades são delegáveis.
+`editarArtistas` cobre `/api/artistas/atualizar` (e o botão **Editar** no perfil). `conexoesArtista` cobre `conectar`/`desconectar` de TikTok e YouTube **para outro artista** — o artista age sobre o próprio slug por ser artista, não pela capacidade (por isso essas rotas usam `sessaoPode`, e não `exigirPermissao`, que barraria o artista na entrada).
+
+**Permissão efetiva** (`temPermissao(user, cap)`): `user.permissoes?.[cap] ?? PADRAO[role]?.[cap] ?? false`. Ou seja, o **override por pessoa** (em `users/{uid}.permissoes`) sobrescreve o padrão do papel; papel desconhecido nunca passa. Papéis estruturais (`ehStaff`, `ehArtista`) não são editáveis — só as 6 capacidades são delegáveis.
 
 ### Enforcement em 3 camadas (lógica espelhada)
 

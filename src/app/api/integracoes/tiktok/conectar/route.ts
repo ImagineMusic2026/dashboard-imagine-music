@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { exigirSessaoAtiva } from '@/lib/server-auth'
+import { exigirSessaoAtiva, sessaoPode } from '@/lib/server-auth'
 import { resolverRedirectUri, tiktokConfigurado, TikTokConfigError } from '@/lib/tiktok/config'
 import { montarUrlAutorizacao } from '@/lib/tiktok/oauth'
 
@@ -11,9 +11,10 @@ export const dynamic = 'force-dynamic'
  * apenas devolve o link. Quem deve abrir o link e autorizar é o ARTISTA, com a
  * própria conta TikTok:
  *  - Artista (portal): autoriza só o próprio slug (o slug vem da sessão).
- *  - Admin: gera o link de qualquer artista (`?slug=`) para enviar a ele.
+ *  - Equipe com `conexoesArtista` (admin e marketing por padrão): gera o link de
+ *    qualquer artista (`?slug=`) para enviar a ele.
  *
- * Marketing não gerencia conexões (403). O destino pós-callback vai em
+ * Quem não tem a permissão leva 403. O destino pós-callback vai em
  * `?returnTo=` (caminho relativo) — default conforme o papel.
  */
 export async function GET(req: Request) {
@@ -28,13 +29,16 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url)
-  const ehAdmin = sessao.role === 'admin'
   const ehArtista = sessao.role === 'artista'
-  if (!ehAdmin && !ehArtista) {
-    return NextResponse.json({ error: 'Apenas admin ou o próprio artista podem conectar uma conta.' }, { status: 403 })
+  const ehEquipe = !ehArtista && sessaoPode(sessao, 'conexoesArtista')
+  if (!ehEquipe && !ehArtista) {
+    return NextResponse.json(
+      { error: 'Você não tem permissão para gerenciar as conexões dos artistas.' },
+      { status: 403 },
+    )
   }
 
-  // Artista só conecta o próprio slug; admin escolhe via querystring.
+  // Artista só conecta o próprio slug; a equipe escolhe via querystring.
   const slug = ehArtista ? sessao.artistaSlug : searchParams.get('slug')?.trim() || null
   if (!slug) {
     return NextResponse.json(

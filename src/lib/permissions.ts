@@ -28,8 +28,9 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     agenda: true,
     integracoes: false,
     importar: false,
-    // O time de marketing é quem mantém o cadastro e cobra a conexão do artista
-    // no dia a dia — por isso estas duas vêm ligadas (o admin pode tirar de alguém).
+    // O time de marketing é quem mantém o cadastro (cria e edita) e cobra a conexão
+    // do artista no dia a dia — por isso estas duas vêm ligadas (o admin pode tirar
+    // de alguém). Excluir artista não é delegável: segue `exigirAdmin`.
     editarArtistas: true,
     conexoesArtista: true,
   },
@@ -51,8 +52,8 @@ export const CAPACIDADES: { cap: Capacidade; label: string; descricao: string }[
   { cap: 'importar', label: 'Importar dados', descricao: 'Subir planilhas de OneRPM e roster.' },
   {
     cap: 'editarArtistas',
-    label: 'Editar artistas',
-    descricao: 'Alterar o cadastro do artista (nome, gênero, foto, redes e projeto).',
+    label: 'Cadastrar / editar artistas',
+    descricao: 'Criar artista novo e alterar o cadastro (nome, gênero, foto, redes e projeto). Excluir segue só admin.',
   },
   {
     cap: 'conexoesArtista',

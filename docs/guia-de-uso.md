@@ -36,7 +36,7 @@ Cada pessoa tem **um papel**, que decide o que ela enxerga:
 | Papel | O que enxerga |
 |-------|---------------|
 | **Admin** | Acesso total ao painel. Gerencia o time, convida pessoas, define permissões, cadastra artistas, conecta integrações, importa planilhas e vê a receita. |
-| **Marketing** | Acesso ao painel da equipe (home, artistas, alertas, conteúdo, agenda). Edita o cadastro dos artistas e gera os links de conexão de YouTube/TikTok. **Sem ver a receita** e **sem gerenciar integrações** por padrão; criar e excluir artista continuam só com o admin. |
+| **Marketing** | Acesso ao painel da equipe (home, artistas, alertas, conteúdo, agenda). Cadastra e edita artistas e gera os links de conexão de YouTube/TikTok. **Sem ver a receita** e **sem gerenciar integrações** por padrão; **excluir** artista continua só com o admin. |
 | **Artista** | Vê **somente o próprio perfil**, numa área separada chamada portal. Não navega pelo painel da equipe. |
 
 Pontos importantes:
@@ -95,7 +95,7 @@ A página **Artistas** lista todos os artistas do roster, com busca e paginaçã
 2. Use o campo de busca para filtrar pelo nome. (A busca rápida ⌘K também leva direto a um artista.)
 3. Clique no nome para abrir o **perfil** dele.
 
-### Cadastrar um novo artista *(admin)*
+### Cadastrar um novo artista *(admin e marketing)*
 
 1. Acesse **Artistas**.
 2. Clique em **Novo artista** e preencha os dados: **nome, descrição e redes sociais** (Spotify, YouTube, Instagram, TikTok).
@@ -113,7 +113,7 @@ A página **Artistas** lista todos os artistas do roster, com busca e paginaçã
 2. Use a opção de **excluir**.
 3. Confirme. O cadastro e as redes vinculadas são removidos.
 
-> **Quem pode:** **editar** exige a permissão de **editar artistas** — por padrão liberada para a **equipe (admin e marketing)**; o admin pode tirar de uma pessoa em Configurações → Permissões. **Criar** e **excluir** continuam só com o **admin**: o botão "Novo artista" e a exclusão dentro do formulário não aparecem para os demais.
+> **Quem pode:** **cadastrar e editar** exige a permissão de **cadastrar / editar artistas** — por padrão liberada para a **equipe (admin e marketing)**; o admin pode tirar de uma pessoa em Configurações → Permissões. **Excluir** continua só com o **admin**: a exclusão dentro do formulário não aparece para os demais.
 
 ---
 
@@ -301,12 +301,12 @@ Na aba **Permissões**, o admin vê uma tabela de **pessoas × capacidades** e p
 | **Agenda** | Acessar e editar eventos (releases, shows, contratos). |
 | **Integrações** | Descobrir contas e sincronizar métricas. |
 | **Importar dados** | Subir planilhas (OneRPM e roster). |
-| **Editar artistas** | Botão **Editar** no perfil do artista: nome, gênero, foto, redes e projeto. |
+| **Cadastrar / editar artistas** | Botão **Novo artista** na lista e o **Editar** no perfil: nome, gênero, foto, redes e projeto. |
 | **Conexões do artista** | Gerar e revogar os links de autorização de YouTube e TikTok. |
 
-Cada capacidade tem um **padrão por papel**; ao ajustar para uma pessoa, você cria um **override** (uma exceção). Há um botão para **restaurar o padrão** do papel quando quiser. Os padrões são: **admin** tem as seis; **marketing** tem agenda, editar artistas e conexões do artista; **artista** não tem nenhuma.
+Cada capacidade tem um **padrão por papel**; ao ajustar para uma pessoa, você cria um **override** (uma exceção). Há um botão para **restaurar o padrão** do papel quando quiser. Os padrões são: **admin** tem as seis; **marketing** tem agenda, cadastrar/editar artistas e conexões do artista; **artista** não tem nenhuma.
 
-> **Excluir artista não é delegável:** o botão de exclusão só aparece para o admin, e a rota também recusa qualquer outro papel. Cadastrar um artista novo também segue só com o admin.
+> **Excluir artista não é delegável:** o botão de exclusão só aparece para o admin, e a rota também recusa qualquer outro papel.
 
 ### Artistas
 

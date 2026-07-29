@@ -223,7 +223,7 @@ Metadados (label, classe, gradiente CSS) em `roleMeta` (`src/lib/users.ts`).
 
 ### Capacidades delegáveis
 
-`type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar' | 'editarArtistas' | 'conexoesArtista'` (`src/lib/users.ts`; padrões em `src/lib/permissions.ts`). **Não existe uma capacidade `gerenciarTime`** — a gestão de membros é admin-only e é imposta diretamente por `exigirAdmin` nas rotas e por `isAdmin()` nas regras. **Criar e excluir artista também não são delegáveis** (`/api/artistas/criar` e `/api/artistas/excluir` seguem em `exigirAdmin`).
+`type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar' | 'editarArtistas' | 'conexoesArtista'` (`src/lib/users.ts`; padrões em `src/lib/permissions.ts`). **Não existe uma capacidade `gerenciarTime`** — a gestão de membros é admin-only e é imposta diretamente por `exigirAdmin` nas rotas e por `isAdmin()` nas regras. **Excluir artista também não é delegável** (`/api/artistas/excluir` segue em `exigirAdmin`).
 
 Padrão por papel (`PADRAO` em `permissions.ts`):
 
@@ -236,7 +236,7 @@ Padrão por papel (`PADRAO` em `permissions.ts`):
 | `editarArtistas` | ✓ | ✓ | ✗ |
 | `conexoesArtista` | ✓ | ✓ | ✗ |
 
-`editarArtistas` cobre `/api/artistas/atualizar` (e o botão **Editar** no perfil). `conexoesArtista` cobre `conectar`/`desconectar` de TikTok e YouTube **para outro artista** — o artista age sobre o próprio slug por ser artista, não pela capacidade (por isso essas rotas usam `sessaoPode`, e não `exigirPermissao`, que barraria o artista na entrada).
+`editarArtistas` cobre `/api/artistas/criar` e `/api/artistas/atualizar` (botões **Novo artista** na lista e **Editar** no perfil). `conexoesArtista` cobre `conectar`/`desconectar` de TikTok e YouTube **para outro artista** — o artista age sobre o próprio slug por ser artista, não pela capacidade (por isso essas rotas usam `sessaoPode`, e não `exigirPermissao`, que barraria o artista na entrada).
 
 **Permissão efetiva** (`temPermissao(user, cap)`): `user.permissoes?.[cap] ?? PADRAO[role]?.[cap] ?? false`. Ou seja, o **override por pessoa** (em `users/{uid}.permissoes`) sobrescreve o padrão do papel; papel desconhecido nunca passa. Papéis estruturais (`ehStaff`, `ehArtista`) não são editáveis — só as 6 capacidades são delegáveis.
 

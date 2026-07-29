@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
-import { exigirAdmin } from '@/lib/server-auth'
+import { exigirPermissao } from '@/lib/server-auth'
 import { ArtistaInputError, salvarArtistaManual } from '@/lib/roster/firestore'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * Cadastro manual de 1 artista. Só admin. Recebe nome + URLs das redes (todas
- * opcionais menos o nome) e faz UPSERT em `artistas/{slug}` preservando o que já
- * existir (receita, redes não informadas).
+ * Cadastro manual de 1 artista. Exige a permissão `editarArtistas` (admin e
+ * marketing por padrão) — a mesma de editar; só excluir segue admin-only. Recebe
+ * nome + URLs das redes (todas opcionais menos o nome) e faz UPSERT em
+ * `artistas/{slug}` preservando o que já existir (receita, redes não informadas).
  */
 export async function POST(req: Request) {
-  const auth = await exigirAdmin(req)
+  const auth = await exigirPermissao(req, 'editarArtistas')
   if (auth instanceof NextResponse) return auth
 
   let body: {

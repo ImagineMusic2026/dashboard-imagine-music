@@ -194,7 +194,7 @@ function ThOrdenavel({
 }
 
 export function ArtistasLista() {
-  const { role, loading, favoritos } = useAuth()
+  const { role, loading, favoritos, pode } = useAuth()
   const [artistas, setArtistas] = useState<ArtistaDoc[] | null>(null)
   const [receitas, setReceitas] = useState<Map<string, ReceitaResumo>>(new Map())
   const [metricas, setMetricas] = useState<Map<string, MetricasSociaisDoc>>(new Map())
@@ -208,7 +208,10 @@ export function ArtistasLista() {
   const [histHealth, setHistHealth] = useState<Map<string, number[]>>(new Map())
   const buscadosRef = useRef<Set<string>>(new Set())
 
+  // `ehAdmin` aqui é sobre a coluna de RECEITA (dado sensível). Cadastrar artista
+  // é permissão à parte — marketing tem por padrão.
   const ehAdmin = role === 'admin'
+  const podeCadastrar = role !== 'artista' && pode('editarArtistas')
 
   const recarregar = useCallback(async () => {
     try {
@@ -372,7 +375,7 @@ export function ArtistasLista() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {ehAdmin && (
+          {podeCadastrar && (
             <button
               type="button"
               onClick={() => setDialogAberto(true)}
@@ -738,7 +741,7 @@ export function ArtistasLista() {
         </span>
       </div>
 
-      {dialogAberto && (
+      {dialogAberto && podeCadastrar && (
         <CriarArtistaDialog onClose={() => setDialogAberto(false)} onCreated={() => void recarregar()} />
       )}
     </div>

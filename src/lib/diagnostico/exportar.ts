@@ -99,7 +99,7 @@ function montarHtml(tipo: TipoDiagnostico, artistaNome: string, doc: Diagnostico
 <title>${esc(titulo)}</title>
 <style>${CSS}</style>
 </head>
-<body>
+<body data-questionario>
   <div class="topo">
     <img src="${esc(logo)}" alt="Imagine Music">
     <div class="kicker">Questionário de Estruturação</div>
@@ -144,22 +144,24 @@ export function exportarDiagnosticoPdf(tipo: TipoDiagnostico, artistaNome: strin
 
   let disparado = false
   iframe.onload = () => {
-    if (disparado) return
-    disparado = true
+    // Inserir um iframe no DOM dispara um `load` do `about:blank` inicial, ANTES do
+    // documento de verdade. Sem conferir o marcador, quem ia pra impressora era a
+    // página vazia — e com o título certo, porque o título vem do documento pai.
+    const conteudo = iframe.contentDocument
     const win = iframe.contentWindow
-    if (!win) {
-      limpar()
-      return
-    }
+    if (disparado || !win || !conteudo?.querySelector('[data-questionario]')) return
+    disparado = true
     win.addEventListener('afterprint', limpar, { once: true })
-    // Safari não dispara `afterprint` no iframe; sem esta rede o iframe (invisível)
-    // ficaria pendurado no DOM e o título da aba, trocado.
-    window.setTimeout(limpar, 60_000)
     document.title = titulo
     win.focus()
     win.print()
   }
 
-  document.body.appendChild(iframe)
+  // `srcdoc` ANTES de inserir: o iframe já entra no DOM carregando o documento certo.
   iframe.srcdoc = html
+  document.body.appendChild(iframe)
+  // Rede de segurança: o Safari não dispara `afterprint` em iframe, e se o documento
+  // nunca carregar o `onload` não roda — sem isto o iframe ficaria pendurado no DOM e
+  // o título da aba, trocado. `limpar` é idempotente.
+  window.setTimeout(limpar, 60_000)
 }

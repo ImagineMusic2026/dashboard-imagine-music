@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Check, ClipboardList, X } from 'lucide-react'
+import { Check, ClipboardList, FileDown, X } from 'lucide-react'
 import type { DiagnosticoDoc } from '@/lib/diagnostico/client'
+import { exportarDiagnosticoPdf } from '@/lib/diagnostico/exportar'
 import { NOME_CURTO, progressoDe, questionario, type TipoDiagnostico } from '@/lib/diagnostico/perguntas'
 import { cn } from '@/lib/utils'
 
@@ -81,14 +82,27 @@ export function DiagnosticoRespostasDialog({
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onFechar}
-            aria-label="Fechar"
-            className="p-1.5 rounded-md hover:bg-bg-800 text-ink-400 transition-colors shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {/* Exportar sai daqui e não do card: o que vai pro PDF é o questionário
+              que está aberto, com o mesmo recorte que a pessoa está lendo. */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => exportarDiagnosticoPdf(tipo, artistaNome, doc)}
+              title='Abre a impressão do navegador — escolha "Salvar como PDF"'
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Exportar PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={onFechar}
+              aria-label="Fechar"
+              className="p-1.5 rounded-md hover:bg-bg-800 text-ink-400 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="h-1 bg-bg-800 shrink-0">

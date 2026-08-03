@@ -204,7 +204,8 @@ export function PerfilArtistaReal({
           mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
       <ProjetoArtistaCard slug={a.slug} />
 
-      {/* Diagnóstico — o que o artista respondeu no portal. Também só staff. */}
+      {/* Diagnóstico — o que o artista respondeu no portal (ou o que a equipe
+          preencheu por ele). Também só staff. */}
       <DiagnosticoArtistaCard slug={a.slug} nome={a.nome} />
 
       {/* Acesso & integrações — substitui o antigo "Redes sociais": nível de

@@ -384,6 +384,7 @@ const JANELA_DIAGNOSTICO_DIAS = 14
 export interface DiagnosticoEnviado {
   slug: string
   tipo: 'projeto' | 'artista'
+  origem?: 'artista' | 'equipe'
   enviadoEmMs: number | null
 }
 
@@ -396,6 +397,9 @@ export interface DiagnosticoEnviado {
  * marca), então sem janela ele viraria permanente e ensinaria a equipe a ignorar a
  * tela. Passada a janela, a resposta continua no perfil do artista, onde é o lugar
  * dela; o que expira é o aviso, não o dado.
+ *
+ * Questionário preenchido PELA EQUIPE não vira alerta: avisar quem acabou de digitar
+ * de que alguém digitou é ruído — e o texto ("respondeu o questionário") seria falso.
  */
 export function derivarAlertasDiagnostico(
   enviados: DiagnosticoEnviado[],
@@ -404,6 +408,7 @@ export function derivarAlertasDiagnostico(
 ): AlertaDerivado[] {
   const rotulo = { projeto: 'Projeto', artista: 'Artista' } as const
   return enviados
+    .filter((d) => d.origem !== 'equipe')
     .filter((d) => d.enviadoEmMs && agora - d.enviadoEmMs <= JANELA_DIAGNOSTICO_DIAS * DIA)
     .map((d) =>
       mk(

@@ -3,19 +3,33 @@ import { db } from '@/lib/firebase'
 import { ehTipoValido, idsValidos, type TipoDiagnostico } from './perguntas'
 
 /**
- * Leitura/escrita do diagnóstico pelo CLIENT SDK — quem responde é o artista, no
- * portal, e as regras do Firestore é que autorizam (mesmo padrão da `agenda`).
+ * Leitura/escrita do diagnóstico pelo CLIENT SDK — respondem o artista (no portal) e
+ * a equipe (no painel), e as regras do Firestore é que autorizam (mesmo padrão da
+ * `agenda`).
  *
  * Caminho: `diagnosticos/{slug}/questionarios/{tipo}`. O slug é um segmento do
  * caminho de propósito: a regra o lê direto de lá (`isArtistaDe(slug)`), sem
  * depender de um campo dentro do doc que o próprio cliente escreve.
  */
 
+/**
+ * Quem gravou por último. É UM questionário por artista e tipo — o artista responde
+ * no portal, a equipe preenche pelo painel quando a resposta veio por fora (reunião,
+ * WhatsApp, o formulário antigo), e os dois mexem no mesmo doc.
+ *
+ * Não é enfeite: sustenta o "respondido pelo artista" do card e segura o alerta
+ * quando quem preencheu foi a própria equipe. A regra do Firestore trava o valor —
+ * cada lado só consegue gravar o seu.
+ */
+export type OrigemDiagnostico = 'artista' | 'equipe'
+
 export interface DiagnosticoDoc {
   slug: string
   tipo: TipoDiagnostico
   respostas: Record<string, string>
   status: 'rascunho' | 'enviado'
+  /** Doc antigo (anterior ao preenchimento pela equipe) só podia vir do portal. */
+  origem: OrigemDiagnostico
   atualizadoEmMs: number | null
   enviadoEmMs: number | null
 }
@@ -53,6 +67,7 @@ export async function getDiagnostico(slug: string, tipo: TipoDiagnostico): Promi
     tipo,
     respostas: (x.respostas ?? {}) as Record<string, string>,
     status: x.status === 'enviado' ? 'enviado' : 'rascunho',
+    origem: x.origem === 'equipe' ? 'equipe' : 'artista',
     atualizadoEmMs: ms(x.atualizadoEm),
     enviadoEmMs: ms(x.enviadoEm),
   }
@@ -87,6 +102,7 @@ export async function listarDiagnosticosEnviados(): Promise<DiagnosticoDoc[]> {
         tipo: (x.tipo === 'projeto' ? 'projeto' : 'artista') as TipoDiagnostico,
         respostas: (x.respostas ?? {}) as Record<string, string>,
         status: 'enviado' as const,
+        origem: (x.origem === 'equipe' ? 'equipe' : 'artista') as OrigemDiagnostico,
         atualizadoEmMs: ms(x.atualizadoEm),
         enviadoEmMs: ms(x.enviadoEm),
       }
@@ -96,17 +112,21 @@ export async function listarDiagnosticosEnviados(): Promise<DiagnosticoDoc[]> {
 /**
  * Salva as respostas. `merge: true` porque o autosave manda o formulário inteiro a
  * cada pausa — e porque `enviadoEm` não pode ser apagado por um rascunho posterior.
+ *
+ * `origem` é obrigatória e não tem padrão: é ela que diz de quem é a resposta, e um
+ * palpite errado aqui vira um "respondido pelo artista" mentiroso no card.
  */
 export async function salvarDiagnostico(
   slug: string,
   tipo: TipoDiagnostico,
   respostas: Record<string, string>,
-  opcoes: { enviar?: boolean } = {}
+  opcoes: { origem: OrigemDiagnostico; enviar?: boolean }
 ): Promise<void> {
   const dados: Record<string, unknown> = {
     slug,
     tipo,
     respostas: limparRespostas(tipo, respostas),
+    origem: opcoes.origem,
     atualizadoEm: serverTimestamp(),
   }
   if (opcoes.enviar) {

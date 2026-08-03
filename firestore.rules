@@ -53,6 +53,13 @@ service cloud.firestore {
         && userData().get('permissoes', {}).get('agenda',
              userData().get('role', '') == 'admin' || userData().get('role', '') == 'marketing');
     }
+    // Quem mantém o cadastro do artista (admin e marketing por padrão). O `isStaff()`
+    // na frente é de propósito: o padrão do papel `artista` é FALSE, mas um override
+    // solto no login de um artista não pode virar acesso ao dado alheio.
+    function podeEditarArtistas() {
+      return isStaff()
+        && userData().get('permissoes', {}).get('editarArtistas', true);
+    }
 
     function convite(token) {
       return get(/databases/$(database)/documents/convites/$(token)).data;
@@ -124,17 +131,27 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Questionário de estruturação (diagnóstico). Quem RESPONDE é o artista, no
-    // portal — por isso é a única coleção com escrita pelo client fora da agenda.
+    // Questionário de estruturação (diagnóstico). Respondem o ARTISTA (no portal) e a
+    // EQUIPE (no painel, quando a resposta veio por fora: reunião, WhatsApp, o
+    // formulário antigo) — por isso é a única coleção com escrita pelo client fora da
+    // agenda. É o MESMO doc pros dois: um questionário por artista e tipo.
     //
     // O slug vem do CAMINHO, não de um campo do doc: o cliente escreve o corpo, e
     // confiar num `slug` de dentro dele deixaria o artista gravar no diagnóstico
     // alheio. `hasOnly` trava o formato — ninguém inventa campo.
+    //
+    // Cada lado só grava a SUA `origem`: o artista não se passa por equipe e a equipe
+    // não forja um "respondido pelo artista". Doc antigo não tem o campo, e aí só o
+    // artista escrevia mesmo — daí o padrão do `get`.
     match /diagnosticos/{slug}/questionarios/{tipo} {
       allow read: if isStaff() || isArtistaDe(slug);
-      allow create, update: if isArtistaDe(slug)
+      allow create, update: if
+        (
+          (isArtistaDe(slug) && request.resource.data.get('origem', 'artista') == 'artista')
+          || (podeEditarArtistas() && request.resource.data.get('origem', '') == 'equipe')
+        )
         && request.resource.data.keys().hasOnly(
-             ['slug', 'tipo', 'respostas', 'status', 'atualizadoEm', 'enviadoEm'])
+             ['slug', 'tipo', 'respostas', 'status', 'origem', 'atualizadoEm', 'enviadoEm'])
         && request.resource.data.slug == slug
         && request.resource.data.tipo == tipo
         && request.resource.data.respostas is map;

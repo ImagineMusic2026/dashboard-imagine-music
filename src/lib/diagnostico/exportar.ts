@@ -69,7 +69,14 @@ function montarHtml(tipo: TipoDiagnostico, artistaNome: string, doc: Diagnostico
   const prog = progressoDe(tipo, doc?.respostas)
   const enviadoEm = doc?.status === 'enviado' ? data(doc.enviadoEmMs) : null
 
-  const estado = doc?.status === 'enviado' ? `Enviado${enviadoEm ? ` em ${enviadoEm}` : ''}` : 'Rascunho'
+  const daEquipe = doc?.origem === 'equipe'
+  const estado =
+    doc?.status === 'enviado'
+      ? `${daEquipe ? 'Concluído' : 'Enviado'}${enviadoEm ? ` em ${enviadoEm}` : ''}`
+      : 'Rascunho'
+  // Quem preencheu vai no papel: o documento circula fora do painel (reunião, plano),
+  // e "respondido pelo artista" é uma informação diferente de "transcrito pela equipe".
+  const autoria = daEquipe ? 'Preenchido pela equipe' : 'Respondido pelo artista'
 
   const corpo = q.secoes
     .map((secao) => {
@@ -109,6 +116,7 @@ function montarHtml(tipo: TipoDiagnostico, artistaNome: string, doc: Diagnostico
     <strong>${esc(NOME_CURTO[tipo])}</strong>
     &middot; ${esc(estado)}
     &middot; ${prog.respondidas} de ${prog.total} respondidas
+    &middot; ${esc(autoria)}
   </p>
   ${corpo}
   <p class="rodape">Gerado pelo Painel Imagine em ${esc(data(Date.now()) ?? '')}.</p>

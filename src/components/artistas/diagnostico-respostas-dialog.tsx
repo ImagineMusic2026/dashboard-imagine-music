@@ -36,6 +36,7 @@ export function DiagnosticoRespostasDialog({
   const q = questionario(tipo)
   const prog = progressoDe(tipo, doc?.respostas)
   const enviado = doc?.status === 'enviado'
+  const daEquipe = doc?.origem === 'equipe'
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -69,7 +70,7 @@ export function DiagnosticoRespostasDialog({
                 {enviado ? (
                   <span className="flex items-center gap-1 text-[10px] tracking-wider font-bold text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
                     <Check className="w-2.5 h-2.5" />
-                    ENVIADO {dataCurta(doc?.enviadoEmMs ?? null)}
+                    {daEquipe ? 'CONCLUÍDO' : 'ENVIADO'} {dataCurta(doc?.enviadoEmMs ?? null)}
                   </span>
                 ) : (
                   <span className="text-[10px] tracking-wider font-bold text-amber-300 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
@@ -78,6 +79,11 @@ export function DiagnosticoRespostasDialog({
                 )}
                 <span className="text-[12px] text-ink-500 num">
                   {prog.respondidas} de {prog.total}
+                </span>
+                {/* Quem escreveu muda como se lê o texto: resposta do artista é a
+                    voz dele; preenchida pela equipe é transcrição. */}
+                <span className="text-[12px] text-ink-500">
+                  · {daEquipe ? 'preenchido pela equipe' : 'respondido pelo artista'}
                 </span>
               </div>
             </div>

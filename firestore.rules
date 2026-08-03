@@ -143,18 +143,28 @@ service cloud.firestore {
     // Cada lado só grava a SUA `origem`: o artista não se passa por equipe e a equipe
     // não forja um "respondido pelo artista". Doc antigo não tem o campo, e aí só o
     // artista escrevia mesmo — daí o padrão do `get`.
+    //
+    // A equipe também pode gravar SEM tocar na autoria (o save que só guarda o link do
+    // arquivo original): num merge, `request.resource.data` já vem com o valor antigo,
+    // então "igual ao que estava" é exatamente isso — e não dá pra forjar, porque só
+    // preserva o que o doc já dizia. `resource != null` porque no create não há antigo.
     match /diagnosticos/{slug}/questionarios/{tipo} {
       allow read: if isStaff() || isArtistaDe(slug);
       allow create, update: if
         (
           (isArtistaDe(slug) && request.resource.data.get('origem', 'artista') == 'artista')
-          || (podeEditarArtistas() && request.resource.data.get('origem', '') == 'equipe')
+          || (podeEditarArtistas() && (
+                request.resource.data.get('origem', '') == 'equipe'
+                || (resource != null && request.resource.data.get('origem', '') == resource.data.get('origem', ''))
+             ))
         )
         && request.resource.data.keys().hasOnly(
-             ['slug', 'tipo', 'respostas', 'status', 'origem', 'atualizadoEm', 'enviadoEm'])
+             ['slug', 'tipo', 'respostas', 'status', 'origem', 'arquivoUrl', 'atualizadoEm', 'enviadoEm'])
         && request.resource.data.slug == slug
         && request.resource.data.tipo == tipo
-        && request.resource.data.respostas is map;
+        && request.resource.data.respostas is map
+        // Link do questionário original (Drive/Pipefy) — opcional, mas se vier é texto.
+        && (!('arquivoUrl' in request.resource.data) || request.resource.data.arquivoUrl is string);
       allow delete: if false;
     }
 

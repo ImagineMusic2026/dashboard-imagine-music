@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Check, CloudOff, Loader2, Send, UserCog } from 'lucide-react'
+import { ArrowLeft, Check, CloudOff, Loader2, Paperclip, Send, UserCog } from 'lucide-react'
 import {
   getDiagnostico,
   salvarDiagnostico,
   MAX_RESPOSTA,
+  MAX_URL,
   type OrigemDiagnostico,
 } from '@/lib/diagnostico/client'
 import { progressoDe, questionario, type Pergunta, type TipoDiagnostico } from '@/lib/diagnostico/perguntas'
@@ -51,6 +52,8 @@ export function DiagnosticoForm({
   const equipe = modo === 'equipe'
 
   const [respostas, setRespostas] = useState<Record<string, string>>({})
+  // Link do questionário ORIGINAL (só o modo equipe edita — quem recebe o arquivo é ela).
+  const [arquivoUrl, setArquivoUrl] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [enviado, setEnviado] = useState(false)
   // Origem do que estava GRAVADO ao abrir — avisa a equipe quando ela está prestes a
@@ -64,7 +67,15 @@ export function DiagnosticoForm({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const respostasRef = useRef(respostas)
   respostasRef.current = respostas
-  const sujo = useRef(false)
+  const arquivoRef = useRef(arquivoUrl)
+  arquivoRef.current = arquivoUrl
+  // `origemSalva` também em ref: `salvar` precisa dela e não pode mudar de identidade
+  // (o efeito de desmontagem depende de `salvar`, e recriá-lo dispararia saves à toa).
+  const origemSalvaRef = useRef(origemSalva)
+  origemSalvaRef.current = origemSalva
+  // Duas sujeiras separadas: o que muda a AUTORIA e o status são as respostas.
+  const sujoRespostas = useRef(false)
+  const sujoArquivo = useRef(false)
 
   useEffect(() => {
     if (!slug) return
@@ -74,6 +85,7 @@ export function DiagnosticoForm({
         if (!vivo) return
         if (d) {
           setRespostas(d.respostas)
+          setArquivoUrl(d.arquivoUrl)
           setEnviado(d.status === 'enviado')
           setOrigemSalva(d.origem)
         }
@@ -88,14 +100,25 @@ export function DiagnosticoForm({
   const salvar = useCallback(
     async (enviar = false) => {
       if (!slug) return
+      // Guardar o link do arquivo não é responder: não reescreve autoria nem status.
+      // No doc que ainda não existe a autoria PRECISA ir junto (a regra exige).
+      const soAnexo =
+        !enviar && !sujoRespostas.current && sujoArquivo.current && origemSalvaRef.current !== null
       setSalvamento({ estado: 'salvando' })
       try {
-        await salvarDiagnostico(slug, tipo, respostasRef.current, { origem: modo, enviar })
-        sujo.current = false
+        await salvarDiagnostico(slug, tipo, respostasRef.current, {
+          origem: soAnexo ? undefined : modo,
+          enviar,
+          // Só a equipe manda o link — do portal, mandar vazio apagaria o que ela guardou.
+          arquivoUrl: modo === 'equipe' ? arquivoRef.current : undefined,
+        })
+        sujoRespostas.current = false
+        sujoArquivo.current = false
         setSalvamento({ estado: 'salvo', em: Date.now() })
-        setOrigemSalva(modo)
-        if (enviar) setEnviado(true)
-        else setEnviado(false)
+        if (!soAnexo) {
+          setOrigemSalva(modo)
+          setEnviado(enviar)
+        }
       } catch {
         setSalvamento({ estado: 'erro' })
       }
@@ -103,12 +126,18 @@ export function DiagnosticoForm({
     [slug, tipo, modo]
   )
 
-  function aoDigitar(id: string, valor: string) {
-    setRespostas((r) => ({ ...r, [id]: valor.slice(0, MAX_RESPOSTA) }))
-    sujo.current = true
+  /** Marca o que ficou sujo e reinicia a contagem do autosave. */
+  function agendarSalvar(o: 'respostas' | 'arquivo') {
+    if (o === 'respostas') sujoRespostas.current = true
+    else sujoArquivo.current = true
     setSalvamento({ estado: 'ocioso' })
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => void salvar(false), DEBOUNCE_MS)
+  }
+
+  function aoDigitar(id: string, valor: string) {
+    setRespostas((r) => ({ ...r, [id]: valor.slice(0, MAX_RESPOSTA) }))
+    agendarSalvar('respostas')
   }
 
   // Salva o que estiver pendente ao sair da página — quem fecha a aba no meio de uma
@@ -116,7 +145,7 @@ export function DiagnosticoForm({
   useEffect(() => {
     return () => {
       if (timer.current) clearTimeout(timer.current)
-      if (sujo.current) void salvar(false)
+      if (sujoRespostas.current || sujoArquivo.current) void salvar(false)
     }
   }, [salvar])
 
@@ -181,6 +210,54 @@ export function DiagnosticoForm({
             : q.intro}
         </p>
       </div>
+
+      {/* O arquivo que a cliente já tem (PDF do Pipefy, formulário digitalizado) fica
+          onde ela guarda — aqui vai só o LINK. Sem upload de propósito: guardar
+          arquivo exigiria storage novo, e o original raramente é aberto depois que as
+          respostas estão aqui dentro. */}
+      {equipe && (
+        <div className="bg-bg-900 border border-bg-700/40 rounded-xl px-4 py-3.5">
+          <label htmlFor="d-arquivo" className="flex items-center gap-1.5 text-sm font-medium text-ink-200 mb-1">
+            <Paperclip className="w-3.5 h-3.5 text-ink-500" />
+            Link do questionário original
+            <span className="text-[12px] font-normal text-ink-600">(opcional)</span>
+          </label>
+          <p id="d-arquivo-ajuda" className="text-[12px] text-ink-500 leading-relaxed mb-1.5">
+            Cole o endereço do arquivo no Drive, no Pipefy ou onde ele estiver. Fica no perfil do artista, pra equipe
+            abrir o original quando precisar conferir.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              id="d-arquivo"
+              type="url"
+              inputMode="url"
+              aria-describedby="d-arquivo-ajuda"
+              value={arquivoUrl}
+              onChange={(e) => {
+                setArquivoUrl(e.target.value.slice(0, MAX_URL))
+                agendarSalvar('arquivo')
+              }}
+              maxLength={MAX_URL}
+              placeholder="https://drive.google.com/…"
+              className={cn(
+                'flex-1 min-w-0 bg-bg-950 border border-bg-700/50 rounded-lg px-4 py-2 text-sm text-ink-100',
+                'placeholder:text-ink-600 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20',
+                'transition-colors'
+              )}
+            />
+            {arquivoUrl.trim() && (
+              <a
+                href={arquivoUrl.trim()}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 px-2.5 py-2 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors"
+              >
+                Abrir
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Editar por cima do que o artista escreveu é permitido — mas ele deixa de
           constar como autor, e isso não pode ser uma surpresa. */}

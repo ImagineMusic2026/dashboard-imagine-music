@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Check, ClipboardList, Pencil } from 'lucide-react'
+import { Check, ClipboardList, Paperclip, Pencil } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { ehStaff } from '@/lib/permissions'
 import { getDiagnostico, type DiagnosticoDoc } from '@/lib/diagnostico/client'
@@ -106,28 +106,46 @@ export function DiagnosticoArtistaCard({ slug, nome }: { slug: string; nome: str
                       </span>
                     )}
                   </div>
-                  {temResposta ? (
-                    <>
-                      <div className="text-[12px] text-ink-500 mt-0.5">
+                  <div className="text-[12px] text-ink-500 mt-0.5">
+                    {temResposta ? (
+                      <>
                         <span className="num">
                           {prog.respondidas} de {prog.total} respondidas
                         </span>
                         {' · '}
                         {daEquipe ? 'preenchido pela equipe' : 'respondido pelo artista'}
-                      </div>
-                      <div className="h-1 rounded-full bg-bg-800 mt-2 overflow-hidden max-w-xs">
-                        <div
-                          className={cn(
-                            'h-full rounded-full transition-all duration-500',
-                            prog.pct === 100 ? 'bg-emerald-500' : 'bg-violet-500'
-                          )}
-                          style={{ width: `${prog.pct}%` }}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-[12px] text-ink-500 mt-0.5">
-                      <span className="num">{prog.total}</span> perguntas — nada respondido ainda
+                      </>
+                    ) : (
+                      <>
+                        <span className="num">{prog.total}</span> perguntas — nada respondido ainda
+                      </>
+                    )}
+                    {/* Fora do ramo "tem resposta" de propósito: dá pra anexar o
+                        original ANTES de transcrever, e aí é o único que existe. */}
+                    {doc?.arquivoUrl && (
+                      <>
+                        {' · '}
+                        <a
+                          href={doc.arquivoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors"
+                        >
+                          <Paperclip className="w-3 h-3" />
+                          original
+                        </a>
+                      </>
+                    )}
+                  </div>
+                  {temResposta && (
+                    <div className="h-1 rounded-full bg-bg-800 mt-2 overflow-hidden max-w-xs">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all duration-500',
+                          prog.pct === 100 ? 'bg-emerald-500' : 'bg-violet-500'
+                        )}
+                        style={{ width: `${prog.pct}%` }}
+                      />
                     </div>
                   )}
                 </div>

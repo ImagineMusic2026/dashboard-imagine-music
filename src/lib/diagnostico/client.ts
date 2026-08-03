@@ -30,12 +30,28 @@ export interface DiagnosticoDoc {
   status: 'rascunho' | 'enviado'
   /** Doc antigo (anterior ao preenchimento pela equipe) só podia vir do portal. */
   origem: OrigemDiagnostico
+  /** Link do questionário ORIGINAL (Drive, Pipefy…), quando a equipe guardou um. */
+  arquivoUrl: string
   atualizadoEmMs: number | null
   enviadoEmMs: number | null
 }
 
 /** Um texto longo, mas com teto — o campo é livre e vai pro Firestore (1MB/doc). */
 export const MAX_RESPOSTA = 5000
+
+/** Teto do link do arquivo original: é uma URL, não mais um campo de texto. */
+export const MAX_URL = 500
+
+/**
+ * O link do questionário original, normalizado. Quem cola um endereço sem esquema
+ * (`drive.google.com/…`) quer um link, não um texto — completar com `https://` evita
+ * o clique morto, e é o mesmo tipo de gentileza do campo de foto do artista.
+ */
+export function limparUrlArquivo(valor: string): string {
+  const s = valor.trim().slice(0, MAX_URL)
+  if (!s) return ''
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`
+}
 
 const ref = (slug: string, tipo: TipoDiagnostico) => doc(db, 'diagnosticos', slug, 'questionarios', tipo)
 
@@ -68,6 +84,7 @@ export async function getDiagnostico(slug: string, tipo: TipoDiagnostico): Promi
     respostas: (x.respostas ?? {}) as Record<string, string>,
     status: x.status === 'enviado' ? 'enviado' : 'rascunho',
     origem: x.origem === 'equipe' ? 'equipe' : 'artista',
+    arquivoUrl: typeof x.arquivoUrl === 'string' ? x.arquivoUrl : '',
     atualizadoEmMs: ms(x.atualizadoEm),
     enviadoEmMs: ms(x.enviadoEm),
   }
@@ -103,6 +120,7 @@ export async function listarDiagnosticosEnviados(): Promise<DiagnosticoDoc[]> {
         respostas: (x.respostas ?? {}) as Record<string, string>,
         status: 'enviado' as const,
         origem: (x.origem === 'equipe' ? 'equipe' : 'artista') as OrigemDiagnostico,
+        arquivoUrl: typeof x.arquivoUrl === 'string' ? x.arquivoUrl : '',
         atualizadoEmMs: ms(x.atualizadoEm),
         enviadoEmMs: ms(x.enviadoEm),
       }
@@ -113,29 +131,37 @@ export async function listarDiagnosticosEnviados(): Promise<DiagnosticoDoc[]> {
  * Salva as respostas. `merge: true` porque o autosave manda o formulário inteiro a
  * cada pausa — e porque `enviadoEm` não pode ser apagado por um rascunho posterior.
  *
- * `origem` é obrigatória e não tem padrão: é ela que diz de quem é a resposta, e um
- * palpite errado aqui vira um "respondido pelo artista" mentiroso no card.
+ * `origem` diz de quem são as RESPOSTAS, e um palpite errado aqui vira um "respondido
+ * pelo artista" mentiroso no card. Omitir é o que marca o save que mexeu SÓ no anexo:
+ * autoria e status ficam como estavam — colar o link do arquivo original não é
+ * responder o questionário, e não pode derrubar um concluído pra rascunho.
+ *
+ * `arquivoUrl` só entra no payload quando vem definida — o formulário do ARTISTA não
+ * tem o campo, e mandá-la vazia dali apagaria o link que a equipe guardou.
  */
 export async function salvarDiagnostico(
   slug: string,
   tipo: TipoDiagnostico,
   respostas: Record<string, string>,
-  opcoes: { origem: OrigemDiagnostico; enviar?: boolean }
+  opcoes: { origem?: OrigemDiagnostico; enviar?: boolean; arquivoUrl?: string }
 ): Promise<void> {
   const dados: Record<string, unknown> = {
     slug,
     tipo,
     respostas: limparRespostas(tipo, respostas),
-    origem: opcoes.origem,
     atualizadoEm: serverTimestamp(),
   }
-  if (opcoes.enviar) {
-    dados.status = 'enviado'
-    dados.enviadoEm = serverTimestamp()
-  } else {
-    // Voltar a editar depois de enviar derruba pra rascunho — o que a equipe vê é
-    // o estado real, não um "enviado" que ficou velho.
-    dados.status = 'rascunho'
+  if (opcoes.arquivoUrl !== undefined) dados.arquivoUrl = limparUrlArquivo(opcoes.arquivoUrl)
+  if (opcoes.origem) {
+    dados.origem = opcoes.origem
+    if (opcoes.enviar) {
+      dados.status = 'enviado'
+      dados.enviadoEm = serverTimestamp()
+    } else {
+      // Voltar a editar depois de enviar derruba pra rascunho — o que a equipe vê é
+      // o estado real, não um "enviado" que ficou velho.
+      dados.status = 'rascunho'
+    }
   }
   await setDoc(ref(slug, tipo), dados, { merge: true })
 }

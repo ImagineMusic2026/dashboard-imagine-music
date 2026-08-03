@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Check, ClipboardList, FileDown, X } from 'lucide-react'
+import { Check, ClipboardList, FileDown, Paperclip, X } from 'lucide-react'
 import type { DiagnosticoDoc } from '@/lib/diagnostico/client'
 import { exportarDiagnosticoPdf } from '@/lib/diagnostico/exportar'
 import { NOME_CURTO, progressoDe, questionario, type TipoDiagnostico } from '@/lib/diagnostico/perguntas'
@@ -91,6 +91,19 @@ export function DiagnosticoRespostasDialog({
           {/* Exportar sai daqui e não do card: o que vai pro PDF é o questionário
               que está aberto, com o mesmo recorte que a pessoa está lendo. */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* O original só existe quando a equipe guardou o link dele. */}
+            {doc?.arquivoUrl && (
+              <a
+                href={doc.arquivoUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="Abre o questionário original (Drive, Pipefy…) em outra aba"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors"
+              >
+                <Paperclip className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Original</span>
+              </a>
+            )}
             <button
               type="button"
               onClick={() => exportarDiagnosticoPdf(tipo, artistaNome, doc)}

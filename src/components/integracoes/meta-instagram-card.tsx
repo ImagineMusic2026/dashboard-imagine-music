@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
 import { listarContasVinculadas } from '@/lib/artistas/client'
 import { getStatusMeta } from '@/lib/metricas-sociais/client'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import type { IntegracaoMetaDoc } from '@/lib/metricas-sociais/types'
 import {
   BTN_PRIMARIO,
@@ -71,6 +72,9 @@ export function MetaInstagramCard() {
         })
         const data = await res.json().catch(() => null)
         if (!res.ok) throw new Error(data?.error ?? 'Falha na operação.')
+        // Descobrir mexe no cadastro, sincronizar nas métricas: as listas do painel
+        // precisam reler, senão mostram o número de antes da ação.
+        invalidarCachesDeLeitura()
         setMsg({
           tipo: 'ok',
           texto:

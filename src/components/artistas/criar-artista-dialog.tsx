@@ -13,6 +13,7 @@ import {
   type DadosProjeto,
 } from '@/components/artistas/artista-form-fields'
 import { cn } from '@/lib/utils'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 
 type RedeRes = { url: string; id: string | null; handle: string | null } | null
 
@@ -56,6 +57,8 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Não foi possível salvar o artista.')
+      // Antes do `onCreated()`: quem recarrega a lista precisa ler o roster novo.
+      invalidarCachesDeLeitura()
       setResultado(data as Resultado)
       onCreated()
     } catch (e) {

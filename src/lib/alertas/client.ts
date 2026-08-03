@@ -7,6 +7,7 @@ import {
   listarMetricasSociais,
 } from '@/lib/metricas-sociais/client'
 import { listarDiagnosticosEnviados } from '@/lib/diagnostico/client'
+import { memoCurta } from '@/lib/cache-leitura'
 import {
   derivarAlertas,
   derivarAlertasCadastro,
@@ -32,12 +33,7 @@ export async function getStatusIntegracoes(): Promise<StatusIntegracoes> {
   return { meta, tiktok, youtube, onerpm }
 }
 
-/**
- * Carrega TODOS os alertas abertos (sociais + cadastro + diagnóstico + operacionais),
- * já ordenados por severidade e recência. Fonte única da página de Alertas e do badge
- * do sino — assim os dois números sempre batem.
- */
-export async function carregarAlertas(): Promise<AlertaDerivado[]> {
+async function derivarTudo(): Promise<AlertaDerivado[]> {
   const [mapa, arts, integ, diagnosticos] = await Promise.all([
     listarMetricasSociais(),
     listarArtistas(),
@@ -54,3 +50,14 @@ export async function carregarAlertas(): Promise<AlertaDerivado[]> {
     ...derivarAlertasOperacionais(integ),
   ])
 }
+
+/**
+ * TODOS os alertas abertos (sociais + cadastro + diagnóstico + operacionais), já
+ * ordenados por severidade e recência. Fonte única da página de Alertas e do badge
+ * do sino — assim os dois números sempre batem.
+ *
+ * Cacheado por um minuto, e não é detalhe: o badge é renderizado pela sidebar E
+ * pela topbar, que montam juntas em toda tela do painel. Sem o cache, cada
+ * carregamento varria o roster e as métricas duas vezes só pra escrever um número.
+ */
+export const carregarAlertas = memoCurta(derivarTudo).ler

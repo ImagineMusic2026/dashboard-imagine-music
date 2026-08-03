@@ -13,6 +13,7 @@ import {
   type DadosProjeto,
 } from '@/components/artistas/artista-form-fields'
 import { corAvatarDe, getProjeto, iniciaisDe, type ArtistaDoc, type RedeSocialDoc } from '@/lib/artistas/client'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 
 /** URL inicial do campo: a url salva ou, faltando ela, uma reconstruída do handle/id. */
@@ -120,6 +121,8 @@ export function EditarArtistaDialog({
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Não foi possível salvar as alterações.')
+      // Antes do `onSaved()`: quem recarrega precisa ler o cadastro novo.
+      invalidarCachesDeLeitura()
       onSaved()
       onClose()
     } catch (e) {
@@ -143,6 +146,7 @@ export function EditarArtistaDialog({
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Não foi possível excluir o artista.')
+      invalidarCachesDeLeitura()
       ;(onDeleted ?? onSaved)()
       onClose()
     } catch (e) {

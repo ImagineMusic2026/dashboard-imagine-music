@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase'
 import { RevisarRosterDialog } from '@/components/importar/revisar-roster-dialog'
 import type { AnaliseRoster, DecisoesRoster, RosterArtist } from '@/lib/roster/types'
 import { cn } from '@/lib/utils'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 
 type Resumo = {
   totais: { total: number; comSpotifyId: number; comYoutube: number; comInstagram: number; comTiktok: number }
@@ -132,6 +133,8 @@ export function ImportadorRoster() {
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Não foi possível importar o cadastro.')
+      // A importação reescreve o roster — as telas de lista não podem ver o antigo.
+      invalidarCachesDeLeitura()
       setResultado(reporContasMantidas(data.resumo as Resumo, rev.analise, decisoes))
       setAnaliseTotais(rev.analise.totais)
       void carregarRecentes()

@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { memoCurta } from '@/lib/cache-leitura'
 import type { OneRpmAggregate } from '@/lib/onerpm/types'
 
 /**
@@ -96,12 +97,20 @@ export function iniciaisDe(nome: string): string {
   return (a + b).toUpperCase()
 }
 
-export async function listarArtistas(): Promise<ArtistaDoc[]> {
+async function lerRoster(): Promise<ArtistaDoc[]> {
   const snap = await getDocs(collection(db, 'artistas'))
   return snap.docs
     .map((d) => ({ slug: d.id, ...(d.data() as Omit<ArtistaDoc, 'slug'>) }))
     .sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
 }
+
+/**
+ * O roster inteiro. Cacheado por um minuto (`memoCurta`): lista, home, busca,
+ * alertas e o badge do sino pedem esta MESMA varredura de 85 docs quase juntos —
+ * sem o cache, cada um pagava a sua. Quem grava artista chama
+ * `invalidarCachesDeLeitura()` e a próxima leitura já vem do Firestore.
+ */
+export const listarArtistas = memoCurta(lerRoster).ler
 
 /** Uma conta/artista vinculado a uma fonte, para as listas de "ver contas" nas Integrações. */
 export interface ContaVinculadaRef {

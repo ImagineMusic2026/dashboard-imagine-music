@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { memoCurta, registrarInvalidacao } from '@/lib/cache-leitura'
 import { formatNumber } from '@/lib/utils'
 import { listarArtistas, type ContaVinculadaRef } from '@/lib/artistas/client'
 import type {
@@ -29,6 +30,9 @@ export async function getMetricasSociais(slug: string): Promise<MetricasSociaisD
 
 const TTL_METRICAS = 60_000
 const cacheMetricas = new Map<string, { promessa: Promise<MetricasSociaisDoc | null>; em: number }>()
+// Sincronizar uma fonte reescreve estes docs — o cache por slug entra no
+// invalidador geral pra não devolver o número de antes do sync.
+registrarInvalidacao(() => cacheMetricas.clear())
 
 /**
  * `getMetricasSociais` com cache curto por slug: os ~8 cards do perfil do
@@ -47,8 +51,7 @@ export function getMetricasSociaisCached(slug: string): Promise<MetricasSociaisD
   return promessa
 }
 
-/** Mapa slug -> métricas, para uso em listagens. */
-export async function listarMetricasSociais(): Promise<Map<string, MetricasSociaisDoc>> {
+async function lerMetricasDeTodos(): Promise<Map<string, MetricasSociaisDoc>> {
   const snap = await getDocs(collection(db, 'metricas-sociais'))
   const m = new Map<string, MetricasSociaisDoc>()
   snap.docs.forEach((d) =>
@@ -56,6 +59,13 @@ export async function listarMetricasSociais(): Promise<Map<string, MetricasSocia
   )
   return m
 }
+
+/**
+ * Mapa slug -> métricas, para uso em listagens. Cacheado por um minuto pelo mesmo
+ * motivo do roster: home, lista, conteúdo, busca e o badge do sino varrem esta
+ * coleção quase ao mesmo tempo.
+ */
+export const listarMetricasSociais = memoCurta(lerMetricasDeTodos).ler
 
 /**
  * Artistas com dados de streaming (OneRPM) — para a lista de "ver contas" na

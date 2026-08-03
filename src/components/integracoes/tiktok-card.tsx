@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
 import { listarContasVinculadas } from '@/lib/artistas/client'
 import { getStatusTikTok } from '@/lib/metricas-sociais/client'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import type { IntegracaoTikTokDoc } from '@/lib/metricas-sociais/types'
 import {
   BTN_PRIMARIO,
@@ -64,6 +65,8 @@ export function TikTokCard() {
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Falha na sincronização.')
+      // O sync reescreve as métricas — as listas do painel precisam reler.
+      invalidarCachesDeLeitura()
       setMsg({
         tipo: 'ok',
         texto: `${data.sincronizados} conta(s) sincronizada(s)${data.falhas ? ` · ${data.falhas} falha(s)` : ''}.`,

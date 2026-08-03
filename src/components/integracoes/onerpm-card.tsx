@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
 import { getStatusOneRpm, listarArtistasComStreaming } from '@/lib/metricas-sociais/client'
 import type { IntegracaoOneRpmDoc } from '@/lib/metricas-sociais/types'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import { formatNumber } from '@/lib/utils'
 import {
   BTN_PRIMARIO,
@@ -64,6 +65,8 @@ export function OneRpmCard() {
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Falha na sincronização.')
+      // O sync reescreve as métricas — as listas do painel precisam reler.
+      invalidarCachesDeLeitura()
       setMsg({
         tipo: 'ok',
         texto: `${data.gravados} artista(s) atualizado(s) · ${data.arquivos} arquivo(s).`,

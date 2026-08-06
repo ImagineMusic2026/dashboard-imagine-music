@@ -17,8 +17,21 @@
  * `invalidarCachesDeLeitura`).
  */
 
-/** Janela em que uma leitura repetida reaproveita a anterior. */
-const TTL_PADRAO = 60_000
+/**
+ * Janela em que uma leitura repetida reaproveita a anterior.
+ *
+ * Eram 60s, e o minuto era caro: cada tela que a pessoa abre remonta os
+ * componentes da página e pede o roster e as métricas de novo. Numa hora de uso
+ * contínuo isso dava ~170 leituras por minuto POR PESSOA — o que estourou a cota
+ * diária do plano gratuito em 2026-08-06.
+ *
+ * Cinco minutos é seguro porque o dado só muda por fora uma vez ao dia (os syncs
+ * rodam de madrugada) e TODA escrita feita pelo painel — criar/editar artista,
+ * importar, sincronizar — chama `invalidarCachesDeLeitura()` e derruba o cache na
+ * hora. O que se perde é ver em até 5 min (em vez de 1) uma mudança feita por
+ * OUTRA pessoa em outra aba.
+ */
+const TTL_PADRAO = 5 * 60_000
 
 const invalidadores = new Set<() => void>()
 
@@ -52,6 +65,41 @@ export function memoCurta<T>(
   }
 
   return { ler, invalidar }
+}
+
+/**
+ * Como `memoCurta`, mas para leituras COM argumentos (ex.: a série diária de um
+ * artista): guarda uma promessa por chave.
+ *
+ * Existe porque o perfil do artista monta ~8 cards ao mesmo tempo e mais de um
+ * pede a MESMA série — o comparativo de canais lê Instagram/TikTok/YouTube/
+ * streaming, e logo abaixo cada card de plataforma pedia a sua de novo. Sem isto,
+ * abrir um perfil pagava cada série duas vezes.
+ *
+ * Entra no invalidador geral igual aos outros: sincronizar uma fonte reescreve os
+ * pontos do dia, e o gráfico tem de mostrar o novo na hora.
+ */
+export function memoCurtaPorChave<A extends unknown[], T>(
+  carregar: (...args: A) => Promise<T>,
+  chaveDe: (...args: A) => string,
+  ttlMs: number = TTL_PADRAO,
+): (...args: A) => Promise<T> {
+  const cache = new Map<string, { promessa: Promise<T>; em: number }>()
+  registrarInvalidacao(() => cache.clear())
+
+  return (...args: A): Promise<T> => {
+    const chave = chaveDe(...args)
+    const agora = Date.now()
+    const hit = cache.get(chave)
+    if (hit && agora - hit.em < ttlMs) return hit.promessa
+    const promessa = carregar(...args).catch((e) => {
+      // Só descarta se ninguém já pôs uma leitura mais nova no lugar.
+      if (cache.get(chave)?.promessa === promessa) cache.delete(chave)
+      throw e
+    })
+    cache.set(chave, { promessa, em: agora })
+    return promessa
+  }
 }
 
 /**

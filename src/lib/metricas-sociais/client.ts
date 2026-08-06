@@ -1,6 +1,6 @@
-import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { memoCurta, registrarInvalidacao } from '@/lib/cache-leitura'
+import { memoCurta, memoCurtaPorChave, registrarInvalidacao } from '@/lib/cache-leitura'
 import { formatNumber } from '@/lib/utils'
 import { listarArtistas, type ContaVinculadaRef } from '@/lib/artistas/client'
 import type {
@@ -99,18 +99,61 @@ export async function listarArtistasComStreaming(): Promise<ContaVinculadaRef[]>
     .map((x) => x.conta)
 }
 
-/** Histórico diário (ordenado por dia asc), limitado aos últimos `limite` dias. */
-export async function getHistoricoInstagram(
-  slug: string,
-  limite = 90,
-): Promise<HistoricoDiaDoc[]> {
+/** Janela padrão das séries diárias. Era o mesmo número do corte em JS de antes. */
+const DIAS_SERIE = 90
+
+/**
+ * As séries mudam UMA vez por dia (os syncs rodam de madrugada), então segurar
+ * cinco minutos não mostra nada velho — e cobre a navegação entre perfis e a volta
+ * pra lista dentro de uma mesma sessão de trabalho. Sincronizar pelo painel
+ * invalida na hora, como nos outros caches.
+ */
+const TTL_SERIE = 5 * 60_000
+
+/**
+ * Uma série diária (`historico*`) de um artista: os `limite` dias MAIS RECENTES,
+ * em ordem crescente.
+ *
+ * O `limit` vai na CONSULTA de propósito. Antes a série vinha inteira do Firestore
+ * e o corte acontecia em JS — ou seja, o banco já tinha cobrado por todos os dias.
+ * Como os syncs gravam 1 doc por dia por artista, o custo de abrir um perfil crescia
+ * sozinho a cada dia que passava (foi o que estourou a cota diária em 2026-08-06).
+ * Pedir em ordem DECRESCENTE com `limit` e inverter devolve exatamente o mesmo
+ * array de antes — nenhuma tela enxerga diferença.
+ *
+ * `orderBy` de um campo só usa o índice automático: não há índice composto a criar.
+ */
+async function lerSerie(slug: string, sub: string, limite: number): Promise<unknown[]> {
   const q = query(
-    collection(db, 'metricas-sociais', slug, 'historico'),
-    orderBy('dia', 'asc'),
+    collection(db, 'metricas-sociais', slug, sub),
+    orderBy('dia', 'desc'),
+    limit(limite),
   )
   const snap = await getDocs(q)
-  const arr = snap.docs.map((d) => d.data() as HistoricoDiaDoc)
-  return arr.slice(-limite)
+  return snap.docs.map((d) => d.data()).reverse()
+}
+
+const serieCached = memoCurtaPorChave(
+  lerSerie,
+  (slug, sub, limite) => `${sub}|${slug}|${limite}`,
+  TTL_SERIE,
+)
+
+/**
+ * Série cacheada, sempre devolvendo uma CÓPIA: o array é compartilhado entre os
+ * cards que pedem a mesma série, e um `sort`/`reverse` no consumidor envenenaria o
+ * cache dos outros.
+ */
+async function serie<T>(slug: string, sub: string, limite: number): Promise<T[]> {
+  return [...((await serieCached(slug, sub, limite)) as T[])]
+}
+
+/** Histórico diário (ordenado por dia asc), limitado aos últimos `limite` dias. */
+export function getHistoricoInstagram(
+  slug: string,
+  limite = DIAS_SERIE,
+): Promise<HistoricoDiaDoc[]> {
+  return serie<HistoricoDiaDoc>(slug, 'historico', limite)
 }
 
 /** Status da integração Meta (doc `integracoes/meta`). */
@@ -120,17 +163,11 @@ export async function getStatusMeta(): Promise<IntegracaoMetaDoc | null> {
 }
 
 /** Histórico diário do TikTok (ordenado por dia asc), últimos `limite` dias. */
-export async function getHistoricoTikTok(
+export function getHistoricoTikTok(
   slug: string,
-  limite = 90,
+  limite = DIAS_SERIE,
 ): Promise<HistoricoTikTokDiaDoc[]> {
-  const q = query(
-    collection(db, 'metricas-sociais', slug, 'historico-tiktok'),
-    orderBy('dia', 'asc'),
-  )
-  const snap = await getDocs(q)
-  const arr = snap.docs.map((d) => d.data() as HistoricoTikTokDiaDoc)
-  return arr.slice(-limite)
+  return serie<HistoricoTikTokDiaDoc>(slug, 'historico-tiktok', limite)
 }
 
 /** Status da integração TikTok (doc `integracoes/tiktok`). */
@@ -140,31 +177,19 @@ export async function getStatusTikTok(): Promise<IntegracaoTikTokDoc | null> {
 }
 
 /** Histórico diário do YouTube (ordenado por dia asc), últimos `limite` dias. */
-export async function getHistoricoYouTube(
+export function getHistoricoYouTube(
   slug: string,
-  limite = 90,
+  limite = DIAS_SERIE,
 ): Promise<HistoricoYouTubeDiaDoc[]> {
-  const q = query(
-    collection(db, 'metricas-sociais', slug, 'historico-youtube'),
-    orderBy('dia', 'asc'),
-  )
-  const snap = await getDocs(q)
-  const arr = snap.docs.map((d) => d.data() as HistoricoYouTubeDiaDoc)
-  return arr.slice(-limite)
+  return serie<HistoricoYouTubeDiaDoc>(slug, 'historico-youtube', limite)
 }
 
 /** Série diária do Health Score (ordenada por dia asc), últimos `limite` dias. */
-export async function getHistoricoHealth(
+export function getHistoricoHealth(
   slug: string,
-  limite = 90,
+  limite = DIAS_SERIE,
 ): Promise<HistoricoHealthDiaDoc[]> {
-  const q = query(
-    collection(db, 'metricas-sociais', slug, 'historico-health'),
-    orderBy('dia', 'asc'),
-  )
-  const snap = await getDocs(q)
-  const arr = snap.docs.map((d) => d.data() as HistoricoHealthDiaDoc)
-  return arr.slice(-limite)
+  return serie<HistoricoHealthDiaDoc>(slug, 'historico-health', limite)
 }
 
 /** Status da integração YouTube (doc `integracoes/youtube`). */
@@ -180,17 +205,11 @@ export async function getStatusOneRpm(): Promise<IntegracaoOneRpmDoc | null> {
 }
 
 /** Histórico diário de streaming (ordenado por dia asc), últimos `limite` dias. */
-export async function getHistoricoStreaming(
+export function getHistoricoStreaming(
   slug: string,
-  limite = 90,
+  limite = DIAS_SERIE,
 ): Promise<HistoricoStreamingDiaDoc[]> {
-  const q = query(
-    collection(db, 'metricas-sociais', slug, 'historico-streaming'),
-    orderBy('dia', 'asc'),
-  )
-  const snap = await getDocs(q)
-  const arr = snap.docs.map((d) => d.data() as HistoricoStreamingDiaDoc)
-  return arr.slice(-limite)
+  return serie<HistoricoStreamingDiaDoc>(slug, 'historico-streaming', limite)
 }
 
 /** Detalhe granular de streaming (faixas + geografia com skip) de um artista. */

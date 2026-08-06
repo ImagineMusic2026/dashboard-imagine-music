@@ -34,16 +34,20 @@ async function lerLink(token: string | null): Promise<LinkDoc | null> {
   return { slug: x.slug, tipo: x.tipo as TipoDiagnostico }
 }
 
-const LINK_INVALIDO = NextResponse.json(
-  { error: 'Este link não está mais ativo. Peça um novo à equipe da Imagine.' },
-  { status: 404 }
-)
+// Função, não constante: uma NextResponse só pode ser ENVIADA uma vez (o corpo é
+// um stream). Compartilhar a mesma instância entre requisições quebra a partir da
+// segunda resposta na mesma instância do servidor.
+const linkInvalido = () =>
+  NextResponse.json(
+    { error: 'Este link não está mais ativo. Peça um novo à equipe da Imagine.' },
+    { status: 404 }
+  )
 
 export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get('token')
   try {
     const link = await lerLink(token)
-    if (!link) return LINK_INVALIDO
+    if (!link) return linkInvalido()
 
     const [artista, diag] = await Promise.all([
       adminDb.doc(`artistas/${link.slug}`).get(),
@@ -75,7 +79,7 @@ export async function POST(req: Request) {
 
   try {
     const link = await lerLink(body.token ?? null)
-    if (!link) return LINK_INVALIDO
+    if (!link) return linkInvalido()
 
     const brutas =
       body.respostas && typeof body.respostas === 'object' && !Array.isArray(body.respostas)

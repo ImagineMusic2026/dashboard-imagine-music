@@ -182,6 +182,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Link PÚBLICO de preenchimento do questionário (colher respostas sem liberar o
+    // portal). Quem gerencia é quem preenche o questionário pelo painel
+    // (`podeEditarArtistas`). O PÚBLICO nunca toca esta coleção pelo client: a
+    // página `/q/{token}` valida o token na API (Admin SDK) — por isso não há
+    // `get: if true` aqui, diferente de `convites`. `update` não existe: link se
+    // cria e se revoga (delete), nunca se edita.
+    match /links-questionario/{token} {
+      allow get, list: if podeEditarArtistas();
+      allow create: if podeEditarArtistas()
+        && request.resource.data.keys().hasOnly(['slug', 'tipo', 'criadoPor', 'criadoEm'])
+        && request.resource.data.slug is string
+        && (request.resource.data.tipo == 'artista' || request.resource.data.tipo == 'projeto');
+      allow update: if false;
+      allow delete: if podeEditarArtistas();
+    }
+
     // A página de Alertas varre TODOS os questionários de uma vez pra avisar quando
     // um artista responde. Query de grupo exige uma regra com prefixo curinga — a
     // do caminho específico acima não autoriza collectionGroup. Só leitura, só staff;

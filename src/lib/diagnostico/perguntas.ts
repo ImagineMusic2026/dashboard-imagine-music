@@ -292,3 +292,22 @@ export function progressoDe(tipo: TipoDiagnostico, respostas: Record<string, str
     pct: perguntas.length ? Math.round((respondidas / perguntas.length) * 100) : 0,
   }
 }
+
+/** Um texto longo, mas com teto — o campo é livre e vai pro Firestore (1MB/doc). */
+export const MAX_RESPOSTA = 5000
+
+/**
+ * Descarta o que não é pergunta conhecida e corta o que passa do teto. Higiene
+ * compartilhada entre o client (antes do setDoc) e a API do link público (antes do
+ * merge via Admin SDK, onde é a ÚNICA validação — regra nenhuma roda lá).
+ */
+export function limparRespostas(tipo: TipoDiagnostico, respostas: Record<string, string>): Record<string, string> {
+  const validos = idsValidos(tipo)
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(respostas)) {
+    if (!validos.has(k)) continue
+    const s = typeof v === 'string' ? v.slice(0, MAX_RESPOSTA) : ''
+    out[k] = s
+  }
+  return out
+}

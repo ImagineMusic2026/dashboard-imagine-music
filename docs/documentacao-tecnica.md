@@ -22,7 +22,7 @@ O **Painel de Acompanhamento de Artistas — Imagine Group** é uma aplicação 
 - **Layout root** (`src/app/layout.tsx`): envolve toda a aplicação no `AuthProvider`; tema dark (`className="dark"`), fontes Plus Jakarta Sans / JetBrains Mono (via `next/font/google`), `lang="pt-BR"`, `suppressHydrationWarning`.
 - **3 grupos de rotas protegidas:** `(auth)`, `(dashboard)`, `(portal)`.
 - **5 páginas públicas:** landing (`/`), `/privacidade`, `/termos`, `/tiktok-conectado`, `/youtube-conectado`.
-- **Páginas de aplicação** (login/aceitar-convite, dashboard, portal) + **21 endpoints de API** (`src/app/api/**/route.ts`).
+- **Páginas de aplicação** (login/aceitar-convite, dashboard, portal, `/q/{token}` público) + **22 endpoints de API** (`src/app/api/**/route.ts`).
 
 **Sem `middleware.ts`.** Não existe middleware na raiz de `src` nem na raiz do projeto (confirmado). Toda proteção é feita por:
 
@@ -177,6 +177,8 @@ Projeto: `painel-imagine-music`. **Escrita: exclusivamente via Admin SDK** (regr
 | `tiktok-tokens/{slug}` | **SEGREDO server-only** — openId, accessToken, refreshToken, expirações (~24h/~365d), scope | `allow read, write: if false` | Admin SDK apenas |
 | `youtube-tokens/{slug}` | **SEGREDO server-only** — channelId?, accessToken, refreshToken, expirações (~1h), scope. Refresh token do Google não expira por tempo | `allow read, write: if false` | Admin SDK apenas |
 | `catalogo-faixas/{isrc}` | Catálogo de faixas (ISRC → título): titulo?, link? (só Deezer), releaseDate?, album?, upc?, artista?, naoEncontrado?, fonte (`'onerpm'` = catálogo oficial importado \| `'deezer'` = fallback), atualizadoEm | **NÃO há regra própria** → cai no catch-all (`if false`): cliente NÃO lê direto. Consumido via `POST /api/faixas/titulos` (sessão ativa) | Admin SDK (background) |
+| `diagnosticos/{slug}/questionarios/{tipo}` | Questionário de estruturação (`tipo` ∈ projeto\|artista): respostas, status (rascunho\|enviado), origem (artista\|equipe), arquivoUrl?, atualizadoEm, enviadoEm? | `isStaff()` OU `isArtistaDe(slug)` (+ collectionGroup só staff) | client: artista (origem 'artista') OU `podeEditarArtistas()` (origem 'equipe'); Admin SDK via `/api/questionario-link` (link público — grava origem 'artista') |
+| `links-questionario/{token}` | Link PÚBLICO de preenchimento do questionário (slug, tipo, criadoPor, criadoEm) — responder sem login/portal | `get`/`list`: `podeEditarArtistas()`; o público **nunca** lê pelo client — o token é validado na API (Admin SDK) | `create`/`delete`: `podeEditarArtistas()`; `update` negado (link se cria e se revoga, não se edita) |
 
 > **Atenção (regra catch-all):** `firestore.rules` termina com `match /{document=**} { allow read, write: if false; }`. Qualquer coleção sem `match` explícito (ex.: `catalogo-faixas`) fica totalmente bloqueada para o cliente — o acesso a essas é sempre via Admin SDK no servidor.
 
@@ -265,6 +267,10 @@ Padrão por papel (`PADRAO` em `permissions.ts`):
 4. Regra Firestore permite `create` em `users` se `isAdmin()` OU (self && email/role/artistaSlug conferem com o convite && convite pendente). Sem auto-promoção: a role vem do convite.
 
 **Gerenciamento (Configurações):** abas time / artistas / permissões / notificações. Diálogo de convidar membro, ações por membro (mudar papel, desativar/reativar, remover), matriz de permissões (override por pessoa via `updateUserPermissoes`), convites pendentes (copiar link, cancelar).
+
+### Link público do questionário (responder sem login)
+
+Pra colher o questionário de estruturação **antes de liberar o portal** (do artista ou do empresário). Quem tem `editarArtistas` gera o link no card do questionário do perfil (`src/lib/diagnostico/links.ts` → `links-questionario/{token}`, um por artista+tipo); a pessoa abre **`/q/{token}`** (página pública, fora dos guards) e responde o mesmo formulário (`DiagnosticoForm` `modo="link"`). O IO passa por **`/api/questionario-link`** (GET valida o token e devolve respostas; POST grava com Admin SDK — única rota sem auth que escreve no Firestore, estreita: só chaves conhecidas via `limparRespostas`, `origem: 'artista'` fixa, nunca toca `arquivoUrl`). Revogar = apagar o doc do link (a página passa a mostrar "link não está mais ativo"). O envio dispara o alerta de "respondeu o questionário" normalmente (origem 'artista').
 
 **Operações críticas (Admin SDK):**
 - `POST /api/membros/ativo` → `adminAuth.updateUser(uid, {disabled})`, `revokeRefreshTokens` se desativando, atualiza `users/{uid}.ativo`.

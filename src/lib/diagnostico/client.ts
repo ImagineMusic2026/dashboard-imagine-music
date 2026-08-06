@@ -1,6 +1,10 @@
 import { collectionGroup, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { ehTipoValido, idsValidos, type TipoDiagnostico } from './perguntas'
+import { ehTipoValido, limparRespostas, MAX_RESPOSTA, type TipoDiagnostico } from './perguntas'
+
+// Higiene das respostas mora em `perguntas.ts` (módulo puro — a API do link público
+// também usa); re-exportada aqui porque o form e afins importam deste módulo.
+export { limparRespostas, MAX_RESPOSTA }
 
 /**
  * Leitura/escrita do diagnóstico pelo CLIENT SDK — respondem o artista (no portal) e
@@ -36,9 +40,6 @@ export interface DiagnosticoDoc {
   enviadoEmMs: number | null
 }
 
-/** Um texto longo, mas com teto — o campo é livre e vai pro Firestore (1MB/doc). */
-export const MAX_RESPOSTA = 5000
-
 /** Teto do link do arquivo original: é uma URL, não mais um campo de texto. */
 export const MAX_URL = 500
 
@@ -56,22 +57,6 @@ export function limparUrlArquivo(valor: string): string {
 const ref = (slug: string, tipo: TipoDiagnostico) => doc(db, 'diagnosticos', slug, 'questionarios', tipo)
 
 const ms = (t: unknown): number | null => (t instanceof Timestamp ? t.toMillis() : null)
-
-/**
- * Descarta o que não é pergunta conhecida e corta o que passa do teto. A validação
- * de verdade é a regra do Firestore (quem pode escrever); isto é higiene — evita
- * que um id renomeado ou um paste gigante entre no doc.
- */
-export function limparRespostas(tipo: TipoDiagnostico, respostas: Record<string, string>): Record<string, string> {
-  const validos = idsValidos(tipo)
-  const out: Record<string, string> = {}
-  for (const [k, v] of Object.entries(respostas)) {
-    if (!validos.has(k)) continue
-    const s = typeof v === 'string' ? v.slice(0, MAX_RESPOSTA) : ''
-    out[k] = s
-  }
-  return out
-}
 
 export async function getDiagnostico(slug: string, tipo: TipoDiagnostico): Promise<DiagnosticoDoc | null> {
   if (!ehTipoValido(tipo)) return null

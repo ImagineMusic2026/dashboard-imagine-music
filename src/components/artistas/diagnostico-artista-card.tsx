@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Check, ClipboardList, Paperclip, Pencil } from 'lucide-react'
+import { Check, ClipboardList, Link2, Link2Off, Paperclip, Pencil } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { ehStaff } from '@/lib/permissions'
+import { copiarTexto } from '@/lib/clipboard'
 import { getDiagnostico, type DiagnosticoDoc } from '@/lib/diagnostico/client'
+import {
+  criarLinkQuestionario,
+  getLinkQuestionario,
+  revogarLinkQuestionario,
+  urlDoLinkQuestionario,
+} from '@/lib/diagnostico/links'
 import { NOME_CURTO, progressoDe, TIPOS, type TipoDiagnostico } from '@/lib/diagnostico/perguntas'
 import { DiagnosticoRespostasDialog } from '@/components/artistas/diagnostico-respostas-dialog'
 import { cn } from '@/lib/utils'
@@ -27,12 +34,16 @@ import { cn } from '@/lib/utils'
  * tivesse respondido, o que agora esconderia justamente a porta de entrada.
  */
 export function DiagnosticoArtistaCard({ slug, nome }: { slug: string; nome: string }) {
-  const { role, pode, loading } = useAuth()
+  const { role, pode, loading, user } = useAuth()
   const staff = !loading && ehStaff(role)
   const podeEditar = staff && pode('editarArtistas')
   const [docs, setDocs] = useState<Partial<Record<TipoDiagnostico, DiagnosticoDoc>>>({})
   const [carregado, setCarregado] = useState(false)
   const [aberto, setAberto] = useState<TipoDiagnostico | null>(null)
+  // Link público de preenchimento por tipo (token), pra quem pode gerenciar.
+  const [links, setLinks] = useState<Partial<Record<TipoDiagnostico, string>>>({})
+  const [ocupadoLink, setOcupadoLink] = useState<TipoDiagnostico | null>(null)
+  const [copiadoLink, setCopiadoLink] = useState<TipoDiagnostico | null>(null)
 
   useEffect(() => {
     if (!staff) return
@@ -52,6 +63,75 @@ export function DiagnosticoArtistaCard({ slug, nome }: { slug: string; nome: str
       vivo = false
     }
   }, [slug, staff])
+
+  // Os links externos ativos — só pra quem pode gerenciá-los (a regra nega o resto).
+  useEffect(() => {
+    if (!podeEditar) return
+    let vivo = true
+    Promise.all(TIPOS.map((t) => getLinkQuestionario(slug, t).catch(() => null)))
+      .then((lista) => {
+        if (!vivo) return
+        const out: Partial<Record<TipoDiagnostico, string>> = {}
+        lista.forEach((l, i) => {
+          if (l) out[TIPOS[i]] = l.token
+        })
+        setLinks(out)
+      })
+      .catch(() => {})
+    return () => {
+      vivo = false
+    }
+  }, [slug, podeEditar])
+
+  async function copiarUrl(tipo: TipoDiagnostico, token: string) {
+    const url = urlDoLinkQuestionario(token)
+    if (await copiarTexto(url)) {
+      setCopiadoLink(tipo)
+      setTimeout(() => setCopiadoLink(null), 1500)
+    } else {
+      window.prompt('Copie o link do questionário:', url)
+    }
+  }
+
+  /** Gera o link (se ainda não há) e já copia — mandar pra pessoa é o próximo passo óbvio. */
+  async function gerarOuCopiarLink(tipo: TipoDiagnostico) {
+    if (ocupadoLink) return
+    const existente = links[tipo]
+    if (existente) {
+      await copiarUrl(tipo, existente)
+      return
+    }
+    if (!user) return
+    setOcupadoLink(tipo)
+    try {
+      const l = await criarLinkQuestionario(slug, tipo, user.uid)
+      setLinks((x) => ({ ...x, [tipo]: l.token }))
+      await copiarUrl(tipo, l.token)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setOcupadoLink(null)
+    }
+  }
+
+  async function revogarLink(tipo: TipoDiagnostico) {
+    const token = links[tipo]
+    if (!token || ocupadoLink) return
+    if (!window.confirm('Revogar o link externo? Quem tiver o endereço deixa de conseguir responder.')) return
+    setOcupadoLink(tipo)
+    try {
+      await revogarLinkQuestionario(token)
+      setLinks((x) => {
+        const resto = { ...x }
+        delete resto[tipo]
+        return resto
+      })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setOcupadoLink(null)
+    }
+  }
 
   if (!staff) return null
   // Enquanto não carregou, nada: o card apareceria com "0 de 22" e saltaria pro
@@ -73,7 +153,7 @@ export function DiagnosticoArtistaCard({ slug, nome }: { slug: string; nome: str
           </div>
           <p className="text-[12px] text-ink-500 mt-1 leading-relaxed">
             {podeEditar
-              ? 'O artista responde pelo portal — e a equipe pode preencher aqui o que já veio por fora (reunião, WhatsApp, formulário antigo).'
+              ? 'O artista responde pelo portal, a equipe preenche aqui o que veio por fora — ou gere um link externo pra ele (ou o empresário) responder sem login, antes mesmo de ter acesso ao painel.'
               : 'Respondido pelo artista no portal, ou preenchido pela equipe.'}
           </p>
         </div>
@@ -136,6 +216,15 @@ export function DiagnosticoArtistaCard({ slug, nome }: { slug: string; nome: str
                         </a>
                       </>
                     )}
+                    {links[tipo] && (
+                      <>
+                        {' · '}
+                        <span className="inline-flex items-center gap-1 text-sky-400">
+                          <Link2 className="w-3 h-3" />
+                          link externo ativo
+                        </span>
+                      </>
+                    )}
                   </div>
                   {temResposta && (
                     <div className="h-1 rounded-full bg-bg-800 mt-2 overflow-hidden max-w-xs">
@@ -150,7 +239,7 @@ export function DiagnosticoArtistaCard({ slug, nome }: { slug: string; nome: str
                   )}
                 </div>
 
-                {/* Duas ações lado a lado, e não a linha inteira clicável: pressável
+                {/* Ações lado a lado, e não a linha inteira clicável: pressável
                     dentro de pressável vira foco duplo no leitor de tela. */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   {temResposta && (
@@ -163,13 +252,44 @@ export function DiagnosticoArtistaCard({ slug, nome }: { slug: string; nome: str
                     </button>
                   )}
                   {podeEditar && (
-                    <Link
-                      href={`/artistas/${slug}/questionario/${tipo}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      {temResposta ? 'Editar' : 'Preencher'}
-                    </Link>
+                    <>
+                      {/* Um clique já copia: gerar o link e mandar pra pessoa é um gesto só. */}
+                      <button
+                        type="button"
+                        onClick={() => void gerarOuCopiarLink(tipo)}
+                        disabled={ocupadoLink === tipo}
+                        title={
+                          links[tipo]
+                            ? 'Copiar o link externo (responder sem login)'
+                            : 'Gerar link externo pra responder sem login'
+                        }
+                        className="p-1.5 rounded-lg hover:bg-bg-800 text-ink-400 hover:text-ink-100 transition-colors disabled:opacity-50"
+                      >
+                        {copiadoLink === tipo ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Link2 className={cn('w-3.5 h-3.5', links[tipo] && 'text-sky-400')} />
+                        )}
+                      </button>
+                      {links[tipo] && (
+                        <button
+                          type="button"
+                          onClick={() => void revogarLink(tipo)}
+                          disabled={ocupadoLink === tipo}
+                          title="Revogar o link externo"
+                          className="p-1.5 rounded-lg hover:bg-red-500/15 text-ink-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                        >
+                          <Link2Off className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <Link
+                        href={`/artistas/${slug}/questionario/${tipo}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        {temResposta ? 'Editar' : 'Preencher'}
+                      </Link>
+                    </>
                   )}
                 </div>
               </div>

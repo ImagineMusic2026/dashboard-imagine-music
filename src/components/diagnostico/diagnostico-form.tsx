@@ -10,6 +10,7 @@ import {
   MAX_URL,
   type OrigemDiagnostico,
 } from '@/lib/diagnostico/client'
+import { carregarViaLink, salvarViaLink } from '@/lib/diagnostico/publico'
 import { progressoDe, questionario, type Pergunta, type TipoDiagnostico } from '@/lib/diagnostico/perguntas'
 import { cn } from '@/lib/utils'
 
@@ -24,11 +25,14 @@ type Salvamento = { estado: 'ocioso' | 'salvando' | 'salvo' | 'erro'; em?: numbe
  * - `modo="artista"`: o artista responde no portal;
  * - `modo="equipe"`: a equipe preenche pelo painel, porque boa parte das respostas
  *   chega por fora (reunião, WhatsApp, o formulário antigo) e antes só o artista
- *   logado conseguia registrar.
+ *   logado conseguia registrar;
+ * - `modo="link"`: a pessoa responde SEM LOGIN pela página pública `/q/{token}` —
+ *   pra colher as respostas antes de liberar o portal. O IO passa pela API (o
+ *   token é a credencial) e o servidor grava `origem: 'artista'`.
  *
- * É o MESMO documento nos dois casos — um questionário por artista e tipo, não uma
+ * É o MESMO documento nos três casos — um questionário por artista e tipo, não uma
  * cópia por quem digitou. O que muda é a `origem` gravada a cada save, e a cópia da
- * tela: no portal se fala COM o artista, no painel se fala SOBRE ele.
+ * tela: no portal/link se fala COM a pessoa, no painel se fala SOBRE o artista.
  *
  * São ~20 perguntas de texto longo: ninguém responde de uma sentada. Por isso
  * autosave por pausa de digitação + retomada — fecha e volta depois, e o rascunho
@@ -40,16 +44,20 @@ export function DiagnosticoForm({
   slug,
   modo,
   artistaNome,
+  token,
 }: {
   tipo: TipoDiagnostico
-  /** Dono do questionário. `null` no portal de um login ainda sem artista vinculado. */
+  /** Dono do questionário. `null` no portal de um login ainda sem artista vinculado (e no modo link). */
   slug: string | null
-  modo: OrigemDiagnostico
+  modo: OrigemDiagnostico | 'link'
   /** Só no modo equipe: de quem é o questionário (o painel preenche por vários). */
   artistaNome?: string
+  /** Só no modo link: o token do link público (a credencial do IO). */
+  token?: string
 }) {
   const q = questionario(tipo)
   const equipe = modo === 'equipe'
+  const viaLink = modo === 'link'
 
   const [respostas, setRespostas] = useState<Record<string, string>>({})
   // Link do questionário ORIGINAL (só o modo equipe edita — quem recebe o arquivo é ela).
@@ -78,9 +86,15 @@ export function DiagnosticoForm({
   const sujoArquivo = useRef(false)
 
   useEffect(() => {
-    if (!slug) return
+    if (viaLink ? !token : !slug) return
     let vivo = true
-    getDiagnostico(slug, tipo)
+    // No modo link a página já validou o token — aqui só se busca o que está salvo.
+    const carga = viaLink
+      ? carregarViaLink(token!).then((d) =>
+          d ? { respostas: d.respostas, arquivoUrl: '', status: d.status, origem: d.origem } : null
+        )
+      : getDiagnostico(slug!, tipo)
+    carga
       .then((d) => {
         if (!vivo) return
         if (d) {
@@ -95,35 +109,40 @@ export function DiagnosticoForm({
     return () => {
       vivo = false
     }
-  }, [slug, tipo])
+  }, [slug, tipo, viaLink, token])
 
   const salvar = useCallback(
     async (enviar = false) => {
-      if (!slug) return
+      if (viaLink ? !token : !slug) return
       // Guardar o link do arquivo não é responder: não reescreve autoria nem status.
       // No doc que ainda não existe a autoria PRECISA ir junto (a regra exige).
       const soAnexo =
         !enviar && !sujoRespostas.current && sujoArquivo.current && origemSalvaRef.current !== null
       setSalvamento({ estado: 'salvando' })
       try {
-        await salvarDiagnostico(slug, tipo, respostasRef.current, {
-          origem: soAnexo ? undefined : modo,
-          enviar,
-          // Só a equipe manda o link — do portal, mandar vazio apagaria o que ela guardou.
-          arquivoUrl: modo === 'equipe' ? arquivoRef.current : undefined,
-        })
+        if (viaLink) {
+          // A API decide a origem ('artista') — o token é a única credencial.
+          await salvarViaLink(token!, respostasRef.current, enviar)
+        } else {
+          await salvarDiagnostico(slug!, tipo, respostasRef.current, {
+            origem: soAnexo ? undefined : modo,
+            enviar,
+            // Só a equipe manda o link — do portal, mandar vazio apagaria o que ela guardou.
+            arquivoUrl: modo === 'equipe' ? arquivoRef.current : undefined,
+          })
+        }
         sujoRespostas.current = false
         sujoArquivo.current = false
         setSalvamento({ estado: 'salvo', em: Date.now() })
         if (!soAnexo) {
-          setOrigemSalva(modo)
+          setOrigemSalva(viaLink ? 'artista' : modo)
           setEnviado(enviar)
         }
       } catch {
         setSalvamento({ estado: 'erro' })
       }
     },
-    [slug, tipo, modo]
+    [slug, tipo, modo, viaLink, token]
   )
 
   /** Marca o que ficou sujo e reinicia a contagem do autosave. */
@@ -158,7 +177,7 @@ export function DiagnosticoForm({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  if (!slug) {
+  if (!slug && !viaLink) {
     return (
       <div className="text-center py-16">
         <h1 className="text-xl font-bold text-ink-100">Perfil ainda não vinculado</h1>
@@ -183,13 +202,16 @@ export function DiagnosticoForm({
 
   return (
     <div className="space-y-6">
-      <Link
-        href={equipe ? `/artistas/${slug}` : '/meu-perfil'}
-        className="inline-flex items-center gap-1.5 text-[13px] text-ink-400 hover:text-ink-100 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        {equipe ? 'Voltar ao perfil do artista' : 'Voltar ao meu perfil'}
-      </Link>
+      {/* Quem chegou por link público não tem painel pra onde voltar. */}
+      {!viaLink && (
+        <Link
+          href={equipe ? `/artistas/${slug}` : '/meu-perfil'}
+          className="inline-flex items-center gap-1.5 text-[13px] text-ink-400 hover:text-ink-100 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          {equipe ? 'Voltar ao perfil do artista' : 'Voltar ao meu perfil'}
+        </Link>
+      )}
 
       <div>
         {equipe && (
@@ -306,7 +328,9 @@ export function DiagnosticoForm({
           portal (px-5); no painel a coluna é centrada e não tem o que sangrar. */}
       <div
         className={cn(
-          'sticky top-16 z-30 py-3 bg-bg-950/90 backdrop-blur border-b border-bg-700/40',
+          'sticky z-30 py-3 bg-bg-950/90 backdrop-blur border-b border-bg-700/40',
+          // top-16 é a altura da topbar fixa do painel/portal; a página pública não tem uma.
+          viaLink ? 'top-0' : 'top-16',
           !equipe && '-mx-5 px-5'
         )}
       >

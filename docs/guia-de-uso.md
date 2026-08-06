@@ -129,6 +129,16 @@ O perfil reúne, em cards:
 - **Receita:** o resumo financeiro do artista — **visível apenas para quem tem permissão de receita** (veja a seção 13).
 - **Redes cadastradas:** os links das redes sociais do artista (Spotify, YouTube, Instagram, TikTok).
 
+### Questionário de estruturação (no perfil)
+
+O card **Questionário de estruturação** mostra os dois questionários (**Projeto** e **Artista**), o progresso e de quem são as respostas (artista ou equipe). Quem tem a permissão de **cadastrar/editar artistas** pode:
+
+- **Ver respostas** (modal, com exportação em PDF) e **Preencher/Editar** pelo painel;
+- **Gerar um link externo** (ícone de corrente): um endereço público para o **artista ou o empresário responder sem login** — útil quando você ainda não quer liberar o acesso ao painel. O clique já copia o link; é só mandar por WhatsApp. As respostas caem direto no painel (e disparam o alerta de questionário respondido).
+- **Revogar o link** a qualquer momento (ícone de corrente cortada): quem tiver o endereço passa a ver "link não está mais ativo". Se gerar de novo, sai um endereço **novo** — o antigo não volta.
+
+> O link dá acesso **somente àquele questionário daquele artista** — nada mais do painel. Cada questionário (Projeto/Artista) tem o seu link: mande o do **Projeto** ao empresário e o do **Artista** ao artista, por exemplo.
+
 > Lembrete: **streaming** e **receita** são coisas diferentes — veja a seção 14.
 
 ---

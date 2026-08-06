@@ -53,6 +53,12 @@ function dataCurta(iso: string | null | undefined): string {
 
 const contaMeses = (h: ReceitaArtistaHistoricoItem) => h.periodoKeys?.length ?? 0
 
+/**
+ * Plataformas visíveis com o card recolhido. O relatório traz 20+ lojas e a cauda
+ * (Boomplay, Tencent…) é centavos — aberta por inteiro, a lista dominava a tela.
+ */
+const LIMITE_PLATAFORMAS = 6
+
 /** Opção do seletor: o consolidado se anuncia como soma; um mês, pelo arquivo. */
 function opcaoLabel(h: ReceitaArtistaHistoricoItem): string {
   if (h.importacaoId === ID_CONSOLIDADO) {
@@ -80,6 +86,7 @@ export function ReceitaArtistaCard({
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null)
   const [verFaixas, setVerFaixas] = useState(false)
   const [verTodasFaixas, setVerTodasFaixas] = useState(false)
+  const [verTodasPlataformas, setVerTodasPlataformas] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -118,6 +125,7 @@ export function ReceitaArtistaCard({
   useEffect(() => {
     setVerFaixas(false)
     setVerTodasFaixas(false)
+    setVerTodasPlataformas(false)
   }, [selecionadoId])
 
   if (estado.tipo === 'carregando') {
@@ -223,13 +231,28 @@ export function ReceitaArtistaCard({
       </div>
 
       <div className="divide-y divide-bg-700/30">
-        {items.map((item) => (
+        {(verTodasPlataformas ? items : items.slice(0, LIMITE_PLATAFORMAS)).map((item) => (
           <ReceitaPlataformaItem
             key={item.plataforma}
             item={item}
             icone={<PlataformaIcon tipo={iconeDaPlataforma(item.plataforma)} />}
           />
         ))}
+        {items.length > LIMITE_PLATAFORMAS && (
+          <button
+            type="button"
+            onClick={() => setVerTodasPlataformas((v) => !v)}
+            aria-expanded={verTodasPlataformas}
+            className="w-full flex items-center justify-center gap-1.5 px-5 py-3 text-[12px] font-semibold text-amber-400 hover:text-amber-300 hover:bg-bg-800/40 transition-colors"
+          >
+            {verTodasPlataformas
+              ? 'Mostrar menos'
+              : `Ver todas as ${items.length} plataformas`}
+            <ChevronDown
+              className={cn('w-4 h-4 transition-transform', verTodasPlataformas && 'rotate-180')}
+            />
+          </button>
+        )}
       </div>
 
       {/* Receita por música — agrupa lançamentos; começa recolhida (pode ter centenas). */}

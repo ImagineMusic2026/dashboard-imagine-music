@@ -179,14 +179,24 @@ export function ImportadorOneRpm() {
         const lote = await parsearNoWorker(await file.arrayBuffer())
 
         setEtapa('salvando')
+        const body = JSON.stringify({
+          arquivoNome: file.name,
+          tamanhoBytes: file.size,
+          lote: enxugarLote(lote),
+        })
+        // A Vercel corta o corpo em 4,5MB (vira um 413 opaco). Um resumo saudável tem
+        // centenas de KB — passar disto é sinal de relatório fora do formato esperado
+        // (ex.: jan/2026, cabeçalho com colunas sem dados explodindo o agregado).
+        if (body.length > 4 * 1024 * 1024) {
+          throw new Error(
+            `O resumo da planilha ficou grande demais pra enviar (${fmtTamanho(body.length)}). ` +
+              'Isso costuma indicar um relatório fora do formato esperado — avise o suporte do painel.'
+          )
+        }
         const res = await fetch('/api/importar/onerpm', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            arquivoNome: file.name,
-            tamanhoBytes: file.size,
-            lote: enxugarLote(lote),
-          }),
+          body,
         })
         const data = await res.json().catch(() => null)
         if (!res.ok) throw new Error(data?.error ?? `A importação falhou (HTTP ${res.status}).`)

@@ -63,27 +63,88 @@ function abaDeVendas(wb: XLSX.WorkBook): XLSX.WorkSheet {
   return ws
 }
 
+/**
+ * Cabeçalhos que a OneRPM anuncia sem escrever as células. O relatório de
+ * jan/2026 ganhou "Creations" e "Views" no MEIO do cabeçalho, mas as linhas de
+ * dados continuaram sem essas duas células — então todo dado à direita de
+ * "Quantity" fica 2 colunas antes do que o cabeçalho promete (Territory lia
+ * "USD", Store lia um número, Gross/Net liam null → receita zerada e agregado
+ * com milhares de "moedas"/"lojas", grande demais até pra subir).
+ */
+const CABECALHOS_SEM_DADOS = new Set(['creations', 'views'])
+
+const moedaParece = (v: unknown): boolean => /^[A-Za-z]{3}$/.test(txt(v))
+
 /** Matriz de células + índice do cabeçalho, resolvido UMA vez (são ~120k linhas). */
-function tabela(ws: XLSX.WorkSheet): { matriz: unknown[][]; posicao: Map<string, number> } {
+function tabela(ws: XLSX.WorkSheet): { matriz: unknown[][]; posicao: Map<string, number>; realinhado: boolean } {
   const matriz = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null, blankrows: false })
   const posicao = new Map<string, number>()
   ;(matriz[0] ?? []).forEach((h, i) => posicao.set(txt(h).toLowerCase(), i))
-  return { matriz, posicao }
+  return realinharSePreciso(matriz, posicao)
+}
+
+/**
+ * O cabeçalho é validado contra os DADOS antes de valer: a coluna "Currency"
+ * tem de conter códigos de moeda ("USD", "BRL"). Quando não contém, o cabeçalho
+ * mentiu — recompõe o índice como se as colunas sem dados não existissem e
+ * valida de novo. Num export futuro em que Creations/Views venham DE VERDADE
+ * preenchidas (alinhadas), a validação passa de primeira e nada muda.
+ */
+function realinharSePreciso(
+  matriz: unknown[][],
+  posicao: Map<string, number>
+): { matriz: unknown[][]; posicao: Map<string, number>; realinhado: boolean } {
+  // Sem coluna Currency não há régua — segue como está (as obrigatórias acusam depois).
+  const validaMoeda = (pos: Map<string, number>): boolean => {
+    const i = pos.get('currency') ?? -1
+    if (i < 0) return true
+    let comValor = 0
+    let validas = 0
+    for (let n = 1; n < matriz.length && comValor < 50; n++) {
+      const v = matriz[n]?.[i]
+      if (v == null || txt(v) === '') continue
+      comValor++
+      if (moedaParece(v)) validas++
+    }
+    return comValor === 0 || validas / comValor >= 0.8
+  }
+  if (validaMoeda(posicao)) return { matriz, posicao, realinhado: false }
+
+  const compacta = new Map<string, number>()
+  let idx = 0
+  for (const h of matriz[0] ?? []) {
+    const nome = txt(h).toLowerCase()
+    if (CABECALHOS_SEM_DADOS.has(nome)) continue
+    compacta.set(nome, idx)
+    idx++
+  }
+  if (validaMoeda(compacta)) return { matriz, posicao: compacta, realinhado: true }
+  // Não melhorou: devolve o original pra falha aparecer do jeito de sempre.
+  return { matriz, posicao, realinhado: false }
 }
 
 const emCelula = (linha: unknown[], i: number): unknown => (i < 0 ? null : linha[i])
 
-/** Abre o arquivo e devolve as duas abas já em linhas cruas. */
+/** Abre o arquivo e devolve as duas abas já em linhas cruas (+ avisos de leitura). */
 export function lerOneRpm(buf: Buffer | ArrayBuffer | Uint8Array): {
   vendas: OneRpmRawRow[]
   repasses: OneRpmShareRow[]
+  avisos: string[]
 } {
   const wb = abrir(buf)
-  return { vendas: lerVendas(abaDeVendas(wb)), repasses: lerRepasses(wb) }
+  const avisos: string[] = []
+  const vendas = lerVendas(abaDeVendas(wb), avisos)
+  const repasses = lerRepasses(wb, avisos)
+  return { vendas, repasses, avisos }
 }
 
-function lerVendas(ws: XLSX.WorkSheet): OneRpmRawRow[] {
-  const { matriz, posicao } = tabela(ws)
+function lerVendas(ws: XLSX.WorkSheet, avisos: string[] = []): OneRpmRawRow[] {
+  const { matriz, posicao, realinhado } = tabela(ws)
+  if (realinhado) {
+    avisos.push(
+      'O cabeçalho da aba "Sales" anuncia colunas sem dados (Creations/Views) — as colunas foram realinhadas automaticamente. Confira os totais com o relatório da OneRPM.'
+    )
+  }
   if (matriz.length < 2) throw new OneRpmParseError('A planilha não tem linhas de dados.')
 
   const faltando = COLUNAS_OBRIGATORIAS.filter((c) => !posicao.has(c.toLowerCase()))
@@ -145,11 +206,14 @@ function lerVendas(ws: XLSX.WorkSheet): OneRpmRawRow[] {
  * o lote simplesmente não tem split. Cabeçalho estranho também vira lista vazia —
  * um repasse ausente não pode impedir a importação da receita.
  */
-function lerRepasses(wb: XLSX.WorkBook): OneRpmShareRow[] {
+function lerRepasses(wb: XLSX.WorkBook, avisos: string[] = []): OneRpmShareRow[] {
   const ws = wb.Sheets[ABA_REPASSES]
   if (!ws) return []
 
-  const { matriz, posicao } = tabela(ws)
+  const { matriz, posicao, realinhado } = tabela(ws)
+  if (realinhado) {
+    avisos.push('A aba "Shares In & Out" também veio com o cabeçalho desalinhado — colunas realinhadas.')
+  }
   if (matriz.length < 2) return []
   if (COLUNAS_REPASSE.some((c) => !posicao.has(c.toLowerCase()))) return []
 
@@ -177,6 +241,10 @@ function lerRepasses(wb: XLSX.WorkBook): OneRpmShareRow[] {
 
 /** Pipeline completo: buffer do XLSX -> lote fatiado por artista (com repasses). */
 export function parseOneRpm(buf: Buffer | ArrayBuffer | Uint8Array): OneRpmLote {
-  const { vendas, repasses } = lerOneRpm(buf)
-  return agregarPorArtista(vendas, repasses)
+  const { vendas, repasses, avisos } = lerOneRpm(buf)
+  const lote = agregarPorArtista(vendas, repasses)
+  // Avisos de LEITURA na frente: se o cabeçalho precisou de conserto, é a primeira
+  // coisa que quem importa deve saber.
+  lote.avisos = [...avisos, ...lote.avisos]
+  return lote
 }

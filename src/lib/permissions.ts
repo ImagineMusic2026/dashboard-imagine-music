@@ -22,6 +22,7 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     importar: true,
     editarArtistas: true,
     conexoesArtista: true,
+    convidarArtistas: true,
   },
   marketing: {
     verReceita: false,
@@ -30,10 +31,12 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     importar: false,
     // O time de marketing é quem mantém o cadastro (cria, edita e preenche o
     // questionário de estruturação) e cobra a conexão do artista no dia a dia — por
-    // isso estas duas vêm ligadas (o admin pode tirar de alguém). Excluir artista não
-    // é delegável: segue `exigirAdmin`.
+    // isso estas vêm ligadas (o admin pode tirar de alguém). Convidar vale SÓ para
+    // logins de artista: convidar admin/marketing segue exclusivo do admin. Excluir
+    // artista não é delegável: segue `exigirAdmin`.
     editarArtistas: true,
     conexoesArtista: true,
+    convidarArtistas: true,
   },
   artista: {
     verReceita: false,
@@ -42,6 +45,7 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     importar: false,
     editarArtistas: false,
     conexoesArtista: false,
+    convidarArtistas: false,
   },
 }
 
@@ -61,6 +65,12 @@ export const CAPACIDADES: { cap: Capacidade; label: string; descricao: string }[
     cap: 'conexoesArtista',
     label: 'Conexões do artista',
     descricao: 'Gerar e revogar os links de autorização do YouTube e do TikTok.',
+  },
+  {
+    cap: 'convidarArtistas',
+    label: 'Convidar artistas',
+    descricao:
+      'Criar e cancelar convites de acesso ao portal do artista. Convidar admin/marketing segue só admin.',
   },
 ]
 

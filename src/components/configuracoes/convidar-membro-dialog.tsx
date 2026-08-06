@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 function mensagemErro(err: unknown): string {
   if (err instanceof FirebaseError && err.code === 'permission-denied') {
-    return 'Sem permissão para convidar. Confirme que seu usuário é admin e que as regras do Firestore estão publicadas.'
+    return 'Sem permissão para convidar. Confirme suas permissões com um admin e que as regras do Firestore estão publicadas.'
   }
   return 'Não foi possível criar o convite. Tente novamente.'
 }
@@ -27,9 +27,12 @@ type Props = {
 
 export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'marketing' }: Props) {
   const { user, appUser } = useAuth()
+  // Só admin escolhe o papel; quem chega aqui pela permissão `convidarArtistas`
+  // (marketing) convida SEMPRE artista — é o único create que as regras aceitam.
+  const ehAdmin = appUser?.role === 'admin'
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<Role>(roleInicial)
+  const [role, setRole] = useState<Role>(ehAdmin ? roleInicial : 'artista')
   const [artistaSlug, setArtistaSlug] = useState('')
   const [artistas, setArtistas] = useState<ArtistaDoc[]>([])
   const [enviando, setEnviando] = useState(false)
@@ -215,33 +218,35 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
               />
             </div>
 
-            <div>
-              <div className="block text-sm font-medium text-ink-300 mb-1.5">Papel</div>
-              <div className="grid grid-cols-3 gap-2">
-                {(Object.keys(roleMeta) as Role[]).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRole(r)}
-                    className={cn(
-                      'px-3 py-2 rounded-lg text-sm font-semibold border transition-colors',
-                      role === r
-                        ? roleMeta[r].classe
-                        : 'bg-bg-950 text-ink-400 border-bg-700/50 hover:bg-bg-800'
-                    )}
-                  >
-                    {roleMeta[r].label}
-                  </button>
-                ))}
+            {ehAdmin && (
+              <div>
+                <div className="block text-sm font-medium text-ink-300 mb-1.5">Papel</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(roleMeta) as Role[]).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRole(r)}
+                      className={cn(
+                        'px-3 py-2 rounded-lg text-sm font-semibold border transition-colors',
+                        role === r
+                          ? roleMeta[r].classe
+                          : 'bg-bg-950 text-ink-400 border-bg-700/50 hover:bg-bg-800'
+                      )}
+                    >
+                      {roleMeta[r].label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-ink-500 mt-2">
+                  {role === 'admin'
+                    ? 'Acesso total — vê tudo e gerencia o time.'
+                    : role === 'marketing'
+                      ? 'Acesso parcial — sem dados sensíveis de receita.'
+                      : 'Portal restrito — vê somente o próprio perfil de artista.'}
+                </p>
               </div>
-              <p className="text-[11px] text-ink-500 mt-2">
-                {role === 'admin'
-                  ? 'Acesso total — vê tudo e gerencia o time.'
-                  : role === 'marketing'
-                    ? 'Acesso parcial — sem dados sensíveis de receita.'
-                    : 'Portal restrito — vê somente o próprio perfil de artista.'}
-              </p>
-            </div>
+            )}
 
             {role === 'artista' && (
               <div>

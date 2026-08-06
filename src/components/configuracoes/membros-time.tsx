@@ -20,7 +20,7 @@ function iniciaisDe(u: AppUser): string {
 }
 
 export function MembrosTime({ modo = 'time' }: { modo?: 'time' | 'artistas' }) {
-  const { role, user } = useAuth()
+  const { role, user, pode } = useAuth()
   const [users, setUsers] = useState<AppUser[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   // null = fechado; Role = papel já selecionado ao abrir o convite.
@@ -53,6 +53,9 @@ export function MembrosTime({ modo = 'time' }: { modo?: 'time' | 'artistas' }) {
   // própria, fora da equipe). `modo` escolhe qual recorte esta instância mostra —
   // assim a aba "Time" e a aba "Artistas" reusam o mesmo componente e fetch.
   const ehArtistas = modo === 'artistas'
+  // Convidar pro TIME é só admin; convidar ARTISTA segue a permissão
+  // `convidarArtistas` (marketing tem por padrão — o admin pode tirar).
+  const podeConvidar = ehArtistas ? pode('convidarArtistas') : ehAdmin
   const lista = ehArtistas
     ? (users?.filter((u) => u.role === 'artista') ?? [])
     : (users?.filter((u) => u.role !== 'artista') ?? [])
@@ -69,6 +72,7 @@ export function MembrosTime({ modo = 'time' }: { modo?: 'time' | 'artistas' }) {
         membros={carregando ? null : lista}
         erro={erro}
         ehAdmin={ehAdmin}
+        podeConvidar={podeConvidar}
         currentUid={user?.uid}
         onRecarregar={recarregar}
         onConvidar={() => setConvidar(ehArtistas ? 'artista' : 'marketing')}
@@ -101,6 +105,7 @@ function SecaoMembros({
   membros,
   erro,
   ehAdmin,
+  podeConvidar,
   currentUid,
   onRecarregar,
   onConvidar,
@@ -112,6 +117,7 @@ function SecaoMembros({
   membros: AppUser[] | null
   erro: string | null
   ehAdmin: boolean
+  podeConvidar: boolean
   currentUid: string | undefined
   onRecarregar: () => void
   onConvidar: () => void
@@ -127,7 +133,7 @@ function SecaoMembros({
             {membros === null ? 'Carregando…' : descricao}
           </div>
         </div>
-        {ehAdmin && (
+        {podeConvidar && (
           <button
             type="button"
             onClick={onConvidar}

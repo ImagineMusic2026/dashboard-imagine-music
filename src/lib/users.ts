@@ -21,6 +21,7 @@ export type Capacidade =
   | 'importar'
   | 'editarArtistas'
   | 'conexoesArtista'
+  | 'convidarArtistas'
 
 /** Perfil do usuário armazenado em Firestore na coleção `users` (id = UID do Auth). */
 export type AppUser = {

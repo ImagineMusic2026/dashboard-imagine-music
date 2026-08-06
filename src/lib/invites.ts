@@ -82,9 +82,16 @@ export async function marcarConviteAceito(token: string): Promise<void> {
   })
 }
 
-/** Lista convites ainda pendentes (somente admin, por regra). */
-export async function listarConvitesPendentes(): Promise<Convite[]> {
-  const snap = await getDocs(query(collection(db, CONVITES), where('status', '==', 'pendente')))
+/**
+ * Lista convites ainda pendentes. Sem filtro é só admin (por regra); com
+ * `role: 'artista'` a query também passa para quem tem a permissão
+ * `convidarArtistas` — a regra de `list` exige o where no role pra provar que
+ * só convites de artista saem da consulta.
+ */
+export async function listarConvitesPendentes(opts?: { role?: Role }): Promise<Convite[]> {
+  const filtros = [where('status', '==', 'pendente')]
+  if (opts?.role) filtros.push(where('role', '==', opts.role))
+  const snap = await getDocs(query(collection(db, CONVITES), ...filtros))
   return snap.docs.map((d) => ({ token: d.id, ...(d.data() as Omit<Convite, 'token'>) }))
 }
 

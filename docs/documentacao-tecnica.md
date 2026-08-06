@@ -169,7 +169,7 @@ Projeto: `painel-imagine-music`. **Escrita: exclusivamente via Admin SDK** (regr
 | `artistas/{slug}` | Cadastro (nome, `redes{spotify,youtube,instagram,tiktok}` com `{url,id,handle}`, etc.) | `isStaff()` OU `isArtistaDe(slug)` | Admin SDK (`/api/artistas/criar\|atualizar\|excluir` — **admin-only**; importar roster) |
 | `receitas/{slug}` | **SENSÍVEL** — receita agregada OneRPM (totalBRL, streams, moedas, receitaPorPlataforma, totais, periodo, ...) | `podeVerReceita()` | Admin SDK (`/api/importar/onerpm`) |
 | `users/{uid}` | Perfil (email, nome, role, ativo, artistaSlug?, permissoes?, conviteToken?) | `get`: self OU `isStaff()`; `list`: `isStaff()` | `create`: `isAdmin()` OU auto-criação ao aceitar convite; `update`/`delete`: `isAdmin()` |
-| `convites/{token}` | Convite (token UUID, email, nome, role, status, criadoPor, criadoEm, artistaSlug?, aceitoEm?) | `get`: liberado (`if true`, link secreto); `list`: `isAdmin()` | `create`/`delete`: `isAdmin()`; `update`: `isAdmin()` OU o convidado (email do token) |
+| `convites/{token}` | Convite (token UUID, email, nome, role, status, criadoPor, criadoEm, artistaSlug?, aceitoEm?) | `get`: liberado (`if true`, link secreto); `list`: `isAdmin()` OU `podeConvidarArtistas()` com `where('role','==','artista')` na query | `create`/`delete`: `isAdmin()`, OU `podeConvidarArtistas()` se o convite é de artista; `update`: `isAdmin()` OU o convidado (email do token) |
 | `agenda/{id}` | Eventos (tipo `release\|show\|contrato\|reuniao`, titulo, descricao?, data, artistaSlug?, artistaNome?, criadoPor, criadoEm) | `podeAgenda()` | `podeAgenda()` — **CRUD client-side** (`src/lib/agenda/client.ts`), sem rota API |
 | `cadastros/{id}` | Auditoria de import do roster | `isAdmin()` | Admin SDK (`/api/importar/roster`) |
 | `importacoes/{id}` | Histórico de import OneRPM receita (id determinístico `artistaSlug+período`) | `podeImportar()` | Admin SDK (`/api/importar/onerpm`) |
@@ -223,7 +223,7 @@ Metadados (label, classe, gradiente CSS) em `roleMeta` (`src/lib/users.ts`).
 
 ### Capacidades delegáveis
 
-`type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar' | 'editarArtistas' | 'conexoesArtista'` (`src/lib/users.ts`; padrões em `src/lib/permissions.ts`). **Não existe uma capacidade `gerenciarTime`** — a gestão de membros é admin-only e é imposta diretamente por `exigirAdmin` nas rotas e por `isAdmin()` nas regras. **Excluir artista também não é delegável** (`/api/artistas/excluir` segue em `exigirAdmin`).
+`type Capacidade = 'verReceita' | 'agenda' | 'integracoes' | 'importar' | 'editarArtistas' | 'conexoesArtista' | 'convidarArtistas'` (`src/lib/users.ts`; padrões em `src/lib/permissions.ts`). **Não existe uma capacidade `gerenciarTime`** — a gestão de membros é admin-only e é imposta diretamente por `exigirAdmin` nas rotas e por `isAdmin()` nas regras. `convidarArtistas` delega SÓ o convite de **artista** (portal); convidar admin/marketing segue admin-only. **Excluir artista também não é delegável** (`/api/artistas/excluir` segue em `exigirAdmin`).
 
 Padrão por papel (`PADRAO` em `permissions.ts`):
 
@@ -235,10 +235,11 @@ Padrão por papel (`PADRAO` em `permissions.ts`):
 | `importar` | ✓ | ✗ | ✗ |
 | `editarArtistas` | ✓ | ✓ | ✗ |
 | `conexoesArtista` | ✓ | ✓ | ✗ |
+| `convidarArtistas` | ✓ | ✓ | ✗ |
 
 `editarArtistas` cobre `/api/artistas/criar` e `/api/artistas/atualizar` (botões **Novo artista** na lista e **Editar** no perfil). `conexoesArtista` cobre `conectar`/`desconectar` de TikTok e YouTube **para outro artista** — o artista age sobre o próprio slug por ser artista, não pela capacidade (por isso essas rotas usam `sessaoPode`, e não `exigirPermissao`, que barraria o artista na entrada).
 
-**Permissão efetiva** (`temPermissao(user, cap)`): `user.permissoes?.[cap] ?? PADRAO[role]?.[cap] ?? false`. Ou seja, o **override por pessoa** (em `users/{uid}.permissoes`) sobrescreve o padrão do papel; papel desconhecido nunca passa. Papéis estruturais (`ehStaff`, `ehArtista`) não são editáveis — só as 6 capacidades são delegáveis.
+**Permissão efetiva** (`temPermissao(user, cap)`): `user.permissoes?.[cap] ?? PADRAO[role]?.[cap] ?? false`. Ou seja, o **override por pessoa** (em `users/{uid}.permissoes`) sobrescreve o padrão do papel; papel desconhecido nunca passa. Papéis estruturais (`ehStaff`, `ehArtista`) não são editáveis — só as 7 capacidades são delegáveis.
 
 ### Enforcement em 3 camadas (lógica espelhada)
 
@@ -246,7 +247,7 @@ Padrão por papel (`PADRAO` em `permissions.ts`):
 |---|---|---|
 | **1. UI (cliente)** | `auth-provider.tsx`, gates | `useAuth().pode(cap)` chama `temPermissao`; gates renderizam children só se a capacidade existir |
 | **2. API (servidor)** | `src/lib/server-auth.ts` | `exigirAdmin`, `exigirSessaoAtiva`, `exigirPermissao(req, cap)`, `autorizarCronOuAdmin`, `autorizarCronOuPermissao`. Tokens Bearer (Firebase ID token) no header `Authorization` |
-| **3. Firestore** | `firestore.rules` | `isAtivo()`, `isAdmin()`, `isStaff()`, `isArtistaDe(slug)`, `podeVerReceita()`, `podeImportar()`, `podeAgenda()` |
+| **3. Firestore** | `firestore.rules` | `isAtivo()`, `isAdmin()`, `isStaff()`, `isArtistaDe(slug)`, `podeVerReceita()`, `podeImportar()`, `podeAgenda()`, `podeEditarArtistas()`, `podeConvidarArtistas()` |
 
 `AuthProvider` (`src/components/auth/auth-provider.tsx`) expõe `useAuth()` com `{ user, appUser, role, pode, loading }`. Escuta `onAuthStateChanged`; para cada user logado faz `getAppUser(uid)`. Trata `permission-denied` graciosamente caso `/users` ainda não tenha regras publicadas.
 
@@ -258,7 +259,7 @@ Padrão por papel (`PADRAO` em `permissions.ts`):
 
 `src/lib/invites.ts` — `type Convite { token (UUID), email, nome, role, status, criadoPor, artistaSlug? }`.
 
-1. **Admin cria** convite (`criarConvite`) → doc em `convites/{token}` com `crypto.randomUUID()` e `serverTimestamp`; e-mail enviado via EmailJS (`@emailjs/browser`, `src/lib/email.ts`).
+1. **Admin cria** convite de qualquer papel; quem tem `convidarArtistas` (marketing por padrão) cria **só convite de artista** (`criarConvite`) → doc em `convites/{token}` com `crypto.randomUUID()` e `serverTimestamp`; e-mail enviado via EmailJS (`@emailjs/browser`, `src/lib/email.ts`).
 2. **Convidado abre** `/aceitar-convite?token=...` → `getConvite(token)` (leitura pública por token), valida `status=='pendente'`.
 3. **Aceite** (`src/app/(auth)/aceitar-convite/page.tsx`): `createUserWithEmailAndPassword` → cria `users/{uid}` (role, ativo=true, `conviteToken`, `artistaSlug` se aplicável) → `marcarConviteAceito(token)` → redireciona `/home`.
 4. Regra Firestore permite `create` em `users` se `isAdmin()` OU (self && email/role/artistaSlug conferem com o convite && convite pendente). Sem auto-promoção: a role vem do convite.
@@ -513,7 +514,7 @@ São **31 scripts operacionais** em `scripts/` (`.mjs` via `node`, `.ts` via `np
 - **Tokens OAuth bloqueados no cliente.** `tiktok-tokens/*` e `youtube-tokens/*` têm `allow read, write: if false`. Acesso só via Admin SDK. **Nunca importar `firebase-admin` em Client Components** (acesso total) e **nunca expor tokens no client**.
 - **Receita é sensível.** `receitas/{slug}` só lê com `podeVerReceita()`. Marketing por padrão não vê; admin delega por pessoa em `users/{uid}.permissoes.verReceita`. A coleção `receitas` é separada de `artistas` justamente para esse gate — a regra Firestore (não só o gate de UI) faz o bloqueio.
 - **3 camadas espelhadas** (`temPermissao` em `permissions.ts`/cliente, `server-auth.ts`/API, `firestore.rules`/banco) — manter em sincronia ao mudar permissões.
-- **Convites:** `convites/{token}` permite `get` por qualquer um com o UUID (link secreto), mas `list` só admin — **nunca listar publicamente**.
+- **Convites:** `convites/{token}` permite `get` por qualquer um com o UUID (link secreto), mas `list` só admin (ou `convidarArtistas` restrito a convites de artista via filtro na query) — **nunca listar publicamente**.
 - **Admin não pode desativar/remover a si mesmo** (trava no servidor). Desativar revoga refresh tokens imediatamente (derruba sessões abertas).
 - **CRON_SECRET** protege os crons; é comparado por igualdade (não é JWT).
 - **Meta:** `appsecret_proof` (HMAC-SHA256) nas requisições Graph.

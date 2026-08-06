@@ -277,9 +277,13 @@ A página **Configurações** é onde o admin gerencia pessoas e acessos. Ela te
 
 > Se o e-mail não sair por algum motivo, o **link do convite continua válido** — copie-o na tela de confirmação e envie manualmente.
 
-### Convites pendentes *(admin)*
+### Convidar um artista *(admin e marketing)*
 
-Na lista de convites pendentes você pode **copiar o link** novamente ou **cancelar** um convite que ainda não foi aceito.
+Convidar **artista** para o portal não é exclusivo do admin: quem tem a permissão **Convidar artistas** (por padrão, toda a equipe de marketing) vê o botão **Convidar artista** em **Configurações › Artistas**. Nesse caso o papel já vem fixo em artista — convidar admin ou marketing continua sendo só do admin. O admin pode conceder ou retirar essa permissão por pessoa na aba **Permissões**.
+
+### Convites pendentes *(admin; artistas também para quem pode convidar)*
+
+Na lista de convites pendentes você pode **copiar o link** novamente ou **cancelar** um convite que ainda não foi aceito. Quem tem a permissão **Convidar artistas** vê e gerencia os convites pendentes **de artista** (aba Artistas); os convites do time seguem visíveis só para admins.
 
 ### Gerenciar membros *(admin)*
 

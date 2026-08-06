@@ -20,8 +20,12 @@ function iniciaisDe(nome: string, email: string): string {
 }
 
 export function ConvitesPendentes({ modo }: { modo?: 'time' | 'artistas' }) {
-  const { role, loading: authLoading } = useAuth()
+  const { role, pode, loading: authLoading } = useAuth()
   const ehAdmin = role === 'admin'
+  const ehArtistas = modo === 'artistas'
+  // Convites do TIME são só admin; os de ARTISTA seguem a permissão
+  // `convidarArtistas` (marketing por padrão).
+  const podeGerenciar = ehArtistas ? pode('convidarArtistas') : ehAdmin
 
   const [convites, setConvites] = useState<Convite[] | null>(null)
   const [copiado, setCopiado] = useState<string | null>(null)
@@ -29,18 +33,20 @@ export function ConvitesPendentes({ modo }: { modo?: 'time' | 'artistas' }) {
 
   const carregar = useCallback(() => {
     if (authLoading) return
-    if (!ehAdmin) {
+    if (!podeGerenciar) {
       setConvites([])
       return
     }
     setConvites(null)
-    listarConvitesPendentes()
+    // Na aba de artistas o filtro por role vai NA QUERY: é o que a regra de
+    // `list` exige de quem não é admin (e pro admin dá no mesmo).
+    listarConvitesPendentes(ehArtistas ? { role: 'artista' } : undefined)
       .then(setConvites)
       .catch((e) => {
         console.error(e)
         setConvites([])
       })
-  }, [authLoading, ehAdmin])
+  }, [authLoading, podeGerenciar, ehArtistas])
 
   useEffect(() => {
     carregar()
@@ -94,7 +100,7 @@ export function ConvitesPendentes({ modo }: { modo?: 'time' | 'artistas' }) {
             <div className="text-[12px] text-ink-500">{total} aguardando aceite</div>
           )}
         </div>
-        {ehAdmin && (
+        {podeGerenciar && (
           <button
             type="button"
             onClick={carregar}

@@ -60,6 +60,13 @@ service cloud.firestore {
       return isStaff()
         && userData().get('permissoes', {}).get('editarArtistas', true);
     }
+    // Quem convida ARTISTA pro portal (admin e marketing por padrão). Vale só para
+    // convites com role 'artista' — convidar admin/marketing segue exclusivo do
+    // admin (cada regra de `convites` abaixo confere o role do convite).
+    function podeConvidarArtistas() {
+      return isStaff()
+        && userData().get('permissoes', {}).get('convidarArtistas', true);
+    }
 
     function convite(token) {
       return get(/databases/$(database)/documents/convites/$(token)).data;
@@ -101,17 +108,24 @@ service cloud.firestore {
     // Convites
     match /convites/{token} {
       // Leitura de UM convite por token (link secreto, UUID) é liberada;
-      // listar todos é só admin.
+      // listar todos é só admin. Quem tem `convidarArtistas` lista SÓ convites de
+      // artista — a query PRECISA trazer where('role','==','artista'), senão o
+      // Firestore não prova o `resource.data.role` e nega a consulta inteira.
       allow get: if true;
-      allow list: if isAdmin();
+      allow list: if isAdmin()
+        || (podeConvidarArtistas() && resource.data.role == 'artista');
 
-      allow create: if isAdmin();
+      // Admin convida qualquer papel; `convidarArtistas` só cria convite de
+      // artista (sem caminho pra marketing emitir convite de admin/marketing).
+      allow create: if isAdmin()
+        || (podeConvidarArtistas() && request.resource.data.role == 'artista');
 
       // Admin gerencia; OU o convidado marca o próprio convite como aceito.
       allow update: if isAdmin()
         || (isSignedIn() && request.auth.token.email == resource.data.email);
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin()
+        || (podeConvidarArtistas() && resource.data.role == 'artista');
     }
 
     // Cadastro do artista (nome, redes, label): NÃO é sensível para a equipe.

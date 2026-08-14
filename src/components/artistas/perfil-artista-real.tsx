@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, Loader2, Pencil } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Loader2, Pencil, Star } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
@@ -49,7 +49,7 @@ export function PerfilArtistaReal({
   /** Esconde o link "← Artistas" (usado no portal do artista, que não tem roster). */
   mostrarVoltar?: boolean
 }) {
-  const { role, pode } = useAuth()
+  const { role, pode, ehFavorito, alternarFavorito } = useAuth()
   const router = useRouter()
   // Editar é permissão (admin e marketing por padrão); excluir continua só admin.
   const podeEditar = role !== 'artista' && pode('editarArtistas')
@@ -98,6 +98,7 @@ export function PerfilArtistaReal({
 
   const a = estado.a
   const links = LINKS.map((l) => ({ ...l, rede: l.get(a) })).filter((l) => l.rede?.url)
+  const favorito = ehFavorito(a.slug)
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -146,6 +147,23 @@ export function PerfilArtistaReal({
             próprio artista conecta. Cada ícone abre um popover com a explicação e o
             botão; some pra quem não tem a permissão. */}
         <div className="flex items-center gap-2 shrink-0">
+          {role !== 'artista' && (
+            <button
+              type="button"
+              onClick={() => alternarFavorito(a.slug)}
+              aria-label={favorito ? `Desfavoritar ${a.nome}` : `Favoritar ${a.nome}`}
+              aria-pressed={favorito}
+              title={favorito ? 'Desfavoritar artista' : 'Favoritar artista'}
+              className={cn(
+                'inline-flex items-center justify-center w-8 h-8 rounded-lg border transition-colors',
+                favorito
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                  : 'bg-bg-800 hover:bg-bg-700 border-bg-700/50 text-ink-400 hover:text-amber-400',
+              )}
+            >
+              <Star className={cn('w-4 h-4', favorito && 'fill-current')} />
+            </button>
+          )}
           <ConectarPlataforma plataforma="tiktok" slug={a.slug} />
           <ConectarPlataforma plataforma="youtube" slug={a.slug} />
           {podeEditar && (

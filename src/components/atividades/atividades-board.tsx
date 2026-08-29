@@ -147,7 +147,7 @@ export function AtividadesBoard() {
         <div>
           <h1 className="text-3xl font-bold text-ink-100">Atividades</h1>
           <p className="text-sm text-ink-400 mt-1">
-            O fluxo de atendimento do começo ao fim — e quem está com cada demanda
+            O fluxo de atendimento do começo ao fim e quem está com cada demanda
           </p>
         </div>
         <button

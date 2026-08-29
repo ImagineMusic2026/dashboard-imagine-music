@@ -28,6 +28,18 @@ export interface ArtistaDoc {
   /** Criado por uma importação de receita, sem redes sociais. Limpo ao editar o perfil. */
   pendenteConfiguracao?: boolean
   pendenteDesde?: number
+  /**
+   * Quantas faixas de `catalogo-faixas` estão atribuídas a este artista.
+   *
+   * Contador DENORMALIZADO de propósito: a tela do catálogo mostra a cobertura
+   * dos 96 artistas de uma vez, e contar ao vivo seria varrer o catálogo inteiro
+   * (1.136 docs) a cada abertura — exatamente o que estourou a cota em agosto.
+   * Aqui o número vem de graça junto com o roster, que já é cacheado.
+   *
+   * Quem mantém: `scripts/atribuir-fonogramas.mjs` (lote) e `/api/fonogramas`
+   * (a cada cadastro/remoção manual). Ausente = nunca contado, não "zero".
+   */
+  fonogramas?: number
   redes?: {
     spotify?: RedeSocialDoc | null
     youtube?: RedeSocialDoc | null

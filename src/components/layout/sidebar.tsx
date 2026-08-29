@@ -8,6 +8,7 @@ import {
   Users,
   Bell,
   Music,
+  Disc3,
   Calendar,
   SquareKanban,
   Upload,
@@ -36,6 +37,7 @@ const navPrincipal: NavItem[] = [
   { href: '/artistas', label: 'Artistas', icon: Users },
   { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/conteudo', label: 'Conteúdo', icon: Music },
+  { href: '/catalogo', label: 'Catálogo', icon: Disc3 },
   { href: '/atividades', label: 'Atividades', icon: SquareKanban },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
 ]

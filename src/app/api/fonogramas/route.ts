@@ -49,6 +49,32 @@ function link(v: unknown): string | null {
   }
 }
 
+/**
+ * Recarimba `artistas/{slug}.fonogramas`. O contador existe pra tela do catálogo
+ * ler a cobertura de todos os artistas sem varrer o catálogo (ver a nota em
+ * `ArtistaDoc.fonogramas`); se ele não for atualizado aqui, o número mente
+ * assim que alguém cadastra ou remove uma faixa à mão.
+ *
+ * `count()` é agregação do Firestore — custa uma leitura, não uma por faixa.
+ * Falha aqui não derruba a operação: a faixa já foi gravada, e o próximo
+ * `atribuir-fonogramas.mjs` reconcilia o número.
+ */
+async function recontar(slug: string): Promise<void> {
+  try {
+    const agg = await adminDb
+      .collection('catalogo-faixas')
+      .where('artistaSlug', '==', slug)
+      .count()
+      .get()
+    await adminDb
+      .collection('artistas')
+      .doc(slug)
+      .set({ fonogramas: agg.data().count }, { merge: true })
+  } catch {
+    /* contador é conveniência: não vale falhar o cadastro por causa dele */
+  }
+}
+
 export async function POST(req: Request) {
   const auth = await exigirPermissao(req, 'editarArtistas')
   if (auth instanceof NextResponse) return auth
@@ -109,6 +135,7 @@ export async function POST(req: Request) {
     { merge: true },
   )
 
+  await recontar(slug)
   return NextResponse.json({ ok: true, isrc })
 }
 
@@ -133,11 +160,13 @@ export async function DELETE(req: Request) {
   // Faixa vinda da OneRPM não se apaga: o doc é o cache ISRC→título da análise de
   // streaming, e o próximo sync a recriaria de qualquer forma. Só solta o vínculo
   // com o artista — é isso que "remover do perfil" significa aqui.
+  const dono = snap.data()?.artistaSlug as string | undefined
+
   if (snap.data()?.atribuicao !== 'manual') {
     await ref.set({ artistaSlug: null, artistaSlugs: [] }, { merge: true })
-    return NextResponse.json({ ok: true, desvinculado: true })
+  } else {
+    await ref.delete()
   }
-
-  await ref.delete()
+  if (dono) await recontar(dono)
   return NextResponse.json({ ok: true })
 }

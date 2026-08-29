@@ -183,5 +183,37 @@ for (let i = 0; i < paraGravar.length; i += 400) {
   gravadas += Math.min(400, paraGravar.length - i)
   console.log(`  gravadas ${gravadas}/${paraGravar.length}`)
 }
+
+/* ── contador por artista ──────────────────────────────────────────────────── */
+
+/**
+ * Carimba `artistas/{slug}.fonogramas` com o total de cada um. É o que deixa a
+ * tela do catálogo mostrar a cobertura dos 96 artistas sem varrer as 1.136
+ * faixas a cada abertura — ver a nota em `ArtistaDoc.fonogramas`.
+ *
+ * Conta pelo `artistaSlug` (o dono principal), que é exatamente o que a consulta
+ * do card do perfil usa — assim o número da lista bate com o do perfil. Grava
+ * inclusive o zero: "contado e não tem" é informação diferente de "nunca contado".
+ */
+const contagemFinal = new Map()
+for (const doc of (await db.collection('catalogo-faixas').get()).docs) {
+  const s = doc.data().artistaSlug
+  if (s) contagemFinal.set(s, (contagemFinal.get(s) ?? 0) + 1)
+}
+const slugs = [...roster]
+for (let i = 0; i < slugs.length; i += 400) {
+  const lote = db.batch()
+  for (const slug of slugs.slice(i, i + 400)) {
+    lote.set(
+      db.collection('artistas').doc(slug),
+      { fonogramas: contagemFinal.get(slug) ?? 0 },
+      { merge: true },
+    )
+  }
+  await lote.commit()
+}
+const semCatalogo = slugs.filter((s) => !contagemFinal.get(s)).length
+console.log(`\ncontador gravado em ${slugs.length} artistas | sem nenhuma faixa: ${semCatalogo}`)
+
 console.log('\npronto.')
 process.exit(0)

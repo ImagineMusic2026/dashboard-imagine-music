@@ -9,6 +9,7 @@ import {
   Bell,
   Music,
   Calendar,
+  SquareKanban,
   Upload,
   Plug,
   Settings,
@@ -35,6 +36,7 @@ const navPrincipal: NavItem[] = [
   { href: '/artistas', label: 'Artistas', icon: Users },
   { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/conteudo', label: 'Conteúdo', icon: Music },
+  { href: '/atividades', label: 'Atividades', icon: SquareKanban },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
 ]
 

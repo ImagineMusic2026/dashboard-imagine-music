@@ -13,6 +13,7 @@ const routeLabels: Record<string, string> = {
   '/artistas': 'Artistas',
   '/alertas': 'Alertas',
   '/conteudo': 'Conteúdo',
+  '/atividades': 'Atividades',
   '/agenda': 'Agenda',
   '/importar': 'Importar',
   '/integracoes': 'Integrações',

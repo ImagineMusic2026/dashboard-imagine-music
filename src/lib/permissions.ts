@@ -18,6 +18,7 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
   admin: {
     verReceita: true,
     agenda: true,
+    atividades: true,
     integracoes: true,
     importar: true,
     editarArtistas: true,
@@ -27,6 +28,9 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
   marketing: {
     verReceita: false,
     agenda: true,
+    // O quadro de atividades É a rotina do marketing — o fluxo de atendimento
+    // que ele toca. Vem ligado; o admin pode tirar de alguém.
+    atividades: true,
     integracoes: false,
     importar: false,
     // O time de marketing é quem mantém o cadastro (cria, edita e preenche o
@@ -41,6 +45,7 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
   artista: {
     verReceita: false,
     agenda: false,
+    atividades: false,
     integracoes: false,
     importar: false,
     editarArtistas: false,
@@ -53,6 +58,12 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
 export const CAPACIDADES: { cap: Capacidade; label: string; descricao: string }[] = [
   { cap: 'verReceita', label: 'Ver receita / financeiro', descricao: 'Receita e streams dos artistas (OneRPM).' },
   { cap: 'agenda', label: 'Agenda', descricao: 'Criar e editar eventos (releases, shows, contratos).' },
+  {
+    cap: 'atividades',
+    label: 'Atividades (kanban)',
+    descricao:
+      'Ver o quadro de demandas do atendimento, criar cards, mover de etapa e definir o responsável.',
+  },
   { cap: 'integracoes', label: 'Integrações', descricao: 'Descobrir contas e sincronizar métricas.' },
   { cap: 'importar', label: 'Importar dados', descricao: 'Subir planilhas de OneRPM e roster.' },
   {

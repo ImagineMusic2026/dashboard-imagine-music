@@ -17,6 +17,7 @@ export type Role = 'admin' | 'marketing' | 'artista'
 export type Capacidade =
   | 'verReceita'
   | 'agenda'
+  | 'atividades'
   | 'integracoes'
   | 'importar'
   | 'editarArtistas'

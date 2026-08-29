@@ -53,6 +53,13 @@ service cloud.firestore {
         && userData().get('permissoes', {}).get('agenda',
              userData().get('role', '') == 'admin' || userData().get('role', '') == 'marketing');
     }
+    // Quadro de atividades (kanban do atendimento). Padrão: admin e marketing.
+    // O `isStaff()` na frente evita que um override solto num login de artista
+    // vire acesso às demandas do time inteiro (mesmo motivo de podeEditarArtistas).
+    function podeAtividades() {
+      return isStaff()
+        && userData().get('permissoes', {}).get('atividades', true);
+    }
     // Quem mantém o cadastro do artista (admin e marketing por padrão). O `isStaff()`
     // na frente é de propósito: o padrão do papel `artista` é FALSE, mas um override
     // solto no login de um artista não pode virar acesso ao dado alheio.
@@ -288,6 +295,14 @@ service cloud.firestore {
     match /agenda/{id} {
       allow read: if podeAgenda();
       allow create, update, delete: if podeAgenda();
+    }
+
+    // Atividades (kanban do fluxo de atendimento). Dado manual da equipe, igual à
+    // agenda: quem tem a permissão `atividades` (staff por padrão) lê e escreve
+    // direto do client. Artista NÃO entra — são as demandas internas do time.
+    match /atividades/{id} {
+      allow read: if podeAtividades();
+      allow create, update, delete: if podeAtividades();
     }
 
     // Demais coleções ficam bloqueadas até serem modeladas.

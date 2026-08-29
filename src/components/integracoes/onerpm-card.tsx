@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Loader2, PlayCircle, RefreshCw } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
-import { getStatusOneRpm, listarArtistasComStreaming } from '@/lib/metricas-sociais/client'
-import type { IntegracaoOneRpmDoc } from '@/lib/metricas-sociais/types'
+import { getStatusOneRpm, getStatusTikTokUgc, listarArtistasComStreaming } from '@/lib/metricas-sociais/client'
+import type { IntegracaoOneRpmDoc, IntegracaoTikTokUgcDoc } from '@/lib/metricas-sociais/types'
 import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
-import { formatNumber } from '@/lib/utils'
+import { cn, formatNumber } from '@/lib/utils'
 import {
   BTN_PRIMARIO,
   ChipsColeta,
@@ -35,6 +35,7 @@ export function OneRpmCard() {
 
   const [aberto, setAberto] = useState(false)
   const [status, setStatus] = useState<IntegracaoOneRpmDoc | null>(null)
+  const [tiktok, setTiktok] = useState<IntegracaoTikTokUgcDoc | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [sincronizando, setSincronizando] = useState(false)
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
@@ -47,6 +48,11 @@ export function OneRpmCard() {
     } finally {
       setCarregando(false)
     }
+    // Sync separado (feed de TikTok por faixa): falhar aqui não pode apagar o
+    // status do streaming, que é o dado principal do card.
+    getStatusTikTokUgc()
+      .then(setTiktok)
+      .catch(() => setTiktok(null))
   }, [])
 
   useEffect(() => {
@@ -157,6 +163,33 @@ export function OneRpmCard() {
               por não ter formato de streaming:{' '}
               {status.lojasIgnoradas.map((l) => l.loja).join(', ')}. O restante sincronizou
               normalmente.
+            </div>
+          )}
+
+          {/* Feed de TikTok por faixa: mesma fonte, execução própria (cron às 5h05).
+              Mostrado aqui pra não repetir a história de agosto — um sync que a tela
+              não exibe é um sync que pode ficar semanas quebrado sem ninguém ver. */}
+          {tiktok && (
+            <div
+              className={cn(
+                'text-[12px] rounded-lg px-3 py-2 border flex flex-wrap items-center gap-x-2 gap-y-1',
+                tiktok.status === 'erro'
+                  ? 'text-red-300 bg-red-500/10 border-red-500/30'
+                  : 'text-ink-300 bg-bg-800/60 border-bg-700/40',
+              )}
+            >
+              <span className="font-semibold text-ink-100">TikTok por faixa</span>
+              {tiktok.status === 'erro' ? (
+                <span>{tiktok.erro ?? 'falhou na última execução'}</span>
+              ) : (
+                <span className="num">
+                  {formatNumber(tiktok.viewsJanela ?? 0)} views · {tiktok.artistasSincronizados ?? 0}{' '}
+                  artistas
+                  {tiktok.ultimaSincronizacao
+                    ? ` · há ${formatarQuando(tiktok.ultimaSincronizacao)}`
+                    : ''}
+                </span>
+              )}
             </div>
           )}
 

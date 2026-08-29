@@ -24,6 +24,8 @@ declare module 'ssh2-sftp-client' {
     constructor(name?: string)
     connect(options: ConnectOptions): Promise<unknown>
     list(remotePath: string): Promise<FileInfo[]>
+    /** `false` se não existe; senão o tipo do nó ('d' diretório, '-' arquivo). */
+    exists(remotePath: string): Promise<false | 'd' | '-' | 'l'>
     get(
       remotePath: string,
       dst?: string | NodeJS.WritableStream,

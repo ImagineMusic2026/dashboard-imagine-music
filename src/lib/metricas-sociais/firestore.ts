@@ -13,6 +13,8 @@ import type {
   IntegracaoYouTubeDoc,
   MetricasSociaisDoc,
   StreamingDetalheDoc,
+  TikTokUgcDoc,
+  IntegracaoTikTokUgcDoc,
   StreamingSnapshot,
   TikTokSnapshot,
   TikTokTokenDoc,
@@ -433,6 +435,20 @@ export async function gravarStatusOneRpm(status: Partial<IntegracaoOneRpmDoc>): 
  */
 export async function salvarStreamingDetalhe(slug: string, detalhe: StreamingDetalheDoc): Promise<void> {
   await adminDb.doc(`metricas-sociais/${slug}/streaming-detalhe/atual`).set(detalhe)
+}
+
+/**
+ * Grava a tração do TikTok por faixa. Sobrescreve o doc inteiro, como o detalhe
+ * de streaming: é um recorte de janela, não um acumulado — merge deixaria faixa
+ * que saiu do período viva pra sempre.
+ */
+export async function salvarTikTokUgc(slug: string, doc: TikTokUgcDoc): Promise<void> {
+  await adminDb.doc(`metricas-sociais/${slug}/streaming-detalhe/tiktok-ugc`).set(doc)
+}
+
+/** Status do sync de UGC do TikTok (`integracoes/onerpm-tiktok`). */
+export async function gravarStatusTikTokUgc(status: Partial<IntegracaoTikTokUgcDoc>): Promise<void> {
+  await adminDb.doc('integracoes/onerpm-tiktok').set(status, { merge: true })
 }
 
 /* ── Catálogo de faixas (ISRC → título; catálogo OneRPM + fallback Deezer) ── */

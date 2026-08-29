@@ -11,6 +11,7 @@ import type {
   HistoricoYouTubeDiaDoc,
   IntegracaoMetaDoc,
   IntegracaoOneRpmDoc,
+  IntegracaoTikTokUgcDoc,
   IntegracaoTikTokDoc,
   IntegracaoYouTubeDoc,
   MetricasSociaisDoc,
@@ -202,6 +203,16 @@ export async function getStatusYouTube(): Promise<IntegracaoYouTubeDoc | null> {
 export async function getStatusOneRpm(): Promise<IntegracaoOneRpmDoc | null> {
   const s = await getDoc(doc(db, 'integracoes', 'onerpm'))
   return s.exists() ? (s.data() as IntegracaoOneRpmDoc) : null
+}
+
+/**
+ * Status do sync de TikTok por faixa (`integracoes/onerpm-tiktok`). Mesma fonte
+ * (SFTP da OneRPM), execução separada — por isso doc separado. Aparece dentro do
+ * card da OneRPM: sync que ninguém enxerga é sync que quebra calado.
+ */
+export async function getStatusTikTokUgc(): Promise<IntegracaoTikTokUgcDoc | null> {
+  const s = await getDoc(doc(db, 'integracoes', 'onerpm-tiktok'))
+  return s.exists() ? (s.data() as IntegracaoTikTokUgcDoc) : null
 }
 
 /** Histórico diário de streaming (ordenado por dia asc), últimos `limite` dias. */

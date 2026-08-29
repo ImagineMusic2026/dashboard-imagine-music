@@ -20,6 +20,16 @@ import { montarDetalhe, montarSnapshot } from './trends-snapshot'
 const HOST = 'trends-data.onerpm.com'
 const BASE = 'Reports/stats'
 
+/**
+ * Pastas do feed que NÃO são streaming e têm sync próprio — pular aqui é o
+ * comportamento certo, não uma falha, então elas não entram em `lojasIgnoradas`
+ * (senão o card acusaria um problema que não existe, todo dia).
+ *
+ * `tiktok`: tração de vídeo por faixa, formato próprio. Ver
+ * `tiktok-ugc-sync.ts` e `/api/integracoes/onerpm/tiktok-ugc`.
+ */
+const PASTAS_COM_SYNC_PROPRIO = new Set(['tiktok'])
+
 export class OneRpmSftpConfigError extends Error {
   constructor(message: string) {
     super(message)
@@ -75,7 +85,7 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
     })
 
     const lojas = (await sftp.list(BASE))
-      .filter((e) => e.type === 'd')
+      .filter((e) => e.type === 'd' && !PASTAS_COM_SYNC_PROPRIO.has(e.name))
       .map((e) => e.name)
       .sort()
 

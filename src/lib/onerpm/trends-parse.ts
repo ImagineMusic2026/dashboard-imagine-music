@@ -19,8 +19,12 @@ export class OneRpmTrendsParseError extends Error {
 
 const COLUNAS = ['store', 'date_stat', 'country_code', 'quantity', 'skips', 'isrc', 'artist_name'] as const
 
-/** Parser de CSV minimalista (RFC-4180-ish): aspas duplas, "" escapado, CRLF. */
-function parseCsv(texto: string): string[][] {
+/**
+ * Parser de CSV minimalista (RFC-4180-ish): aspas duplas, "" escapado, CRLF.
+ * Exportado porque o feed de UGC do TikTok (`tiktok-ugc-parse`) é outro formato
+ * no mesmo SFTP e merece o mesmo parser, não uma segunda cópia dele.
+ */
+export function parseCsv(texto: string): string[][] {
   const t = texto.charCodeAt(0) === 0xfeff ? texto.slice(1) : texto // tira BOM
   const linhas: string[][] = []
   let campo = ''

@@ -295,6 +295,54 @@ export interface StreamingDetalheDoc {
   coletadoEm: string
 }
 
+/**
+ * Documento `metricas-sociais/{slug}/streaming-detalhe/tiktok-ugc` — tração de
+ * vídeo por faixa no TikTok, vinda do feed `Reports/stats/tiktok` da OneRPM
+ * (ver `tiktok-ugc-parse`). Fica ao lado do detalhe de streaming porque é a
+ * mesma natureza: recorte granular por ISRC, reescrito inteiro a cada sync.
+ */
+export interface TikTokUgcDoc {
+  periodo: { de: string; ate: string; dias: number }
+  /** Soma do artista na janela (inclui a parte de UGC separada). */
+  totais: {
+    criacoes: number
+    views: number
+    curtidas: number
+    comentarios: number
+    compartilhamentos: number
+    favoritos: number
+    criacoesUgc: number
+    viewsUgc: number
+    watchtimeMedio: number | null
+  }
+  /** Faixas por views (top N). */
+  porFaixa: {
+    isrc: string
+    criacoes: number
+    views: number
+    curtidas: number
+    comentarios: number
+    compartilhamentos: number
+    favoritos: number
+    criacoesUgc: number
+    viewsUgc: number
+    watchtimeMedio: number | null
+  }[]
+  coletadoEm: string
+}
+
+/** Documento `integracoes/onerpm-tiktok` — status do sync de UGC do TikTok. */
+export interface IntegracaoTikTokUgcDoc {
+  status: StatusIntegracao
+  artistasSincronizados: number
+  arquivos: number
+  viewsJanela: number
+  janelaDias: number
+  ultimaSincronizacao: string | null
+  ultimoDia: string | null
+  erro?: string | null
+}
+
 export type StatusIntegracao = 'conectado' | 'nao_configurado' | 'erro'
 
 /** Um artista com streaming na última sincronização (para a lista "ver contas"). */

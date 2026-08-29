@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, query, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { memoCurtaPorChave, invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 
@@ -81,6 +81,68 @@ const cache = memoCurtaPorChave(lerFonogramas, (slug) => slug)
  */
 export function listarFonogramas(slug: string): Promise<Fonograma[]> {
   return cache(slug)
+}
+
+/* ── TikTok por faixa ──────────────────────────────────────────────────────── */
+
+/**
+ * Tração de vídeo no TikTok de UMA faixa, na janela do último sync.
+ * Vem de `metricas-sociais/{slug}/streaming-detalhe/tiktok-ugc` (feed próprio da
+ * OneRPM, ver `tiktok-ugc-parse`). `ugc` é a parte feita pelo PÚBLICO — é o
+ * número que diz se a faixa está viralizando, e não se confunde com o
+ * desempenho do conteúdo oficial.
+ */
+export interface TikTokFaixa {
+  isrc: string
+  criacoes: number
+  views: number
+  curtidas: number
+  comentarios: number
+  compartilhamentos: number
+  favoritos: number
+  criacoesUgc: number
+  viewsUgc: number
+  /** Segundos assistidos em média (ponderado por views). */
+  watchtimeMedio: number | null
+}
+
+export interface TikTokDoArtista {
+  periodo: { de: string; ate: string; dias: number }
+  totais: Omit<TikTokFaixa, 'isrc'>
+  /** Indexado por ISRC pra o card casar com a lista de fonogramas em O(1). */
+  porIsrc: Map<string, TikTokFaixa>
+}
+
+async function lerTikTok(slug: string): Promise<TikTokDoArtista | null> {
+  const snap = await getDoc(doc(db, 'metricas-sociais', slug, 'streaming-detalhe', 'tiktok-ugc'))
+  if (!snap.exists()) return null
+  const d = snap.data() as {
+    periodo?: TikTokDoArtista['periodo']
+    totais?: TikTokDoArtista['totais']
+    porFaixa?: TikTokFaixa[]
+  }
+  const porIsrc = new Map<string, TikTokFaixa>()
+  for (const f of d.porFaixa ?? []) porIsrc.set(f.isrc, f)
+  if (!d.periodo || !d.totais) return null
+  return { periodo: d.periodo, totais: d.totais, porIsrc }
+}
+
+const cacheTikTok = memoCurtaPorChave(lerTikTok, (slug) => slug)
+
+/**
+ * TikTok por faixa de um artista — UM doc lido, não uma consulta por faixa.
+ * `null` quando o artista ainda não apareceu no feed (é o caso comum: a OneRPM
+ * só publica isto desde 2026-08-07).
+ */
+export function getTikTokDoArtista(slug: string): Promise<TikTokDoArtista | null> {
+  return cacheTikTok(slug)
+}
+
+/** Número curto pra caber no card: 1,2M · 34,5k · 812. */
+export function compacto(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace('.', ',')}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1).replace('.', ',')}k`
+  return String(n)
 }
 
 export interface DadosFonograma {

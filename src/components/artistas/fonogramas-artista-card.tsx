@@ -1,16 +1,21 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Disc3, ExternalLink, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Disc3, ExternalLink, Eye, Loader2, Pencil, Plus, Search, Trash2, Video } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
+import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { ehStaff } from '@/lib/permissions'
 import { FonogramaDialog } from '@/components/artistas/fonograma-dialog'
 import {
+  compacto,
+  getTikTokDoArtista,
   lancamentoCurto,
   listarFonogramas,
   origemMeta,
   removerFonograma,
   type Fonograma,
+  type TikTokDoArtista,
+  type TikTokFaixa,
 } from '@/lib/fonogramas/client'
 import { cn } from '@/lib/utils'
 
@@ -38,6 +43,7 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
   const staff = !loading && ehStaff(role)
   const podeEditar = staff && pode('editarArtistas')
   const [faixas, setFaixas] = useState<Fonograma[] | null>(null)
+  const [tiktok, setTiktok] = useState<TikTokDoArtista | null>(null)
   const [expandido, setExpandido] = useState(false)
   const [busca, setBusca] = useState('')
   const [dialogo, setDialogo] = useState<Dialogo>(null)
@@ -55,7 +61,12 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
   useEffect(() => {
     if (!staff) return
     carregar()
-  }, [staff, carregar])
+    // Um doc só, com o TikTok de TODAS as faixas do artista. Falha ou ausência
+    // (a OneRPM só publica isto desde 07/08) some sem quebrar a lista.
+    getTikTokDoArtista(slug)
+      .then(setTiktok)
+      .catch(() => setTiktok(null))
+  }, [staff, slug, carregar])
 
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase()
@@ -91,6 +102,20 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
         <span className="text-[10px] num bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded font-semibold">
           {faixas.length}
         </span>
+
+        {/* Resumo do TikTok do artista. Só aparece quando o feed já cobriu ele —
+            a OneRPM publica isto desde 07/08, então a maioria ainda não tem. */}
+        {tiktok && tiktok.totais.views > 0 && (
+          <span
+            className="inline-flex items-center gap-1.5 text-[10px] num font-semibold px-2 py-0.5 rounded border bg-cyan-500/10 text-cyan-300 border-cyan-500/25"
+            title={`TikTok: ${tiktok.totais.views.toLocaleString('pt-BR')} views e ${tiktok.totais.criacoesUgc.toLocaleString('pt-BR')} vídeos do público em ${tiktok.periodo.dias} dia(s) com dado (${tiktok.periodo.de} a ${tiktok.periodo.ate})`}
+          >
+            <span className="w-3 h-3 block" aria-hidden>
+              <PlataformaIcon tipo="tiktok" />
+            </span>
+            {compacto(tiktok.totais.views)} views · {compacto(tiktok.totais.criacoesUgc)} vídeos
+          </span>
+        )}
 
         {faixas.length >= MIN_BUSCA && (
           <div className="relative ml-auto">
@@ -166,6 +191,8 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
                   </div>
                 </div>
 
+                <TikTokDaFaixa faixa={tiktok?.porIsrc.get(f.isrc)} dias={tiktok?.periodo.dias} />
+
                 <div className="flex items-center gap-1 shrink-0">
                   {f.link && (
                     <a
@@ -239,6 +266,46 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
           }}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * Coluna de TikTok de uma faixa: views e quantos vídeos o PÚBLICO fez com o som.
+ *
+ * A separação importa — views inclui o conteúdo oficial, e "vídeos" (UGC) é o
+ * que mostra a faixa pegando na mão das pessoas. Faixa sem dado não vira "0":
+ * ela simplesmente não aparece, porque o feed só existe desde 07/08 e zerar
+ * sugeriria fracasso onde na verdade é ausência de medição.
+ */
+function TikTokDaFaixa({ faixa, dias }: { faixa?: TikTokFaixa; dias?: number }) {
+  if (!faixa || (!faixa.views && !faixa.criacoesUgc)) return null
+
+  const janela = dias ? ` em ${dias} dia${dias === 1 ? '' : 's'} com dado` : ''
+  const watch =
+    faixa.watchtimeMedio != null
+      ? ` · ${faixa.watchtimeMedio.toFixed(1).replace('.', ',')}s assistidos em média`
+      : ''
+
+  return (
+    <div
+      className="hidden sm:flex items-center gap-3 shrink-0 text-[11px] num text-ink-400 mr-1"
+      title={`TikTok${janela}: ${faixa.views.toLocaleString('pt-BR')} views, ${faixa.criacoesUgc.toLocaleString('pt-BR')} vídeos do público, ${faixa.curtidas.toLocaleString('pt-BR')} curtidas, ${faixa.compartilhamentos.toLocaleString('pt-BR')} compartilhamentos${watch}`}
+    >
+      <span className="flex items-center gap-1 w-16 justify-end" aria-hidden>
+        <Eye className="w-3 h-3 text-cyan-400/70" />
+        {compacto(faixa.views)}
+      </span>
+      <span className="flex items-center gap-1 w-14 justify-end" aria-hidden>
+        <Video className="w-3 h-3 text-cyan-400/70" />
+        {compacto(faixa.criacoesUgc)}
+      </span>
+      {/* O texto acessível vai aqui uma vez só — os dois números acima são o
+          mesmo dado em forma visual, e repetir viraria ruído no leitor de tela. */}
+      <span className="sr-only">
+        TikTok: {faixa.views.toLocaleString('pt-BR')} visualizações e{' '}
+        {faixa.criacoesUgc.toLocaleString('pt-BR')} vídeos criados pelo público.
+      </span>
     </div>
   )
 }

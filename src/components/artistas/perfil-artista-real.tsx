@@ -21,6 +21,7 @@ import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
 import { ContratosArtistaCard } from '@/components/artistas/contratos-artista-card'
+import { FonogramasArtistaCard } from '@/components/artistas/fonogramas-artista-card'
 import { DiagnosticoArtistaCard } from '@/components/artistas/diagnostico-artista-card'
 import { AcessoIntegracoesCard } from '@/components/artistas/acesso-integracoes-card'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -222,6 +223,10 @@ export function PerfilArtistaReal({
       {/* Projeto — cadastro comercial, SÓ staff (o portal do artista renderiza este
           mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
       <ProjetoArtistaCard slug={a.slug} />
+
+      {/* Fonogramas — a obra do artista (catálogo OneRPM + o que a equipe cadastrou).
+          Só staff; o card se autoprotege pelo mesmo motivo do de Projeto. */}
+      <FonogramasArtistaCard slug={a.slug} />
 
       {/* Contratos — ficha da vigência + link do PDF digitalizado (o painel não
           tem Storage). Capacidade `contratos`, padrão admin; o card se autoprotege

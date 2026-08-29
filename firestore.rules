@@ -324,6 +324,21 @@ service cloud.firestore {
       allow create, update, delete: if podeAtividades();
     }
 
+    // Catálogo de fonogramas (ISRC → título/álbum/UPC/lançamento + o artista dono).
+    // Leitura só STAFF: título de faixa não é sensível, mas o doc traz o catálogo
+    // do selo INTEIRO, e o artista não precisa listar a obra dos outros. O card do
+    // perfil lê com filtro por `artistaSlug` e `limit` — nunca a coleção toda.
+    // (O portal do artista continua vendo os títulos do próprio streaming: aquilo
+    // passa por `/api/faixas/titulos`, que é servidor e não depende desta regra.)
+    //
+    // Escrita SÓ por Admin SDK (`/api/fonogramas`): esta coleção é também o cache
+    // ISRC→título de que a análise de streaming depende, e um doc mal formado ali
+    // envenena aquela tela. A rota valida ISRC e campos antes de gravar.
+    match /catalogo-faixas/{isrc} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
     // Demais coleções ficam bloqueadas até serem modeladas.
     // (ao modelar dados reais, exija isAtivo() — e isAdmin() para escrita sensível)
     match /{document=**} {

@@ -20,6 +20,7 @@ import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
+import { ContratosArtistaCard } from '@/components/artistas/contratos-artista-card'
 import { DiagnosticoArtistaCard } from '@/components/artistas/diagnostico-artista-card'
 import { AcessoIntegracoesCard } from '@/components/artistas/acesso-integracoes-card'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -221,6 +222,11 @@ export function PerfilArtistaReal({
       {/* Projeto — cadastro comercial, SÓ staff (o portal do artista renderiza este
           mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
       <ProjetoArtistaCard slug={a.slug} />
+
+      {/* Contratos — ficha da vigência + link do PDF digitalizado (o painel não
+          tem Storage). Capacidade `contratos`, padrão admin; o card se autoprotege
+          porque este mesmo perfil é o que o artista vê no portal. */}
+      <ContratosArtistaCard slug={a.slug} />
 
       {/* Diagnóstico — o que o artista respondeu no portal (ou o que a equipe
           preencheu por ele). Também só staff. */}

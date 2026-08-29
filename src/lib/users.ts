@@ -18,6 +18,7 @@ export type Capacidade =
   | 'verReceita'
   | 'agenda'
   | 'atividades'
+  | 'contratos'
   | 'integracoes'
   | 'importar'
   | 'editarArtistas'

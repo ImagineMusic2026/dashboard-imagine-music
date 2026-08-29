@@ -60,6 +60,13 @@ service cloud.firestore {
       return isStaff()
         && userData().get('permissoes', {}).get('atividades', true);
     }
+    // Contratos do artista (ficha + link do documento). Padrão só ADMIN — traz
+    // vigência, percentual e o documento assinado. O admin libera na matriz quem
+    // mais precisar; `isStaff()` na frente impede override em login de artista.
+    function podeContratos() {
+      return isStaff()
+        && userData().get('permissoes', {}).get('contratos', userData().get('role', '') == 'admin');
+    }
     // Quem mantém o cadastro do artista (admin e marketing por padrão). O `isStaff()`
     // na frente é de propósito: o padrão do papel `artista` é FALSE, mas um override
     // solto no login de um artista não pode virar acesso ao dado alheio.
@@ -150,6 +157,18 @@ service cloud.firestore {
     match /projetos/{slug} {
       allow read: if isStaff();
       allow write: if false;
+    }
+
+    // Contratos do artista — ficha (tipo, vigência, percentual, observações) mais o
+    // LINK do PDF digitalizado; o arquivo mora no Drive da Imagine, porque o projeto
+    // não tem Storage. Subcoleção de `projetos` para herdar a fronteira certa: é
+    // documento da relação comercial, e o artista não lê nada aqui.
+    //
+    // Regra de subcoleção não é herdada — este bloco é o que a libera. CRUD pelo
+    // client (é cadastro manual da equipe, como a agenda), exigindo `contratos`.
+    match /projetos/{slug}/contratos/{id} {
+      allow read: if podeContratos();
+      allow create, update, delete: if podeContratos();
     }
 
     // Questionário de estruturação (diagnóstico). Respondem o ARTISTA (no portal) e a

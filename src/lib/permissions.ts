@@ -19,6 +19,7 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     verReceita: true,
     agenda: true,
     atividades: true,
+    contratos: true,
     integracoes: true,
     importar: true,
     editarArtistas: true,
@@ -31,6 +32,9 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     // O quadro de atividades É a rotina do marketing — o fluxo de atendimento
     // que ele toca. Vem ligado; o admin pode tirar de alguém.
     atividades: true,
+    // Contrato traz vigência, percentual e o link do documento assinado. Fica
+    // FECHADO por padrão pro marketing: quem precisar, o admin libera na matriz.
+    contratos: false,
     integracoes: false,
     importar: false,
     // O time de marketing é quem mantém o cadastro (cria, edita e preenche o
@@ -46,6 +50,7 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     verReceita: false,
     agenda: false,
     atividades: false,
+    contratos: false,
     integracoes: false,
     importar: false,
     editarArtistas: false,
@@ -63,6 +68,12 @@ export const CAPACIDADES: { cap: Capacidade; label: string; descricao: string }[
     label: 'Atividades (kanban)',
     descricao:
       'Ver o quadro de demandas do atendimento, criar cards, mover de etapa e definir o responsável.',
+  },
+  {
+    cap: 'contratos',
+    label: 'Contratos do artista',
+    descricao:
+      'Ver e manter a ficha de contrato no perfil do artista (vigência, percentual e link do documento).',
   },
   { cap: 'integracoes', label: 'Integrações', descricao: 'Descobrir contas e sincronizar métricas.' },
   { cap: 'importar', label: 'Importar dados', descricao: 'Subir planilhas de OneRPM e roster.' },

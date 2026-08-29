@@ -144,6 +144,22 @@ export function OneRpmCard() {
           {msg && <MensagemAcao msg={msg} />}
           {!msg && status?.status === 'erro' && status?.erro && <MensagemAcao msg={{ tipo: 'erro', texto: status.erro }} />}
 
+          {/* Pasta do feed que o sync não consegue ler. Sincronizar ignorando é o
+              certo (o resto do streaming entra), mas precisa APARECER: foi
+              exatamente uma pasta nova e silenciosa que segurou o sync por 10 dias. */}
+          {!!status?.lojasIgnoradas?.length && (
+            <div className="text-[12px] rounded-lg px-3 py-2 border text-amber-200 bg-amber-500/10 border-amber-500/30">
+              <strong>
+                {status.lojasIgnoradas.length === 1
+                  ? 'Uma pasta do feed foi ignorada'
+                  : `${status.lojasIgnoradas.length} pastas do feed foram ignoradas`}
+              </strong>{' '}
+              por não ter formato de streaming:{' '}
+              {status.lojasIgnoradas.map((l) => l.loja).join(', ')}. O restante sincronizou
+              normalmente.
+            </div>
+          )}
+
           <p className="text-[11px] text-ink-500 leading-snug">
             O feed vem por arquivo (CSV diário via SFTP), não por API ao vivo — o sync diário mantém
             atualizado{status?.ultimoDia ? ` (último dia disponível: ${status.ultimoDia})` : ''}. A

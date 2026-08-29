@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { autorizarCronOuPermissao } from '@/lib/server-auth'
 import { gravarStatusOneRpm } from '@/lib/metricas-sociais/firestore'
 import { OneRpmSftpConfigError, onerpmSftpConfigurado, sincronizarTrends } from '@/lib/onerpm/trends-sync'
+import { OneRpmTrendsParseError } from '@/lib/onerpm/trends-parse'
 
 // ssh2 + firebase-admin precisam do runtime Node (não funciona no Edge).
 export const runtime = 'nodejs'
@@ -49,13 +50,21 @@ async function handle(req: Request) {
       ultimaSincronizacao: new Date().toISOString(),
       ultimoDia: r.periodo.ate || null,
       artistas: r.porArtista,
+      lojasIgnoradas: r.lojasIgnoradas,
       erro: null,
     })
 
     return NextResponse.json({ ok: true, ...r })
   } catch (e) {
+    // A mensagem real vai pro status. O erro genérico de antes ("Falha ao
+    // sincronizar") escondeu por 10 dias que o problema era uma pasta nova no
+    // feed — quem olhasse o card não tinha como saber por onde começar.
     const msg =
-      e instanceof OneRpmSftpConfigError ? e.message : 'Falha ao sincronizar o streaming da OneRPM.'
+      e instanceof OneRpmSftpConfigError || e instanceof OneRpmTrendsParseError
+        ? e.message
+        : e instanceof Error && e.message
+          ? `Falha ao sincronizar o streaming da OneRPM: ${e.message}`
+          : 'Falha ao sincronizar o streaming da OneRPM.'
     console.error('[api/integracoes/onerpm/sincronizar]', e)
     await gravarStatusOneRpm({ status: 'erro', erro: msg }).catch(() => {})
     return NextResponse.json({ error: msg }, { status: 502 })

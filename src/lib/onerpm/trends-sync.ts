@@ -1,7 +1,7 @@
 import SftpClient from 'ssh2-sftp-client'
 import { mapaNomesArtistas, salvarStreamingArtista, salvarStreamingDetalhe } from '@/lib/metricas-sociais/firestore'
 import type { HistoricoStreamingDiaDoc, OneRpmArtistaResumo } from '@/lib/metricas-sociais/types'
-import { lerLinhasTrends } from './trends-parse'
+import { lerLinhasTrends, OneRpmTrendsParseError } from './trends-parse'
 import { acumular, finalizar, novoAcumulador } from './trends-aggregate'
 import { resolverSlugArtista } from './trends-aliases'
 import { montarDetalhe, montarSnapshot } from './trends-snapshot'
@@ -50,6 +50,12 @@ export interface TrendsSyncResult {
   periodo: { de: string; ate: string }
   /** Artistas (slug do roster) com streaming na janela, deduplicados e ordenados por streams desc. */
   porArtista: OneRpmArtistaResumo[]
+  /**
+   * Lojas do feed que o parser não entende (pasta nova ou formato trocado), com o
+   * motivo. Sincronizar ignorando é melhor que parar tudo — mas some da tela seria
+   * pior ainda, então isto sobe pro status da integração.
+   */
+  lojasIgnoradas: { loja: string; motivo: string }[]
 }
 
 export async function sincronizarTrends(opts?: { dias?: number }): Promise<TrendsSyncResult> {
@@ -74,7 +80,7 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
       .sort()
 
     // Monta a lista de arquivos (últimos `dias` por loja).
-    const caminhos: string[] = []
+    const caminhos: { loja: string; path: string }[] = []
     for (const loja of lojas) {
       const files = (await sftp.list(`${BASE}/${loja}`))
         // `e.size > 0` pula arquivos vazios (ex.: pandora/uma vêm sem dados) — não
@@ -82,7 +88,7 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
         .filter((e) => e.type !== 'd' && e.size > 0 && e.name.toLowerCase().endsWith('.csv'))
         .map((e) => e.name)
         .sort()
-      for (const arq of files.slice(-dias)) caminhos.push(`${BASE}/${loja}/${arq}`)
+      for (const arq of files.slice(-dias)) caminhos.push({ loja, path: `${BASE}/${loja}/${arq}` })
     }
 
     // Baixa em PARALELO (lotes) e agrega. Sequencial é lento demais para o limite
@@ -91,13 +97,47 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
     // Concorrência do download. Acima de ~16 a vazão satura (a conexão é o gargalo).
     // Se um dia o cron apertar o limite do serverless, baixe `ONERPM_SYNC_DIAS`.
     const CONCORRENCIA = 16
+
+    /**
+     * Loja cujo CSV o parser não entende → motivo. Em 2026-08-07 a OneRPM criou
+     * `Reports/stats/tiktok`, que NÃO é feed de streaming: é métrica de UGC
+     * (`creations`, `video_views`, `likes`…) e não tem `quantity`/`skips`. O
+     * `lerLinhasTrends` levantava `OneRpmTrendsParseError` no primeiro arquivo
+     * dela e derrubava o sync INTEIRO — o streaming ficou 10 dias parado sem
+     * ninguém saber por quê (o erro gravado era só "Falha ao sincronizar").
+     *
+     * Agora uma loja incompatível é ignorada e REPORTADA: o resto sincroniza, e o
+     * motivo sobe pro status da integração em vez de virar um X vermelho mudo.
+     * Vale pra qualquer loja nova ou formato que mude — o feed já mudou antes.
+     */
+    const lojasIgnoradas = new Map<string, string>()
+    let arquivos = 0
+
     for (let i = 0; i < caminhos.length; i += CONCORRENCIA) {
-      const bufs = await Promise.all(
-        caminhos.slice(i, i + CONCORRENCIA).map((p) => sftp.get(p) as Promise<Buffer>),
-      )
-      for (const buf of bufs) acumular(acc, lerLinhasTrends(buf))
+      // Assim que uma loja se mostra incompatível, os arquivos dela nem descem.
+      const lote = caminhos.slice(i, i + CONCORRENCIA).filter((c) => !lojasIgnoradas.has(c.loja))
+      if (!lote.length) continue
+      const bufs = await Promise.all(lote.map((c) => sftp.get(c.path) as Promise<Buffer>))
+      bufs.forEach((buf, k) => {
+        try {
+          acumular(acc, lerLinhasTrends(buf))
+          arquivos++
+        } catch (e) {
+          // Só formato desconhecido é tolerado. Falha de rede/leitura sobe: aí é
+          // problema de execução, e engolir isso esconderia dado que existe.
+          if (!(e instanceof OneRpmTrendsParseError)) throw e
+          lojasIgnoradas.set(lote[k].loja, e.message)
+        }
+      })
     }
-    const arquivos = caminhos.length
+
+    // Todas as lojas incompatíveis = não sobrou dado nenhum. Isso é falha real
+    // (o feed inteiro mudou de forma), não um aviso — tem de estourar.
+    if (!arquivos && lojasIgnoradas.size) {
+      throw new OneRpmTrendsParseError(
+        `Nenhum arquivo do feed pôde ser lido. Lojas: ${Array.from(lojasIgnoradas.keys()).join(', ')}.`,
+      )
+    }
 
     const agg = finalizar(acc)
     const coletadoEm = new Date().toISOString()
@@ -146,6 +186,7 @@ export async function sincronizarTrends(opts?: { dias?: number }): Promise<Trend
       gravados,
       periodo: { de: agg.periodo.de, ate: agg.periodo.ate },
       porArtista,
+      lojasIgnoradas: Array.from(lojasIgnoradas, ([loja, motivo]) => ({ loja, motivo })),
     }
   } finally {
     await sftp.end().catch(() => {})

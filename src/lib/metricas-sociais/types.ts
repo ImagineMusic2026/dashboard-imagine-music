@@ -325,6 +325,12 @@ export interface IntegracaoOneRpmDoc {
    * por streams desc. Alimenta o "ver contas" do card sem varrer `metricas-sociais`.
    */
   artistas?: OneRpmArtistaResumo[]
+  /**
+   * Lojas do feed que o sync não conseguiu ler (pasta nova ou formato trocado).
+   * Sincronização segue com as demais — este campo é o que impede o problema de
+   * ficar invisível. Ver `lojasIgnoradas` em `trends-sync`.
+   */
+  lojasIgnoradas?: { loja: string; motivo: string }[]
   erro?: string | null
 }
 

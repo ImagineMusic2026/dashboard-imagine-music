@@ -1,144 +1,146 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, Plus, Search, X } from 'lucide-react'
-import { useAuth } from '@/components/auth/auth-provider'
-import { AtividadeCard } from '@/components/atividades/atividade-card'
-import { AtividadeDialog } from '@/components/atividades/atividade-dialog'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
-  carimboConclusao,
-  daEtapa,
-  estaAtrasada,
-  etapaMeta,
-  ETAPAS,
-  excluirAtividade,
-  invalidarAtividades,
-  listarAtividades,
-  listarEquipe,
-  moverAtividade,
-  ordemAoSoltar,
-  type Atividade,
-  type EtapaAtividade,
-} from '@/lib/atividades/client'
-import { listarArtistas, type ArtistaDoc } from '@/lib/artistas/client'
-import type { AppUser } from '@/lib/users'
+  AlertTriangle,
+  CalendarDays,
+  GanttChartSquare,
+  List,
+  Loader2,
+  Plus,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  SquareKanban,
+  Users,
+  X,
+} from 'lucide-react'
+import { useAuth } from '@/components/auth/auth-provider'
+import { AtividadeDetalhe } from '@/components/atividades/atividade-detalhe'
+import { AtividadeDialog } from '@/components/atividades/atividade-dialog'
+import { CalendarioView } from '@/components/atividades/calendario-view'
+import { CargaView } from '@/components/atividades/carga-view'
+import { CronogramaView } from '@/components/atividades/cronograma-view'
+import { IndicadoresQuadro } from '@/components/atividades/indicadores-quadro'
+import { ListaView } from '@/components/atividades/lista-view'
+import { QuadroProvider, useQuadro } from '@/components/atividades/quadro-contexto'
+import { QuadroView } from '@/components/atividades/quadro-view'
+import { type Atividade } from '@/lib/atividades/client'
+import { agrupamentoMeta, AGRUPAMENTOS, type Agrupamento } from '@/lib/atividades/cronograma'
+import {
+  campoLigado,
+  PRIORIDADES,
+  prioridadeMeta,
+  visaoMeta,
+  type Visao,
+} from '@/lib/atividades/tipos'
 import { cn } from '@/lib/utils'
-
-type Dialogo = null | { modo: 'novo'; etapa: EtapaAtividade } | { modo: 'editar'; atividade: Atividade }
 
 const seletor =
   'bg-bg-900 border border-bg-700/50 rounded-lg px-3 py-2 text-xs text-ink-200 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20'
 
-/**
- * Quadro do fluxo de atendimento: colunas = etapas, card = demanda.
- *
- * Duas decisões que valem por escrito:
- *
- * 1. Mover é OTIMISTA e escreve UM doc. O board mexe no estado local na hora,
- *    grava só o card movido e não relê a coleção. É o que mantém o custo de um
- *    dia de arrasta-e-solta perto de zero na cota gratuita do Firestore (a
- *    mesma que já derrubou o painel uma vez). Se a escrita falhar, recarrega
- *    tudo e avisa — a tela nunca fica mentindo.
- * 2. A posição na coluna é um número fracionado (ver `ordemAoSoltar`), então
- *    encaixar no meio não reescreve os vizinhos.
- */
+const iconeDaVisao: Record<Visao, typeof SquareKanban> = {
+  quadro: SquareKanban,
+  cronograma: GanttChartSquare,
+  lista: List,
+  calendario: CalendarDays,
+  carga: Users,
+}
+
+/** Visões em que agrupar muda alguma coisa. */
+const ACEITAM_AGRUPAMENTO: Visao[] = ['quadro', 'cronograma', 'lista']
+
+type Dialogo = null | { modo: 'novo'; etapa: string } | { modo: 'editar'; atividade: Atividade }
+
 export function AtividadesBoard() {
-  const { user } = useAuth()
-  const [atividades, setAtividades] = useState<Atividade[] | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
-  const [artistas, setArtistas] = useState<ArtistaDoc[]>([])
-  const [equipe, setEquipe] = useState<AppUser[]>([])
+  return (
+    <QuadroProvider>
+      <QuadroTela />
+    </QuadroProvider>
+  )
+}
+
+/**
+ * A casca do quadro: cabeçalho, indicadores, filtros e a visão escolhida.
+ *
+ * As cinco visões dividem o MESMO carregamento (ver `quadro-contexto`), então
+ * trocar de aba não custa nenhuma leitura — é o que permite oferecer cinco
+ * leituras do mesmo dado num painel que roda na cota gratuita do Firestore.
+ */
+function QuadroTela() {
+  const { role } = useAuth()
+  const {
+    config,
+    carregandoConfig,
+    carregando,
+    erro,
+    artistas,
+    equipe,
+    filtros,
+    setFiltros,
+    filtrando,
+    limparFiltros,
+    etiquetasConhecidas,
+    todas,
+  } = useQuadro()
+
+  const [visao, setVisao] = useState<Visao | null>(null)
+  const [agrupamento, setAgrupamento] = useState<Agrupamento>('nenhum')
+  const [maisFiltros, setMaisFiltros] = useState(false)
   const [dialogo, setDialogo] = useState<Dialogo>(null)
-  const [excluindo, setExcluindo] = useState<string | null>(null)
-  const [arrastando, setArrastando] = useState<string | null>(null)
-  const [colunaAlvo, setColunaAlvo] = useState<EtapaAtividade | null>(null)
+  const [detalheId, setDetalheId] = useState<string | null>(null)
 
-  // Filtros — o "quem está com o quê" que a gestão pede.
-  const [busca, setBusca] = useState('')
-  const [fArtista, setFArtista] = useState('')
-  const [fResponsavel, setFResponsavel] = useState('')
-
-  const carregar = useCallback(async () => {
-    try {
-      setAtividades(await listarAtividades())
-      setErro(null)
-    } catch {
-      setErro('Não consegui carregar o quadro. Confirme que as regras do Firestore estão publicadas.')
-    }
-  }, [])
-
+  // A visão inicial vem da configuração, mas só na primeira vez que ela chega —
+  // depois disso quem manda é a escolha da pessoa nesta sessão. O `carregandoConfig`
+  // é o que faz a configuração ser respeitada: sem ele, o efeito rodava no
+  // primeiro render (quando o contexto ainda devolve o padrão de fábrica),
+  // travava a visão em "quadro" e a escolha do admin nunca chegava a valer.
   useEffect(() => {
-    carregar()
-    listarArtistas()
-      .then(setArtistas)
-      .catch(() => setArtistas([]))
-    listarEquipe()
-      .then(setEquipe)
-      .catch(() => setEquipe([]))
-  }, [carregar])
+    if (carregandoConfig) return
+    setVisao((atual) => atual ?? config.visaoPadrao)
+  }, [carregandoConfig, config.visaoPadrao])
 
-  const recarregar = useCallback(async () => {
-    invalidarAtividades()
-    await carregar()
-  }, [carregar])
+  const visaoAtiva: Visao = visao && config.visoes.includes(visao) ? visao : config.visoes[0]
 
-  const visiveis = useMemo(() => {
-    const termo = busca.trim().toLowerCase()
-    return (atividades ?? []).filter((a) => {
-      if (fArtista && a.artistaSlug !== fArtista) return false
-      if (fResponsavel === '__sem__' ? !!a.responsavelUid : fResponsavel && a.responsavelUid !== fResponsavel)
-        return false
-      if (!termo) return true
-      return (
-        a.titulo.toLowerCase().includes(termo) ||
-        (a.descricao ?? '').toLowerCase().includes(termo) ||
-        (a.artistaNome ?? '').toLowerCase().includes(termo)
-      )
-    })
-  }, [atividades, busca, fArtista, fResponsavel])
+  /**
+   * Agrupar por um campo que a configuração desligou não faria sentido: a opção
+   * existiria no seletor e produziria um quadro inteiro dentro de "Sem tipo".
+   */
+  const agrupamentosDisponiveis = AGRUPAMENTOS.filter((g) => {
+    if (g === 'artista') return campoLigado(config, 'artista')
+    if (g === 'responsavel') return campoLigado(config, 'responsavel')
+    if (g === 'area') return campoLigado(config, 'area')
+    if (g === 'tipo') return campoLigado(config, 'tipo')
+    return true
+  })
 
-  const resumo = useMemo(() => {
-    const abertas = visiveis.filter((a) => a.etapa !== 'concluido')
-    return {
-      abertas: abertas.length,
-      atrasadas: abertas.filter(estaAtrasada).length,
-      semDono: abertas.filter((a) => !a.responsavelUid).length,
-    }
-  }, [visiveis])
+  // Se o campo do agrupamento em uso for desligado, volta para "sem agrupar" em
+  // vez de deixar a tela num modo que o seletor não oferece mais.
+  const agrupamentoAtivo = agrupamentosDisponiveis.includes(agrupamento) ? agrupamento : 'nenhum'
+  const detalhe = detalheId ? todas.find((a) => a.id === detalheId) : null
 
-  const filtrando = !!(busca.trim() || fArtista || fResponsavel)
+  // A demanda aberta pode sumir (excluída aqui ou por outra pessoa) — sem isto o
+  // painel de detalhe ficaria preso mostrando um card que não existe mais.
+  useEffect(() => {
+    if (detalheId && !todas.some((a) => a.id === detalheId)) setDetalheId(null)
+  }, [todas, detalheId])
 
-  /** Move o card (arrastar ou setas): estado local na hora, uma escrita, sem releitura. */
-  async function mover(id: string, destino: EtapaAtividade, alvoId: string | null) {
-    const lista = atividades ?? []
-    const atual = lista.find((a) => a.id === id)
-    if (!atual) return
-    const ordem = ordemAoSoltar(lista, destino, alvoId, id)
-    if (atual.etapa === destino && atual.ordem === ordem) return
-    const concluidoEm = carimboConclusao(destino, atual.concluidoEm)
-
-    setAtividades(lista.map((a) => (a.id === id ? { ...a, etapa: destino, ordem, concluidoEm } : a)))
-    try {
-      await moverAtividade(id, destino, ordem, concluidoEm)
-      setErro(null)
-    } catch {
-      setErro('Não consegui mover a demanda. O quadro foi recarregado.')
-      await recarregar()
-    }
-  }
-
-  async function remover(a: Atividade) {
-    setExcluindo(a.id)
-    try {
-      await excluirAtividade(a.id)
-      setAtividades((lista) => (lista ?? []).filter((x) => x.id !== a.id))
-      setErro(null)
-    } catch {
-      setErro('Não consegui excluir a demanda.')
-      await recarregar()
-    } finally {
-      setExcluindo(null)
-    }
+  /** Setas andam entre as abas, Home/End vão às pontas — padrão de tablist. */
+  function aoNavegarAbas(e: React.KeyboardEvent, atual: Visao) {
+    const teclas = ['ArrowRight', 'ArrowLeft', 'Home', 'End']
+    if (!teclas.includes(e.key)) return
+    e.preventDefault()
+    const i = config.visoes.indexOf(atual)
+    const destino =
+      e.key === 'Home'
+        ? 0
+        : e.key === 'End'
+          ? config.visoes.length - 1
+          : (i + (e.key === 'ArrowRight' ? 1 : -1) + config.visoes.length) % config.visoes.length
+    const proxima = config.visoes[destino]
+    setVisao(proxima)
+    document.getElementById(`aba-${proxima}`)?.focus()
   }
 
   return (
@@ -147,87 +149,247 @@ export function AtividadesBoard() {
         <div>
           <h1 className="text-3xl font-bold text-ink-100">Atividades</h1>
           <p className="text-sm text-ink-400 mt-1">
-            O fluxo de atendimento do começo ao fim e quem está com cada demanda
+            O fluxo de atendimento do começo ao fim, o cronograma de cada projeto e quem está com
+            cada demanda
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setDialogo({ modo: 'novo', etapa: 'solicitado' })}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-semibold transition-colors shrink-0 self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Nova demanda
-        </button>
+        <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+          {role === 'admin' && (
+            <Link
+              href="/configuracoes?aba=quadro"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-900 border border-bg-700/50 text-ink-300 hover:text-ink-100 text-sm font-semibold transition-colors"
+            >
+              <Settings2 className="w-4 h-4" aria-hidden />
+              <span className="hidden sm:inline">Configurar quadro</span>
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setDialogo({ modo: 'novo', etapa: config.etapas[0]?.key ?? 'solicitado' })}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-semibold transition-colors"
+          >
+            <Plus className="w-4 h-4" aria-hidden />
+            Nova demanda
+          </button>
+        </div>
       </div>
 
+      <IndicadoresQuadro />
+
+      {/* Visões ------------------------------------------------------------- */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar demanda…"
-            aria-label="Buscar demanda"
-            className={cn(seletor, 'pl-8 w-48')}
-          />
+        <div
+          className="flex items-center gap-0.5 bg-bg-900 border border-bg-700/50 rounded-lg p-0.5 overflow-x-auto"
+          role="tablist"
+          aria-label="Visão do quadro"
+        >
+          {config.visoes.map((v) => {
+            const Icone = iconeDaVisao[v]
+            const ativa = visaoAtiva === v
+            return (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                id={`aba-${v}`}
+                aria-selected={ativa}
+                aria-controls="painel-visao"
+                // Numa lista de abas, só a selecionada entra na ordem de
+                // tabulação; entre elas se anda com as setas. Sem isto o Tab
+                // pisava nas cinco antes de chegar ao conteúdo.
+                tabIndex={ativa ? 0 : -1}
+                onKeyDown={(e) => aoNavegarAbas(e, v)}
+                onClick={() => setVisao(v)}
+                title={visaoMeta[v].descricao}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap',
+                  ativa ? 'bg-violet-500/15 text-violet-300' : 'text-ink-400 hover:text-ink-200',
+                )}
+              >
+                <Icone className="w-3.5 h-3.5" aria-hidden />
+                {visaoMeta[v].label}
+              </button>
+            )
+          })}
         </div>
-        <select
-          value={fArtista}
-          onChange={(e) => setFArtista(e.target.value)}
-          aria-label="Filtrar por artista"
-          className={seletor}
-        >
-          <option value="">Todos os artistas</option>
-          {artistas.map((a) => (
-            <option key={a.slug} value={a.slug}>
-              {a.nome}
-            </option>
-          ))}
-        </select>
-        <select
-          value={fResponsavel}
-          onChange={(e) => setFResponsavel(e.target.value)}
-          aria-label="Filtrar por responsável"
-          className={seletor}
-        >
-          <option value="">Todos os responsáveis</option>
-          {user?.uid && <option value={user.uid}>Só as minhas</option>}
-          <option value="__sem__">Sem responsável</option>
-          {equipe
-            .filter((u) => u.uid !== user?.uid)
-            .map((u) => (
-              <option key={u.uid} value={u.uid}>
-                {u.nome || u.email}
+
+        {ACEITAM_AGRUPAMENTO.includes(visaoAtiva) && (
+          <select
+            value={agrupamentoAtivo}
+            onChange={(e) => setAgrupamento(e.target.value as Agrupamento)}
+            aria-label="Agrupar demandas"
+            className={seletor}
+          >
+            {agrupamentosDisponiveis.map((g) => (
+              <option key={g} value={g}>
+                {agrupamentoMeta[g]}
               </option>
             ))}
-        </select>
+          </select>
+        )}
+
+        <div className="relative">
+          <Search
+            className="w-3.5 h-3.5 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={filtros.busca}
+            onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+            placeholder="Buscar demanda…"
+            aria-label="Buscar demanda"
+            className={cn(seletor, 'pl-8 w-44')}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setMaisFiltros((v) => !v)}
+          aria-expanded={maisFiltros}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors',
+            maisFiltros || filtrando
+              ? 'bg-violet-500/10 border-violet-500/30 text-violet-300'
+              : 'bg-bg-900 border-bg-700/50 text-ink-400 hover:text-ink-200',
+          )}
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden />
+          Filtros
+        </button>
+
         {filtrando && (
           <button
             type="button"
-            onClick={() => {
-              setBusca('')
-              setFArtista('')
-              setFResponsavel('')
-            }}
+            onClick={limparFiltros}
             className="flex items-center gap-1 text-xs text-ink-400 hover:text-ink-100 px-2 py-2 transition-colors"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3.5 h-3.5" aria-hidden />
             Limpar
           </button>
         )}
-
-        {/* No celular desce pra uma linha só dele; no desktop cola à direita. */}
-        <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto text-[11px] text-ink-500">
-          <span className="num">
-            <strong className="text-ink-200">{resumo.abertas}</strong> em aberto
-          </span>
-          {resumo.atrasadas > 0 && (
-            <span className="num text-red-400 font-semibold">{resumo.atrasadas} atrasada{resumo.atrasadas === 1 ? '' : 's'}</span>
-          )}
-          {resumo.semDono > 0 && <span className="num">{resumo.semDono} sem responsável</span>}
-        </div>
       </div>
+
+      {maisFiltros && (
+        <div className="flex flex-wrap items-center gap-2 bg-bg-900/40 border border-bg-700/30 rounded-xl p-3">
+          {campoLigado(config, 'artista') && (
+            <select
+              value={filtros.artista}
+              onChange={(e) => setFiltros({ ...filtros, artista: e.target.value })}
+              aria-label="Filtrar por artista"
+              className={seletor}
+            >
+              <option value="">Todos os artistas</option>
+              {artistas.map((a) => (
+                <option key={a.slug} value={a.slug}>
+                  {a.nome}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {campoLigado(config, 'responsavel') && (
+            <select
+              value={filtros.responsavel}
+              onChange={(e) => setFiltros({ ...filtros, responsavel: e.target.value })}
+              aria-label="Filtrar por responsável"
+              className={seletor}
+            >
+              <option value="">Todos os responsáveis</option>
+              <option value="__sem__">Sem responsável</option>
+              {equipe.map((u) => (
+                <option key={u.uid} value={u.uid}>
+                  {u.nome || u.email}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {campoLigado(config, 'area') && !!config.areas.length && (
+            <select
+              value={filtros.area}
+              onChange={(e) => setFiltros({ ...filtros, area: e.target.value })}
+              aria-label="Filtrar por área"
+              className={seletor}
+            >
+              <option value="">Todas as áreas</option>
+              {config.areas.map((a) => (
+                <option key={a.key} value={a.key}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {campoLigado(config, 'tipo') && !!config.tipos.length && (
+            <select
+              value={filtros.tipo}
+              onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}
+              aria-label="Filtrar por tipo"
+              className={seletor}
+            >
+              <option value="">Todos os tipos</option>
+              {config.tipos.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <select
+            value={filtros.prioridade}
+            onChange={(e) =>
+              setFiltros({ ...filtros, prioridade: e.target.value as typeof filtros.prioridade })
+            }
+            aria-label="Filtrar por prioridade"
+            className={seletor}
+          >
+            <option value="">Toda prioridade</option>
+            {PRIORIDADES.map((p) => (
+              <option key={p} value={p}>
+                {prioridadeMeta[p].label}
+              </option>
+            ))}
+          </select>
+
+          {campoLigado(config, 'etiquetas') && !!etiquetasConhecidas.length && (
+            <select
+              value={filtros.etiqueta}
+              onChange={(e) => setFiltros({ ...filtros, etiqueta: e.target.value })}
+              aria-label="Filtrar por etiqueta"
+              className={seletor}
+            >
+              <option value="">Todas as etiquetas</option>
+              {etiquetasConhecidas.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <label className="flex items-center gap-1.5 text-xs text-ink-300 px-2">
+            <input
+              type="checkbox"
+              checked={filtros.ocultarConcluidas}
+              onChange={(e) => setFiltros({ ...filtros, ocultarConcluidas: e.target.checked })}
+              className="w-3.5 h-3.5 rounded accent-violet-500"
+            />
+            Esconder concluídas
+          </label>
+
+          <label className="flex items-center gap-1.5 text-xs text-ink-300 px-2">
+            <input
+              type="checkbox"
+              checked={filtros.somenteAtrasadas}
+              onChange={(e) => setFiltros({ ...filtros, somenteAtrasadas: e.target.checked })}
+              className="w-3.5 h-3.5 rounded accent-violet-500"
+            />
+            Só atrasadas
+          </label>
+        </div>
+      )}
 
       {erro && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
@@ -236,105 +398,60 @@ export function AtividadesBoard() {
         </div>
       )}
 
-      {atividades === null ? (
-        // Sem lista E com erro, quem explica é o aviso acima — repetir
-        // "carregando" aqui deixaria um spinner eterno na tela.
+      <div
+        id="painel-visao"
+        role="tabpanel"
+        aria-labelledby={`aba-${visaoAtiva}`}
+        tabIndex={-1}
+      >
+      {carregando ? (
+        // Com erro, quem explica é o aviso acima — repetir "carregando" aqui
+        // deixaria um spinner eterno na tela.
         erro ? null : (
           <div className="flex items-center gap-2 text-ink-400 text-sm py-10">
-            <Loader2 className="w-4 h-4 animate-spin" /> Carregando quadro…
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Carregando quadro…
           </div>
         )
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1">
-          {ETAPAS.map((etapa) => {
-            const cards = daEtapa(visiveis, etapa)
-            const meta = etapaMeta[etapa]
-            return (
-              <section
-                key={etapa}
-                aria-label={`${meta.label} — ${cards.length} demanda${cards.length === 1 ? '' : 's'}`}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                  setColunaAlvo(etapa)
-                }}
-                onDragLeave={() => setColunaAlvo((c) => (c === etapa ? null : c))}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  const id = e.dataTransfer.getData('text/plain')
-                  setColunaAlvo(null)
-                  setArrastando(null)
-                  if (id) mover(id, etapa, null)
-                }}
-                className={cn(
-                  'w-[270px] shrink-0 bg-bg-900/40 border rounded-xl flex flex-col transition-colors',
-                  colunaAlvo === etapa ? 'border-violet-500/50 bg-violet-500/5' : 'border-bg-700/30',
-                )}
-              >
-                <div className="px-3 py-3 border-b border-bg-700/30 flex items-center gap-2">
-                  <span className={cn('w-1.5 h-1.5 rounded-full', meta.bar)} aria-hidden />
-                  <span className={cn('text-xs font-bold uppercase tracking-wider', meta.text)}>
-                    {meta.label}
-                  </span>
-                  <span className="ml-auto text-[10px] num bg-bg-800 text-ink-400 px-1.5 py-0.5 rounded font-semibold">
-                    {cards.length}
-                  </span>
-                </div>
+        <>
+          {visaoAtiva === 'quadro' && (
+            <QuadroView
+              agrupamento={agrupamentoAtivo}
+              onAbrir={(a) => setDetalheId(a.id)}
+              onNovo={(etapa) => setDialogo({ modo: 'novo', etapa })}
+            />
+          )}
+          {visaoAtiva === 'cronograma' && (
+            <CronogramaView agrupamento={agrupamentoAtivo} onAbrir={(a) => setDetalheId(a.id)} />
+          )}
+          {visaoAtiva === 'lista' && (
+            <ListaView agrupamento={agrupamentoAtivo} onAbrir={(a) => setDetalheId(a.id)} />
+          )}
+          {visaoAtiva === 'calendario' && <CalendarioView onAbrir={(a) => setDetalheId(a.id)} />}
+          {visaoAtiva === 'carga' && <CargaView onAbrir={(a) => setDetalheId(a.id)} />}
+        </>
+      )}
+      </div>
 
-                <div className="p-2 space-y-2 flex-1 min-h-[120px]">
-                  {cards.map((a) => (
-                    <AtividadeCard
-                      key={a.id}
-                      atividade={a}
-                      arrastando={arrastando === a.id}
-                      excluindo={excluindo === a.id}
-                      onEditar={() => setDialogo({ modo: 'editar', atividade: a })}
-                      onMover={(destino) => mover(a.id, destino, null)}
-                      onExcluir={() => remover(a)}
-                      onArrastarInicio={() => setArrastando(a.id)}
-                      onArrastarFim={() => {
-                        setArrastando(null)
-                        setColunaAlvo(null)
-                      }}
-                      onSoltarAntes={() => {
-                        if (arrastando && arrastando !== a.id) mover(arrastando, etapa, a.id)
-                        setArrastando(null)
-                        setColunaAlvo(null)
-                      }}
-                    />
-                  ))}
-
-                  {cards.length === 0 && (
-                    <p className="text-[11px] text-ink-600 text-center py-6 px-2">
-                      {filtrando ? 'Nada com esses filtros.' : 'Arraste uma demanda pra cá.'}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setDialogo({ modo: 'novo', etapa })}
-                  className="m-2 mt-0 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold text-ink-500 hover:text-violet-300 hover:bg-bg-800/60 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Adicionar em {meta.label}
-                </button>
-              </section>
-            )
-          })}
-        </div>
+      {detalhe && (
+        <AtividadeDetalhe
+          atividade={detalhe}
+          bloqueado={!!dialogo}
+          onFechar={() => setDetalheId(null)}
+          onEditar={() => setDialogo({ modo: 'editar', atividade: detalhe })}
+        />
       )}
 
-      {dialogo && user?.uid && (
+      {dialogo && (
         <AtividadeDialog
           atividade={dialogo.modo === 'editar' ? dialogo.atividade : null}
-          etapaInicial={dialogo.modo === 'novo' ? dialogo.etapa : 'solicitado'}
-          uid={user.uid}
-          atuais={atividades ?? []}
-          onClose={() => setDialogo(null)}
-          onSalvo={async () => {
+          etapaInicial={dialogo.modo === 'novo' ? dialogo.etapa : (config.etapas[0]?.key ?? '')}
+          onFechar={() => setDialogo(null)}
+          onSalvo={(id) => {
             setDialogo(null)
-            await recarregar()
+            // Criar uma demanda já abre o detalhe dela: quase sempre o próximo
+            // passo é anexar o briefing ou destrinchar o checklist.
+            if (dialogo.modo === 'novo') setDetalheId(id)
           }}
         />
       )}

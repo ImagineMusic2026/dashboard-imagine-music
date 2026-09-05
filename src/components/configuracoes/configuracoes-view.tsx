@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ConfigQuadroTab } from '@/components/atividades/config-quadro'
 import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
 import { MatrizPermissoes } from '@/components/configuracoes/matriz-permissoes'
@@ -8,18 +9,30 @@ import { NotificacoesPrefs } from '@/components/configuracoes/notificacoes-prefs
 import { PerfilTab } from '@/components/configuracoes/perfil-tab'
 import { cn } from '@/lib/utils'
 
-type Aba = 'time' | 'artistas' | 'permissoes' | 'notificacoes' | 'perfil'
+type Aba = 'time' | 'artistas' | 'permissoes' | 'quadro' | 'notificacoes' | 'perfil'
 
 const ABAS: { key: Aba; label: string }[] = [
   { key: 'time', label: 'Time' },
   { key: 'artistas', label: 'Artistas' },
   { key: 'permissoes', label: 'Permissões' },
+  { key: 'quadro', label: 'Quadro de atividades' },
   { key: 'notificacoes', label: 'Notificações' },
   { key: 'perfil', label: 'Perfil' },
 ]
 
+const ABAS_VALIDAS = new Set(ABAS.map((a) => a.key))
+
 export function ConfiguracoesView() {
   const [aba, setAba] = useState<Aba>('time')
+
+  // `?aba=quadro` abre direto na configuração do quadro — é o link que o botão
+  // "Configurar quadro" da tela de Atividades usa. Lido de `window` e não de
+  // `useSearchParams` de propósito: aquele exigiria um limite de Suspense em
+  // volta da página inteira só para ler um parâmetro opcional.
+  useEffect(() => {
+    const pedida = new URLSearchParams(window.location.search).get('aba')
+    if (pedida && ABAS_VALIDAS.has(pedida as Aba)) setAba(pedida as Aba)
+  }, [])
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -60,6 +73,7 @@ export function ConfiguracoesView() {
             </>
           )}
           {aba === 'permissoes' && <MatrizPermissoes />}
+          {aba === 'quadro' && <ConfigQuadroTab />}
           {aba === 'notificacoes' && <NotificacoesPrefs />}
           {aba === 'perfil' && <PerfilTab />}
         </div>

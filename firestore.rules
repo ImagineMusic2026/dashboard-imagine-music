@@ -322,6 +322,25 @@ service cloud.firestore {
     match /atividades/{id} {
       allow read: if podeAtividades();
       allow create, update, delete: if podeAtividades();
+
+      // Comentários da demanda. Ficam numa SUBCOLEÇÃO (e não num array no
+      // documento, como o checklist e o histórico) porque uma demanda tocada
+      // por várias pessoas durante semanas junta dezenas de parágrafos, e eles
+      // viajariam em TODA leitura do quadro. Aqui só são lidos quando alguém
+      // abre a demanda.
+      //
+      // Escrever é de quem tem a permissão do quadro; EDITAR e APAGAR, só do
+      // próprio autor (ou do admin). Comentário é fala de alguém: reescrever a
+      // fala do outro não é edição de dado, é troca de autoria. O `autorUid` é
+      // conferido na criação justamente para que essa dona não possa ser
+      // forjada.
+      match /comentarios/{comentarioId} {
+        allow read: if podeAtividades();
+        allow create: if podeAtividades()
+          && request.resource.data.autorUid == request.auth.uid;
+        allow update, delete: if podeAtividades()
+          && (resource.data.autorUid == request.auth.uid || isAdmin());
+      }
     }
 
     // Catálogo de fonogramas (ISRC → título/álbum/UPC/lançamento + o artista dono).

@@ -1,4 +1,5 @@
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
+import { extrairSinais } from './sinais'
 
 /**
  * Health Score REAL, derivado dos mesmos snapshots de `metricas-sociais` que
@@ -57,8 +58,6 @@ export interface ArtistaSaude {
   motivoRisco: string | null
 }
 
-const DIA = 86_400_000
-
 /** Pesos dos pilares — exportado pra UI rotular a composição ("Engajamento · 25%"). */
 export const PESOS: Record<keyof SaudeBreakdown, number> = {
   audiencia: 0.2,
@@ -69,13 +68,6 @@ export const PESOS: Record<keyof SaudeBreakdown, number> = {
 }
 
 const clamp = (n: number, lo = 0, hi = 100): number => Math.max(lo, Math.min(hi, n))
-
-function mediana(arr: number[]): number {
-  const a = [...arr].sort((x, y) => x - y)
-  const n = a.length
-  if (!n) return 0
-  return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2
-}
 
 /* ── normalizadores: cada sinal bruto -> 0-100 ───────────────────────────── */
 
@@ -181,70 +173,16 @@ export function derivarHealthScores(
 
   for (const [slug, doc] of Array.from(mapa)) {
     const nome = nomePorSlug.get(slug) ?? slug
-    const ig = doc.instagram
-    const yt = doc.youtube
-    const tt = doc.tiktok
+    // Sinais brutos em `./sinais` — a régua da v1.2 (`./v12`) lê os MESMOS.
+    const s = extrairSinais(doc, agora)
+    const { seguidoresTotal, crescimentoPct: crescimentoSegPct } = s
 
-    // Audiência — seguidores somados (YT só quando a contagem é pública).
-    const igSeg = ig?.seguidores ?? 0
-    const ytSeg = yt && !yt.inscritosOcultos ? (yt.inscritos ?? 0) : 0
-    const ttSeg = tt?.seguidores ?? 0
-    const seguidoresTotal = igSeg + ytSeg + ttSeg
-
-    // Crescimento — delta vs a coleta anterior (IG e YT carimbam o "antes";
-    // a Display API do TikTok não expõe histórico de seguidores).
-    let segAtual = 0
-    let segAntes = 0
-    let temAntes = false
-    if (ig?.seguidores != null && ig.seguidoresAntes != null && ig.seguidoresAntes > 0) {
-      segAtual += ig.seguidores
-      segAntes += ig.seguidoresAntes
-      temAntes = true
-    }
-    if (
-      yt?.inscritos != null &&
-      yt.inscritosAntes != null &&
-      yt.inscritosAntes > 0 &&
-      !yt.inscritosOcultos
-    ) {
-      segAtual += yt.inscritos
-      segAntes += yt.inscritosAntes
-      temAntes = true
-    }
-    const crescimentoSegPct = temAntes && segAntes > 0 ? (segAtual - segAntes) / segAntes : null
-
-    // Engajamento — mediana por post / base (resiste a um viral isolado).
-    let igRate: number | null = null
-    if (ig?.seguidores && ig.seguidores > 0 && ig.postsRecentes?.length) {
-      const vals = ig.postsRecentes
-        .map((p) => (p.curtidas ?? 0) + (p.comentarios ?? 0))
-        .filter((v) => v > 0)
-      if (vals.length) igRate = mediana(vals) / ig.seguidores
-    }
-    let ytRate: number | null = null
-    if (yt?.inscritos && yt.inscritos > 0 && yt.videosRecentes?.length) {
-      const vals = yt.videosRecentes.map((v) => v.views ?? 0).filter((v) => v > 0)
-      if (vals.length) ytRate = mediana(vals) / yt.inscritos
-    }
-
-    // Conteúdo — recência + volume a partir das datas de publicação.
-    const datas: number[] = []
-    for (const p of ig?.postsRecentes ?? []) if (p.publicadoEm) datas.push(Date.parse(p.publicadoEm))
-    for (const v of yt?.videosRecentes ?? []) if (v.publicadoEm) datas.push(Date.parse(v.publicadoEm))
-    let diasUltimo: number | null = null
-    let posts30d = 0
-    if (datas.length) {
-      diasUltimo = Math.max(0, (agora - Math.max(...datas)) / DIA)
-      posts30d = datas.filter((t) => agora - t <= 30 * DIA).length
-    }
-
-    const st = doc.streaming
     const breakdown: SaudeBreakdown = {
       audiencia: pontosAudiencia(seguidoresTotal),
       crescimento: pontosCrescimento(crescimentoSegPct),
-      engajamento: pontosEngajamento(igRate, ytRate),
-      conteudo: pontosConteudo(diasUltimo, posts30d),
-      streaming: st ? pontosStreaming(st.streams28d ?? 0, st.streams7d ?? 0) : null,
+      engajamento: pontosEngajamento(s.igRate, s.ytRate),
+      conteudo: pontosConteudo(s.diasUltimoPost, s.posts30d),
+      streaming: s.streams28d != null ? pontosStreaming(s.streams28d, s.streams7d) : null,
     }
 
     // Sem nenhum dos pilares "de base" (social OU streaming) não há score honesto.

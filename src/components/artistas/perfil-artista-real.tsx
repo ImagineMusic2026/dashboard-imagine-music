@@ -21,6 +21,7 @@ import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
 import { ContratosArtistaCard } from '@/components/artistas/contratos-artista-card'
+import { EstagioArtistaCard } from '@/components/artistas/estagio-artista-card'
 import { FonogramasArtistaCard } from '@/components/artistas/fonogramas-artista-card'
 import { DiagnosticoArtistaCard } from '@/components/artistas/diagnostico-artista-card'
 import { AcessoIntegracoesCard } from '@/components/artistas/acesso-integracoes-card'
@@ -232,6 +233,12 @@ export function PerfilArtistaReal({
           tem Storage). Capacidade `contratos`, padrão admin; o card se autoprotege
           porque este mesmo perfil é o que o artista vê no portal. */}
       <ContratosArtistaCard slug={a.slug} />
+
+      {/* Estágio (IGE, metodologia IAOS v1.2) — mede PORTE, não saúde; por isso
+          vem colado no Health Score e separado dele. Só staff; o card se
+          autoprotege porque este mesmo perfil é o que o artista vê no portal. */}
+      <EstagioArtistaCard slug={a.slug} nome={a.nome} />
+
 
       {/* Diagnóstico — o que o artista respondeu no portal (ou o que a equipe
           preencheu por ele). Também só staff. */}

@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import { memoCurta } from '@/lib/cache-leitura'
+import { auth, db } from '@/lib/firebase'
+import { invalidarCachesDeLeitura, memoCurta, memoCurtaPorChave } from '@/lib/cache-leitura'
 import type { OneRpmAggregate } from '@/lib/onerpm/types'
 
 /**
@@ -63,6 +63,24 @@ export interface ProjetoDoc {
   emailProjeto?: string
   servicosPrevistos?: string[]
   anotacoesGerais?: string
+  /**
+   * Mercado ao vivo declarado pela equipe — 10% do IGE (IAOS-DOC-02 v1.2). Mora
+   * aqui, e não em `artistas/{slug}`, porque é uma classificação da EQUIPE sobre
+   * o projeto (o nível 0 é "mercado praticamente inativo") e o artista lê o
+   * próprio cadastro no portal.
+   */
+  mercadoAoVivo?: {
+    nivel: number
+    score: number
+    declaradoEm: string
+    declaradoPor?: string
+    declaradoPorEmail?: string | null
+    metodologia?: string
+    /** Data da AVALIAÇÃO (YYYY-MM-DD) — pode ser anterior ao dia em que foi digitada. */
+    avaliadoEm?: string | null
+    /** Observação livre da equipe sobre a classificação. */
+    observacao?: string | null
+  }
 }
 
 /** Resumo de receita (coleção `receitas`, admin-only). */
@@ -179,14 +197,46 @@ export async function getArtista(slug: string): Promise<ArtistaDoc | null> {
   return s.exists() ? { slug: s.id, ...(s.data() as Omit<ArtistaDoc, 'slug'>) } : null
 }
 
+async function lerProjeto(slug: string): Promise<ProjetoDoc | null> {
+  const s = await getDoc(doc(db, 'projetos', slug))
+  return s.exists() ? { slug: s.id, ...(s.data() as Omit<ProjetoDoc, 'slug'>) } : null
+}
+
+const cacheProjeto = memoCurtaPorChave(lerProjeto, (slug) => slug)
+
 /**
  * Cadastro comercial. As regras só liberam STAFF — pro artista logado no portal
  * isto lança permission-denied, que é exatamente o comportamento desejado. Quem
  * chama trata como "não tem projeto".
+ *
+ * Cacheado por slug porque o perfil monta DOIS cards que leem este mesmo doc (o
+ * de Projeto e o de Estágio, que precisa do mercado ao vivo) — sem isto, abrir
+ * um perfil pagaria a leitura duas vezes.
  */
-export async function getProjeto(slug: string): Promise<ProjetoDoc | null> {
-  const s = await getDoc(doc(db, 'projetos', slug))
-  return s.exists() ? { slug: s.id, ...(s.data() as Omit<ProjetoDoc, 'slug'>) } : null
+export function getProjeto(slug: string): Promise<ProjetoDoc | null> {
+  return cacheProjeto(slug)
+}
+
+/**
+ * Declara (ou desfaz) o nível de mercado ao vivo do artista. Passa por rota —
+ * `projetos` nega escrita pelo client, e o score tem que vir da tabela oficial,
+ * não do navegador.
+ */
+export async function salvarMercadoAoVivo(
+  slug: string,
+  nivel: number | null,
+  extras?: { avaliadoEm?: string | null; observacao?: string | null },
+): Promise<void> {
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+  const res = await fetch('/api/artistas/mercado-ao-vivo', {
+    method: nivel == null ? 'DELETE' : 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(nivel == null ? { slug } : { slug, nivel, ...extras }),
+  })
+  const data = (await res.json().catch(() => null)) as { error?: string } | null
+  if (!res.ok) throw new Error(data?.error ?? 'Não foi possível salvar a declaração.')
+  invalidarCachesDeLeitura()
 }
 
 /** Mapa slug -> resumo de receita. Só admin consegue ler (regras). */

@@ -41,3 +41,6 @@ serviceAccountKey.json
 
 # claude code (config local de ferramenta)
 .claude/
+
+# Preferências locais do Obsidian; as notas do vault são versionadas.
+/vault/.obsidian/

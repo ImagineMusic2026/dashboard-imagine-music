@@ -193,12 +193,93 @@ function ThOrdenavel({
   )
 }
 
+/** Uma barra cinza que pulsa, no lugar de um valor que ainda não chegou. */
+function Barra({ w, className }: { w: string; className?: string }) {
+  return <div className={cn('h-3 rounded bg-bg-700/60', className)} style={{ width: w }} />
+}
+
+/**
+ * O esqueleto da lista enquanto as leituras não voltam.
+ *
+ * É o MESMO desenho da tabela final — mesmas colunas, mesma altura de linha,
+ * mesmo avatar redondo —, e é isso que o torna melhor que um spinner: quando os
+ * dados chegam, nada se move de lugar. Um spinner centralizado obrigaria a
+ * página a saltar do nada para uma tabela cheia.
+ *
+ * O número de linhas é o MESMO da paginação (`POR_PAGINA`), não um número
+ * escolhido a olho: é isso que faz a caixa já nascer com a altura final e a
+ * chegada dos dados não empurrar o rodapé nem a paginação para baixo. No
+ * celular são menos, porque lá cada artista é um card alto e o excedente cai
+ * fora da tela de qualquer jeito.
+ */
+function EsqueletoLista({ ehAdmin }: { ehAdmin: boolean }) {
+  const linhas = Array.from({ length: POR_PAGINA }, (_, i) => i)
+  return (
+    <div
+      className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden animate-pulse"
+      aria-busy="true"
+      aria-live="polite"
+      aria-label="Carregando a lista de artistas"
+    >
+      {/* Desktop — espelha as colunas da tabela real */}
+      <div className="hidden lg:block">
+        <div className="border-b border-bg-700/40 flex items-center gap-4 px-4 py-3">
+          <Barra w="1rem" />
+          <Barra w="4rem" />
+          <Barra w="3.5rem" />
+          <Barra w="3rem" />
+          <Barra w="4.5rem" />
+          <Barra w="4rem" className="ml-auto" />
+          {ehAdmin && <Barra w="3.5rem" />}
+          <Barra w="3rem" />
+        </div>
+        <div className="divide-y divide-bg-700/30">
+          {linhas.map((i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3">
+              <div className="w-4 h-4 rounded bg-bg-700/40 shrink-0" />
+              <div className="w-10 h-10 rounded-full bg-bg-700/60 shrink-0" />
+              <div className="flex flex-col gap-1.5 w-40 shrink-0">
+                <Barra w="70%" />
+                <Barra w="45%" className="h-2 bg-bg-700/40" />
+              </div>
+              <Barra w="3.5rem" className="shrink-0" />
+              <Barra w="6rem" className="shrink-0" />
+              <Barra w="4.5rem" className="shrink-0 h-6 bg-bg-700/40" />
+              <Barra w="3rem" className="ml-auto shrink-0" />
+              <Barra w="4rem" className="shrink-0" />
+              {ehAdmin && <Barra w="4.5rem" className="shrink-0" />}
+              <Barra w="1.5rem" className="shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Celular — espelha os cards, que é o que a lista vira abaixo de lg */}
+      <div className="lg:hidden divide-y divide-bg-700/30">
+        {linhas.slice(0, 6).map((i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3">
+            <div className="w-10 h-10 rounded-full bg-bg-700/60 shrink-0" />
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+              <Barra w="55%" />
+              <Barra w="35%" className="h-2 bg-bg-700/40" />
+            </div>
+            <Barra w="2.5rem" className="shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function ArtistasLista() {
   const { role, loading, favoritos, pode } = useAuth()
   const [artistas, setArtistas] = useState<ArtistaDoc[] | null>(null)
   const [receitas, setReceitas] = useState<Map<string, ReceitaResumo>>(new Map())
   const [metricas, setMetricas] = useState<Map<string, MetricasSociaisDoc>>(new Map())
   const [erro, setErro] = useState(false)
+  // Verdadeiro até TODAS as leituras voltarem — é o que segura a tabela até ela
+  // ter algo completo pra mostrar.
+  const [carregando, setCarregando] = useState(true)
   const [busca, setBusca] = useState('')
   const [soFavoritos, setSoFavoritos] = useState(false)
   // Padrão: maior audiência primeiro (a cliente pediu o roster ordenado por alcance).
@@ -213,25 +294,38 @@ export function ArtistasLista() {
   const ehAdmin = role === 'admin'
   const podeCadastrar = role !== 'artista' && pode('editarArtistas')
 
+  /**
+   * As três leituras em PARALELO, e a lista só aparece quando todas voltam.
+   *
+   * Antes eram três `await` em sequência, e como são independentes entre si a
+   * segunda só começava depois de a primeira terminar. O efeito na tela era
+   * pior que a demora: a tabela aparecia já preenchida de nomes mas com Health,
+   * Tendência, Audiência e Receita VAZIAS, e os números iam caindo em ondas,
+   * cada onda mexendo no layout. Quem olhava via uma tela quebrada se
+   * consertando sozinha.
+   *
+   * `allSettled` e não `all`: métricas e receita continuam sendo secundárias —
+   * se uma delas falhar, a lista ainda tem que aparecer com o que deu certo.
+   * Só a falha do roster é erro de verdade.
+   */
   const recarregar = useCallback(async () => {
-    try {
-      setArtistas(await listarArtistas())
+    setCarregando(true)
+    const [oRoster, oMetricas, oReceitas] = await Promise.allSettled([
+      listarArtistas(),
+      listarMetricasSociais(),
+      ehAdmin ? listarReceitas() : Promise.resolve(new Map<string, ReceitaResumo>()),
+    ])
+
+    if (oRoster.status === 'fulfilled') {
+      setArtistas(oRoster.value)
       setErro(false)
-    } catch {
+    } else {
       setErro(true)
     }
-    try {
-      setMetricas(await listarMetricasSociais())
-    } catch {
-      /* métricas (health/audiência/alertas) são secundárias pro render da lista */
-    }
-    if (ehAdmin) {
-      try {
-        setReceitas(await listarReceitas())
-      } catch {
-        /* receita é secundária */
-      }
-    }
+    if (oMetricas.status === 'fulfilled') setMetricas(oMetricas.value)
+    if (oReceitas.status === 'fulfilled') setReceitas(oReceitas.value)
+
+    setCarregando(false)
   }, [ehAdmin])
 
   useEffect(() => {
@@ -359,7 +453,7 @@ export function ArtistasLista() {
         <div>
           <h1 className="text-3xl font-bold text-ink-100">Artistas</h1>
           <p className="text-sm text-ink-400 mt-1">
-            {artistas === null ? (
+            {carregando || artistas === null ? (
               <span className="text-ink-500">carregando…</span>
             ) : (
               <>
@@ -427,10 +521,8 @@ export function ArtistasLista() {
             (<span className="num">firebase deploy --only firestore:rules</span>).
           </div>
         </div>
-      ) : artistas === null ? (
-        <div className="flex items-center gap-2 text-ink-400 text-sm py-10">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando artistas…
-        </div>
+      ) : carregando || artistas === null ? (
+        <EsqueletoLista ehAdmin={ehAdmin} />
       ) : (
         <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
           <div className="overflow-x-auto hidden lg:block">

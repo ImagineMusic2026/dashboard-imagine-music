@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Disc3, ExternalLink, Eye, Loader2, Pencil, Plus, Search, Trash2, Video } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
@@ -106,15 +107,18 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
         {/* Resumo do TikTok do artista. Só aparece quando o feed já cobriu ele —
             a OneRPM publica isto desde 07/08, então a maioria ainda não tem. */}
         {tiktok && tiktok.totais.views > 0 && (
-          <span
-            className="inline-flex items-center gap-1.5 text-[10px] num font-semibold px-2 py-0.5 rounded border bg-cyan-500/10 text-cyan-300 border-cyan-500/25"
-            title={`TikTok: ${tiktok.totais.views.toLocaleString('pt-BR')} views e ${tiktok.totais.criacoesUgc.toLocaleString('pt-BR')} vídeos do público em ${tiktok.periodo.dias} dia(s) com dado (${tiktok.periodo.de} a ${tiktok.periodo.ate})`}
+          // Leva pra tela de Viralização já no artista: o card resume, a tela
+          // mostra a curva, os países e faixa a faixa.
+          <Link
+            href={`/viralizacao?artista=${encodeURIComponent(slug)}`}
+            className="inline-flex items-center gap-1.5 text-[10px] num font-semibold px-2 py-0.5 rounded border bg-cyan-500/10 text-cyan-300 border-cyan-500/25 hover:bg-cyan-500/20 transition-colors"
+            title={`TikTok: ${tiktok.totais.views.toLocaleString('pt-BR')} views e ${tiktok.totais.criacoesUgc.toLocaleString('pt-BR')} vídeos do público em ${tiktok.periodo.dias} dia(s) com dado (${tiktok.periodo.de} a ${tiktok.periodo.ate}). Abrir a viralização.`}
           >
             <span className="w-3 h-3 block" aria-hidden>
               <PlataformaIcon tipo="tiktok" />
             </span>
             {compacto(tiktok.totais.views)} views · {compacto(tiktok.totais.criacoesUgc)} vídeos
-          </span>
+          </Link>
         )}
 
         {faixas.length >= MIN_BUSCA && (

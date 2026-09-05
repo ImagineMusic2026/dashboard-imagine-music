@@ -58,9 +58,23 @@ async function handle(req: Request) {
       ultimaSincronizacao: new Date().toISOString(),
       ultimoDia: r.periodo.ate || null,
       erro: null,
+      // Ranking do roster junto do status: é o que a tela de Viralização lê pra
+      // mostrar o selo inteiro sem abrir um doc por artista.
+      artistas: r.ranking,
+      periodo: r.periodo.ate ? r.periodo : null,
     })
 
-    return NextResponse.json({ ok: true, ...r })
+    // `ranking` fica fora da resposta: são ~85 linhas que só interessam ao doc.
+    return NextResponse.json({
+      ok: true,
+      arquivos: r.arquivos,
+      views: r.views,
+      criacoes: r.criacoes,
+      artistas: r.artistas,
+      gravados: r.gravados,
+      periodo: r.periodo,
+      ignorados: r.ignorados,
+    })
   } catch (e) {
     // Mensagem real no status — o erro genérico do sync de streaming foi o que
     // escondeu por 10 dias a causa do apagão de agosto.

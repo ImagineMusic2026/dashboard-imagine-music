@@ -1,5 +1,6 @@
 import SftpClient from 'ssh2-sftp-client'
 import { salvarTikTokUgc } from '@/lib/metricas-sociais/firestore'
+import type { TikTokUgcArtistaResumo } from '@/lib/metricas-sociais/types'
 import {
   acumularUgc,
   finalizarUgc,
@@ -51,6 +52,8 @@ export interface TikTokUgcSyncResult {
   periodo: { de: string; ate: string }
   /** Arquivos que o parser não entendeu (formato mudou) — reportado, não fatal. */
   ignorados: number
+  /** Ranking do roster por vídeos do público, para o doc de status. */
+  ranking: TikTokUgcArtistaResumo[]
 }
 
 export async function sincronizarTikTokUgc(opts?: { dias?: number }): Promise<TikTokUgcSyncResult> {
@@ -80,6 +83,7 @@ export async function sincronizarTikTokUgc(opts?: { dias?: number }): Promise<Ti
         gravados: 0,
         periodo: { de: '', ate: '' },
         ignorados: 0,
+        ranking: [],
       }
     }
 
@@ -120,6 +124,10 @@ export async function sincronizarTikTokUgc(opts?: { dias?: number }): Promise<Ti
           salvarTikTokUgc(a.slug, {
             periodo: a.periodo,
             totais: a.totais,
+            tendencia: a.tendencia,
+            dias: a.dias,
+            porDia: a.porDia,
+            porPais: a.porPais,
             porFaixa: a.porFaixa,
             coletadoEm,
           }),
@@ -131,6 +139,20 @@ export async function sincronizarTikTokUgc(opts?: { dias?: number }): Promise<Ti
     const de = artistas.reduce((m, a) => (!m || a.periodo.de < m ? a.periodo.de : m), '')
     const ate = artistas.reduce((m, a) => (a.periodo.ate > m ? a.periodo.ate : m), '')
 
+    // Ranking pelo que o PÚBLICO fez, não pelo total: o artista que só tem views
+    // do conteúdo oficial não está viralizando, e é essa a lista da tela.
+    const ranking: TikTokUgcArtistaResumo[] = artistas
+      .filter((a) => a.totais.criacoesUgc > 0 || a.totais.viewsUgc > 0)
+      .map((a) => ({
+        slug: a.slug,
+        nome: a.nome,
+        criacoesUgc: a.totais.criacoesUgc,
+        viewsUgc: a.totais.viewsUgc,
+        ugc7: a.tendencia.ugc7,
+        ugcAnt7: a.tendencia.ugcAnt7,
+      }))
+      .sort((x, y) => y.criacoesUgc - x.criacoesUgc || y.viewsUgc - x.viewsUgc)
+
     return {
       arquivos: nomes.length - ignorados,
       views: artistas.reduce((s, a) => s + a.totais.views, 0),
@@ -139,6 +161,7 @@ export async function sincronizarTikTokUgc(opts?: { dias?: number }): Promise<Ti
       gravados,
       periodo: { de, ate },
       ignorados,
+      ranking,
     }
   } finally {
     await sftp.end().catch(() => {})

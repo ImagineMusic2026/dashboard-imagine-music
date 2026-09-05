@@ -315,6 +315,24 @@ export interface TikTokUgcDoc {
     viewsUgc: number
     watchtimeMedio: number | null
   }
+  /**
+   * Aceleração: duas janelas de 7 dias COM DADO (o feed pula dias). Existe
+   * porque o acumulado da janela não distingue "viralizou" de "viralizou e já
+   * passou" — a tela de Viralização precisa das duas.
+   */
+  tendencia?: { ugc7: number; ugcAnt7: number; viewsUgc7: number; viewsUgcAnt7: number }
+  /** Dias com dado, em ordem. É o eixo X de TODAS as séries deste documento. */
+  dias?: string[]
+  /** Alinhado a `dias`. */
+  porDia?: {
+    dia: string
+    criacoes: number
+    views: number
+    criacoesUgc: number
+    viewsUgc: number
+  }[]
+  /** Países do UGC por views (top N) — de onde vem quem usa o som. */
+  porPais?: { pais: string; criacoesUgc: number; viewsUgc: number }[]
   /** Faixas por views (top N). */
   porFaixa: {
     isrc: string
@@ -327,8 +345,26 @@ export interface TikTokUgcDoc {
     criacoesUgc: number
     viewsUgc: number
     watchtimeMedio: number | null
+    ugc7?: number
+    ugcAnt7?: number
+    viewsUgc7?: number
+    viewsUgcAnt7?: number
+    /** Vídeos do público por dia, alinhado a `dias`. Só nas faixas do topo. */
+    serieUgc?: number[]
   }[]
   coletadoEm: string
+}
+
+/** Um artista no ranking de UGC do TikTok (alimenta a tela de Viralização). */
+export interface TikTokUgcArtistaResumo {
+  slug: string
+  nome: string
+  /** Vídeos que o público fez com as músicas dele na janela. */
+  criacoesUgc: number
+  viewsUgc: number
+  /** Mesmas duas janelas de 7 dias da tendência do artista. */
+  ugc7: number
+  ugcAnt7: number
 }
 
 /** Documento `integracoes/onerpm-tiktok` — status do sync de UGC do TikTok. */
@@ -341,6 +377,15 @@ export interface IntegracaoTikTokUgcDoc {
   ultimaSincronizacao: string | null
   ultimoDia: string | null
   erro?: string | null
+  /**
+   * Ranking compacto do roster (slug + nome + UGC), ordenado por vídeos criados.
+   * Mesmo padrão de `IntegracaoOneRpmDoc.artistas`, e pela mesma razão: a tela
+   * de Viralização mostra o selo inteiro com UMA leitura, em vez de abrir os ~85
+   * docs de `streaming-detalhe` — a cota gratuita já derrubou o painel uma vez.
+   */
+  artistas?: TikTokUgcArtistaResumo[]
+  /** Período coberto pela janela, para a tela não inventar recorte. */
+  periodo?: { de: string; ate: string } | null
 }
 
 export type StatusIntegracao = 'conectado' | 'nao_configurado' | 'erro'

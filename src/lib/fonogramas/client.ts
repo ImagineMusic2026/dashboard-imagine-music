@@ -104,6 +104,27 @@ export interface TikTokFaixa {
   viewsUgc: number
   /** Segundos assistidos em média (ponderado por views). */
   watchtimeMedio: number | null
+  /** Vídeos do público nos últimos 7 dias com dado, e nos 7 anteriores. */
+  ugc7?: number
+  ugcAnt7?: number
+  viewsUgc7?: number
+  viewsUgcAnt7?: number
+  /** Vídeos do público por dia, alinhado a `dias`. Só nas faixas do topo. */
+  serieUgc?: number[]
+}
+
+export interface TikTokDia {
+  dia: string
+  criacoes: number
+  views: number
+  criacoesUgc: number
+  viewsUgc: number
+}
+
+export interface TikTokPais {
+  pais: string
+  criacoesUgc: number
+  viewsUgc: number
 }
 
 export interface TikTokDoArtista {
@@ -111,6 +132,14 @@ export interface TikTokDoArtista {
   totais: Omit<TikTokFaixa, 'isrc'>
   /** Indexado por ISRC pra o card casar com a lista de fonogramas em O(1). */
   porIsrc: Map<string, TikTokFaixa>
+  /** Mesma lista, na ordem gravada (views desc) — é como a tela lista. */
+  faixas: TikTokFaixa[]
+  /** Aceleração em duas janelas de 7 dias com dado. Ausente em doc antigo. */
+  tendencia: { ugc7: number; ugcAnt7: number; viewsUgc7: number; viewsUgcAnt7: number } | null
+  /** Eixo X das séries (dias com dado, em ordem). Vazio em doc antigo. */
+  dias: string[]
+  porDia: TikTokDia[]
+  porPais: TikTokPais[]
 }
 
 async function lerTikTok(slug: string): Promise<TikTokDoArtista | null> {
@@ -119,12 +148,28 @@ async function lerTikTok(slug: string): Promise<TikTokDoArtista | null> {
   const d = snap.data() as {
     periodo?: TikTokDoArtista['periodo']
     totais?: TikTokDoArtista['totais']
+    tendencia?: TikTokDoArtista['tendencia']
+    dias?: string[]
+    porDia?: TikTokDia[]
+    porPais?: TikTokPais[]
     porFaixa?: TikTokFaixa[]
   }
+  const faixas = d.porFaixa ?? []
   const porIsrc = new Map<string, TikTokFaixa>()
-  for (const f of d.porFaixa ?? []) porIsrc.set(f.isrc, f)
+  for (const f of faixas) porIsrc.set(f.isrc, f)
   if (!d.periodo || !d.totais) return null
-  return { periodo: d.periodo, totais: d.totais, porIsrc }
+  // Série, países e tendência só existem em doc gravado depois de 2026-09-04. O
+  // painel não espera o sync: quem tem doc velho vê os números, sem as curvas.
+  return {
+    periodo: d.periodo,
+    totais: d.totais,
+    porIsrc,
+    faixas,
+    tendencia: d.tendencia ?? null,
+    dias: d.dias ?? [],
+    porDia: d.porDia ?? [],
+    porPais: d.porPais ?? [],
+  }
 }
 
 const cacheTikTok = memoCurtaPorChave(lerTikTok, (slug) => slug)

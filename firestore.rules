@@ -166,6 +166,19 @@ service cloud.firestore {
     //
     // Regra de subcoleção não é herdada — este bloco é o que a libera. CRUD pelo
     // client (é cadastro manual da equipe, como a agenda), exigindo `contratos`.
+    // Inventário de Patrimônio Artístico (IPI, IPN, editora, masters, status do
+    // catálogo, observações de titularidade). Subcoleção pelo mesmo motivo dos
+    // contratos logo abaixo: `projetos/{slug}` libera leitura para toda a equipe,
+    // e regra é por documento — não esconde campo. Aqui a leitura exige
+    // `contratos` (admin por padrão), que é a fronteira que este conteúdo pede.
+    //
+    // Escrita SÓ por Admin SDK (`/api/artistas/dossie`): o parecer do catálogo é
+    // gravado com data e responsável, e esse carimbo não pode vir do navegador.
+    match /projetos/{slug}/patrimonio/{doc} {
+      allow read: if podeContratos();
+      allow write: if false;
+    }
+
     match /projetos/{slug}/contratos/{id} {
       allow read: if podeContratos();
       allow create, update, delete: if podeContratos();

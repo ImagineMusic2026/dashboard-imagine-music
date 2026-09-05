@@ -7,6 +7,7 @@ import { ArrowLeft, ExternalLink, Loader2, Pencil, Star } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
+import { EstagioArtistaCard } from '@/components/artistas/estagio-artista-card'
 import { ResumoExecutivoArtista } from '@/components/artistas/resumo-executivo-artista'
 import { InsightsArtistaCard } from '@/components/artistas/insights-artista-card'
 import { ComparativoCanaisCard } from '@/components/artistas/comparativo-canais-card'
@@ -21,7 +22,7 @@ import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
 import { ContratosArtistaCard } from '@/components/artistas/contratos-artista-card'
-import { EstagioArtistaCard } from '@/components/artistas/estagio-artista-card'
+import { DossieArtistaCard } from '@/components/artistas/dossie-artista-card'
 import { FonogramasArtistaCard } from '@/components/artistas/fonogramas-artista-card'
 import { DiagnosticoArtistaCard } from '@/components/artistas/diagnostico-artista-card'
 import { AcessoIntegracoesCard } from '@/components/artistas/acesso-integracoes-card'
@@ -190,6 +191,11 @@ export function PerfilArtistaReal({
       {/* Health Score — score real consolidado (mesma lib da home) */}
       <HealthScoreArtistaCard slug={a.slug} nome={a.nome} />
 
+      {/* Estágio (IGE, metodologia IAOS v1.2) — mede PORTE, não saúde; por isso
+          vem colado no Health Score e separado dele. Só staff; o card se
+          autoprotege porque este mesmo perfil é o que o artista vê no portal. */}
+      <EstagioArtistaCard slug={a.slug} nome={a.nome} />
+
       {/* Canais — comparativo lado a lado; clique rola até o card (âncoras abaixo). */}
       <ComparativoCanaisCard slug={a.slug} />
 
@@ -234,11 +240,9 @@ export function PerfilArtistaReal({
           porque este mesmo perfil é o que o artista vê no portal. */}
       <ContratosArtistaCard slug={a.slug} />
 
-      {/* Estágio (IGE, metodologia IAOS v1.2) — mede PORTE, não saúde; por isso
-          vem colado no Health Score e separado dele. Só staff; o card se
-          autoprotege porque este mesmo perfil é o que o artista vê no portal. */}
-      <EstagioArtistaCard slug={a.slug} nome={a.nome} />
-
+      {/* Dossiê das alavancas (IAOS). Só equipe — o componente se autoprotege,
+          porque este perfil é o mesmo que o portal do artista renderiza. */}
+      <DossieArtistaCard slug={a.slug} />
 
       {/* Diagnóstico — o que o artista respondeu no portal (ou o que a equipe
           preencheu por ele). Também só staff. */}

@@ -13,6 +13,7 @@ tipo: indice
 - [[01 - Produto/Conteúdo]]
 - [[01 - Produto/Viralização]]
 - [[01 - Produto/Agenda]]
+- [[01 - Produto/Atividades]]
 
 ## Acesso e pessoas
 
@@ -29,6 +30,7 @@ tipo: indice
 - [[03 - Artistas/Estágio (IGE)]]
 - [[03 - Artistas/Diagnósticos e questionários]]
 - [[03 - Artistas/Projeto comercial interno]]
+- [[03 - Artistas/Dossiê do artista]]
 
 ## Dados e integrações
 
@@ -44,6 +46,7 @@ tipo: indice
 - [[05 - Fluxos/Fluxos principais]]
 - [[05 - Fluxos/Convites e acesso]]
 - [[05 - Fluxos/Questionários públicos]]
+- [[05 - Fluxos/Importação de dados]]
 - [[05 - Fluxos/Importação de dados - detalhada]]
 - [[06 - Tecnologia/Arquitetura técnica]]
 - [[06 - Tecnologia/Rotas e fronteiras de acesso]]
@@ -53,4 +56,6 @@ tipo: indice
 
 ## Evolução
 
+- [[07 - Gestão do produto/Roadmap]]
+- [[07 - Gestão do produto/Decisões de produto e técnica]]
 - [[99 - Pendências/Pendências e decisões]]

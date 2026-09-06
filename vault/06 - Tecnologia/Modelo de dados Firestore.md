@@ -18,9 +18,28 @@ Firestore é o banco central. Leituras no cliente respeitam regras; dados sensí
 | `convites/{token}`                         | Convites de acesso.                                                     | Link por token; listagem restrita.          |
 | `agenda/{id}`                              | Releases, shows, contratos e reuniões.                                  | Quem tem `agenda` lê e altera.              |
 | `integracoes/{doc}`                        | Status de Meta, TikTok, YouTube e OneRPM.                               | Staff lê; servidor escreve.                 |
-| `configuracoes/{doc}`                      | Configurações gerais, como WhatsApp do portal.                          | Membro ativo lê; admin escreve.             |
+| `configuracoes/{doc}`                      | Configurações gerais e a do quadro de atividades.                       | Membro ativo lê; admin escreve.             |
+| `atividades/{id}`                          | Demandas do quadro: etapa, datas, dependências, subtarefas, checklist.  | Quem tem `atividades` lê e altera.          |
 | `diagnosticos/{slug}/questionarios/{tipo}` | Respostas Projeto/Artista.                                              | Staff ou artista vinculado.                 |
 | `links-questionario/{token}`               | Token de formulário externo.                                            | A API valida; o público não lê diretamente. |
+
+## Subcoleções que existem para separar acesso
+
+Regra do Firestore é **por documento** e não esconde campo. Quando parte de um documento precisa de uma fronteira mais estreita que o resto, ela vira subcoleção:
+
+| Subcoleção | Por quê |
+| --- | --- |
+| `projetos/{slug}/contratos/{id}` | Vigência, percentual e o PDF assinado exigem `contratos`, enquanto o projeto inteiro é legível por toda a equipe. |
+| `projetos/{slug}/patrimonio/inventario` | Mesma razão: IPI, IPN, licenciamento e o parecer "Restrito" exigem `contratos`. Ver [[03 - Artistas/Dossiê do artista]]. |
+| `atividades/{id}/comentarios/{id}` | Aqui o motivo é **custo**, não sigilo: comentários viajariam em toda leitura do quadro. O card mostra só o contador denormalizado `qtdComentarios`; o fio só é lido ao abrir a demanda. |
+
+## Campos acrescentados em 09/2026
+
+`artistas/{slug}` ganhou `imagineBio`, `imagineUp`, `soundchartsId` e `entradaIaos` — fatos públicos do artista, que ele enxerga no portal.
+
+`projetos/{slug}` ganhou `mercadoAoVivo` (nível, score, data da avaliação, responsável e observação), `equipe`, `expansao` e `digital`. São juízo da equipe **sobre** o artista, e por isso ficam do lado que ele não lê.
+
+`configuracoes/atividades` guarda o quadro configurável: etapas, tipos, áreas, etiquetas, campos ligados, visões e modelos de projeto. Um documento só, cacheado — nada de uma coleção com um documento por coluna.
 
 ## Métricas sociais
 

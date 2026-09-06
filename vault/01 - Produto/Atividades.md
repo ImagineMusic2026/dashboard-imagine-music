@@ -66,5 +66,7 @@ Comentário só pode ser editado ou apagado pelo próprio autor (ou pelo admin).
 - Renomear uma coluna é seguro a qualquer momento: a chave gravada nas demandas não muda, só o rótulo na tela.
 - Arrastar a barra de uma demanda que tem sucessoras **não** empurra ninguém sozinho; o cronograma oferece o empurrão numa faixa de confirmação.
 - Excluir uma demanda solta as subtarefas dela (viram demandas de topo) e remove as setas que apontavam pra ela.
+- Se a conferência de uso não carregar, a remoção de coluna também fica bloqueada — "não sei quantas demandas há aqui" é tratado como "não deixa", que é o lado seguro.
+- O **caminho crítico** é a corrente de dependências mais longa pela duração planejada, não o cálculo de folga total do MS Project. Para um cronograma de lançamento aponta o mesmo gargalo, mas a diferença está registrada para não ser cobrada como defeito.
 
 Veja [[02 - Acesso e equipe/Perfis e permissões]] e [[06 - Tecnologia/Modelo de dados Firestore]].

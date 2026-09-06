@@ -78,3 +78,52 @@ Registre aqui decisões que evitam rediscussão no futuro. Cada nova entrada dev
 
 **Consequência:** a Imagine compara as duas réguas na tela antes de decidir; virar a chave é trocar quem chama o cálculo. Veja [[03 - Artistas/Health Score]].
 
+## 2026-09-04 — Porte e saúde medidos separados
+
+**Contexto:** o Health Score contava seguidores junto com engajamento e cadência, misturando "que tamanho o artista tem" com "como ele vai".
+
+**Decisão:** a audiência saiu do Health Score e virou o componente de 30% do [[03 - Artistas/Estágio (IGE)]]. O Health Score em produção **não** mudou.
+
+**Motivo:** é a separação que a metodologia IAOS v1.2 exige, e sem ela um artista grande e parado pontuava como um artista pequeno e crescendo.
+
+**Consequência:** existem duas leituras no perfil, e elas respondem perguntas diferentes. A régua v1.2 aparece **ao lado** da oficial, como prévia, até a Imagine homologar as faixas — trocar a régua é decisão dela, não efeito colateral de um deploy.
+
+## 2026-09-05 — Cronograma no lugar de só kanban
+
+**Contexto:** a cliente pediu "algo como MS Project" para as Atividades.
+
+**Decisão:** as demandas ganharam janela de datas, dependências, subtarefas e marcos, e o quadro passou a ter cinco visões sobre a **mesma** coleção. As colunas, o vocabulário, os campos e os modelos passaram a ser configuráveis pelo admin.
+
+**Motivo:** um kanban responde "em que etapa está"; a pergunta da gestão era "quando acontece e o que trava o quê".
+
+**Consequência:** a configuração é única para o time — não há quadro pessoal, e mudar uma coluna muda a tela de todos. O caminho crítico é a corrente mais longa pela duração planejada, não a folga total do MS Project; a simplificação está registrada em [[01 - Produto/Atividades]].
+
+## 2026-09-05 — Situação de evidência é derivada, nunca gravada
+
+**Contexto:** o documento de cadastro-base pede que release, presskit e afins tenham status "disponível / desatualizado / ausente".
+
+**Decisão:** o painel grava **quando** alguém conferiu o link e calcula o status na tela, com janela de 180 dias. A única exceção é a situação do catálogo, gravada com data e responsável.
+
+**Motivo:** status gravado envelhece sozinho — um presskit marcado como "disponível" em março continuaria dizendo isso em dezembro. Já era a escolha feita na situação dos contratos.
+
+**Consequência:** os carimbos precisam vir do servidor, senão o status derivado deixa de significar algo. E a janela de 180 dias é uma escolha nossa, aberta a revisão: o documento pede o status mas não define o prazo.
+
+## 2026-09-05 — Patrimônio artístico em subcoleção
+
+**Contexto:** o inventário (IPI, IPN, licenciamento, parecer "Restrito") foi primeiro modelado como um campo dentro de `projetos/{slug}`, com a permissão aplicada só na escrita e na tela.
+
+**Decisão:** movido para `projetos/{slug}/patrimonio/inventario`, com leitura sob `contratos`.
+
+**Motivo:** `projetos/{slug}` libera leitura para toda a equipe e regra do Firestore é **por documento** — não esconde campo. Quem tivesse `editarArtistas` receberia titularidade e licenciamento no navegador, mesmo com o bloco escondido na tela. Esconder na interface não é fronteira.
+
+**Consequência:** custa uma leitura a mais por perfil aberto, e só para quem tem `contratos`. É o mesmo movimento que os contratos já haviam feito, pelo mesmo motivo.
+
+## 2026-09-05 — Agenda como link, não como cadastro de shows
+
+**Contexto:** o documento pedia, em páginas seguidas, o link do Google Calendar e o cálculo de volume, recorrência, sazonalidade, público/privado e distribuição geográfica.
+
+**Decisão:** a cliente escolheu o link.
+
+**Motivo:** menos trabalho para a equipe, e a agenda já existe fora do painel.
+
+**Consequência:** **os cinco cálculos não saem de um link.** Enquanto for assim, a medida de palco é a declaração de Mercado ao Vivo. Registrado aqui para não virar expectativa frustrada mais adiante.

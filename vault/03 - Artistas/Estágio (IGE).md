@@ -48,3 +48,11 @@ Fica em `projetos/{slug}`, não em `artistas/{slug}` — é classificação da e
 - Confirmar o desvio do fator de equilíbrio.
 
 Veja [[03 - Artistas/Health Score]] e [[04 - Dados e integrações/Integrações]].
+
+## Mercado ao vivo — o que fica registrado
+
+A equipe escolhe uma das seis descrições padronizadas e o score vem da tabela oficial; ninguém digita nota. Ficam gravados **nível, score, data da avaliação, responsável e uma observação livre**.
+
+A data da avaliação é separada da data do registro de propósito: a avaliação costuma sair de uma reunião e ser digitada dias depois, e a metodologia pede a data em que se avaliou, não a de quem digitou.
+
+Veja [[03 - Artistas/Dossiê do artista]] para as outras evidências da alavanca de Expansão.

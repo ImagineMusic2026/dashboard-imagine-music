@@ -19,6 +19,17 @@ tipo: arquitetura
 
 `/meu-perfil` e rotas de diagnóstico do artista logado.
 
+## Escritas que passam obrigatoriamente pelo servidor
+
+`projetos/{slug}` e `artistas/{slug}` negam escrita pelo navegador. O que a equipe edita nessas coleções vai por rota com Admin SDK:
+
+| Rota | O que grava | Permissão |
+| --- | --- | --- |
+| `POST /api/artistas/dossie` | Os cinco blocos do dossiê | `editarArtistas`, exceto `patrimonio`, que exige `contratos` |
+| `POST /api/artistas/mercado-ao-vivo` | Nível declarado, com score da tabela oficial | `editarArtistas` |
+
+Dois motivos para não abrir essas escritas ao cliente: a **nota** do mercado ao vivo tem que vir da tabela oficial e não do navegador, e os **carimbos** de quem conferiu e quando sustentam o status derivado das evidências — se viessem no corpo do pedido, deixariam de significar algo.
+
 ## Proteção em três níveis
 
 1. **Interface:** provider de autenticação e gates escondem ações sem capacidade.

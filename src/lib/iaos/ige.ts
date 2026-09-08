@@ -16,6 +16,11 @@
  * ⚠️ HOJE só 40% é apurável: consumo e airplay dependem do Soundcharts, que ainda
  * não está integrado. Por isso o índice SEMPRE carrega a cobertura junto, e o
  * Estágio sai marcado como provisório enquanto ela não fechar em 100%.
+ *
+ * O que FALTA é o dado, não a régua: as faixas que convertem ouvintes e
+ * execuções em nota estão em `FAIXAS_CONSUMO` e `FAIXAS_AIRPLAY`, calibradas
+ * por nós e pendentes de homologação. Ligar o Soundcharts vira preencher dois
+ * números.
  */
 
 export const METODOLOGIA = 'IAOS-DOC-02 v1.2'
@@ -297,18 +302,84 @@ export interface MercadoAoVivoDeclarado {
   declaradoPorEmail?: string | null
 }
 
+/* ── consumo (40%) e airplay (20%) ────────────────────────────────────────── */
+
 /**
- * Monta os quatro componentes a partir do que o painel tem hoje. Consumo e
- * airplay entram como ND até o Soundcharts existir — a assinatura já os aceita
- * para que ligar a integração não exija mexer aqui.
+ * As faixas que convertem métrica bruta em nota.
+ *
+ * ⚠️ CALIBRAGEM NOSSA, PENDENTE DE HOMOLOGAÇÃO PELA IMAGINE.
+ *
+ * A v1.2 fixa os PESOS (consumo 40%, airplay 20%) e a escala de saída — os
+ * degraus 5/20/40/60/80/100, que ela publica na tabela de mercado ao vivo —,
+ * mas não publica quantas execuções ou quantos ouvintes correspondem a cada
+ * degrau. Sem essa conversão o Soundcharts entregaria os números crus e os dois
+ * componentes continuariam saindo ND: contratar a ferramenta, sozinho, não
+ * fecharia o índice.
+ *
+ * Os cortes abaixo seguem a forma das tabelas que a metodologia JÁ define (a de
+ * porte de audiência e a de mercado ao vivo), em ordens de grandeza compatíveis
+ * com um selo regional brasileiro. O degrau 5 existe pelo mesmo motivo que
+ * existe no mercado ao vivo: "medido e praticamente nulo" não é o mesmo que
+ * "não medido", e não pode virar 20.
+ *
+ * Trocar isto é editar as duas tabelas. Nada mais no cálculo depende dos
+ * valores — é o mesmo contrato do `PARAMETROS_V12` no Health Score.
+ */
+export const FAIXAS_CONSUMO: { ate: number; score: number }[] = [
+  { ate: 5_000, score: 5 },
+  { ate: 50_000, score: 20 },
+  { ate: 250_000, score: 40 },
+  { ate: 1_000_000, score: 60 },
+  { ate: 5_000_000, score: 80 },
+  { ate: Infinity, score: 100 },
+]
+
+export const FAIXAS_AIRPLAY: { ate: number; score: number }[] = [
+  { ate: 50, score: 5 },
+  { ate: 500, score: 20 },
+  { ate: 2_500, score: 40 },
+  { ate: 10_000, score: 60 },
+  { ate: 50_000, score: 80 },
+  { ate: Infinity, score: 100 },
+]
+
+function porFaixa(valor: number | null | undefined, faixas: { ate: number; score: number }[]) {
+  // `null` é ausência de medição e continua ausência — o §8 da metodologia diz
+  // que ausência de dado não equivale a zero. Só número medido vira nota.
+  if (valor == null || !Number.isFinite(valor) || valor < 0) return null
+  return faixas.find((f) => valor < f.ate)?.score ?? 100
+}
+
+/** Consumo: ouvintes mensais no Spotify + views/28d no YouTube, somados. */
+export function scoreConsumo(valor: number | null | undefined): number | null {
+  return porFaixa(valor, FAIXAS_CONSUMO)
+}
+
+/** Airplay: execuções em rádio nos últimos 28 dias. */
+export function scoreAirplay(valor: number | null | undefined): number | null {
+  return porFaixa(valor, FAIXAS_AIRPLAY)
+}
+
+/**
+ * Monta os quatro componentes a partir do que o painel tem hoje.
+ *
+ * `consumo` e `airplay` entram como MÉTRICA BRUTA, não como nota: a conversão é
+ * aqui dentro, pelas faixas acima. Enquanto o Soundcharts não existir eles
+ * chegam `null` e os dois componentes saem ND — mas a régua já está montada, e
+ * ligar a integração passa a ser preencher dois números, não construir a
+ * conversão.
  */
 export function montarComponentes(entradas: {
   audiencia: ResultadoAudiencia | null
   mercadoAoVivo: MercadoAoVivoDeclarado | null
+  /** Ouvintes mensais + views/28d, somados. Bruto, não nota. */
   consumo?: number | null
+  /** Execuções em rádio/28d. Bruto, não nota. */
   airplay?: number | null
 }): ComponenteApurado[] {
   const { audiencia, mercadoAoVivo } = entradas
+  const notaConsumo = scoreConsumo(entradas.consumo)
+  const notaAirplay = scoreAirplay(entradas.airplay)
   return [
     {
       chave: 'audiencia',
@@ -323,15 +394,21 @@ export function montarComponentes(entradas: {
       chave: 'consumo',
       rotulo: ROTULO_COMPONENTE.consumo,
       peso: PESOS_IGE.consumo,
-      score: entradas.consumo ?? null,
-      origem: 'Depende do Soundcharts (Spotify monthly listeners + YouTube views/28d)',
+      score: notaConsumo,
+      origem:
+        notaConsumo === null
+          ? 'Depende do Soundcharts (Spotify monthly listeners + YouTube views/28d)'
+          : `${entradas.consumo?.toLocaleString('pt-BR')} entre ouvintes mensais e views/28d`,
     },
     {
       chave: 'airplay',
       rotulo: ROTULO_COMPONENTE.airplay,
       peso: PESOS_IGE.airplay,
-      score: entradas.airplay ?? null,
-      origem: 'Depende do Soundcharts (execuções em rádio/28d)',
+      score: notaAirplay,
+      origem:
+        notaAirplay === null
+          ? 'Depende do Soundcharts (execuções em rádio/28d)'
+          : `${entradas.airplay?.toLocaleString('pt-BR')} execuções em 28 dias`,
     },
     {
       chave: 'mercadoAoVivo',

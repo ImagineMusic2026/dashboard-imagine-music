@@ -49,6 +49,38 @@ Fica em `projetos/{slug}`, não em `artistas/{slug}` — é classificação da e
 
 Veja [[03 - Artistas/Health Score]] e [[04 - Dados e integrações/Integrações]].
 
+## Faixas de consumo e airplay
+
+A v1.2 fixa os pesos (consumo 40%, airplay 20%) e a escala de saída, mas **não publica** quantos ouvintes ou execuções correspondem a cada degrau. Sem essa conversão, contratar o Soundcharts sozinho não fecharia o índice: os números chegariam crus e os dois componentes seguiriam ND.
+
+As faixas abaixo foram calibradas por nós em 05/09/2026, na mesma forma das tabelas que a metodologia já define, em ordens de grandeza compatíveis com um selo regional brasileiro. **Pendentes de homologação pela Imagine** — trocar é editar duas tabelas em `src/lib/iaos/ige.ts`, nada mais no cálculo depende dos valores.
+
+**Consumo** — ouvintes mensais no Spotify + views/28d no YouTube, somados:
+
+| Faixa | Nota |
+| --- | --- |
+| < 5 mil | 5 |
+| < 50 mil | 20 |
+| < 250 mil | 40 |
+| < 1 milhão | 60 |
+| < 5 milhões | 80 |
+| 5 milhões ou mais | 100 |
+
+**Airplay** — execuções em rádio nos últimos 28 dias:
+
+| Faixa | Nota |
+| --- | --- |
+| < 50 | 5 |
+| < 500 | 20 |
+| < 2.500 | 40 |
+| < 10.000 | 60 |
+| < 50.000 | 80 |
+| 50.000 ou mais | 100 |
+
+O degrau 5 existe pelo mesmo motivo que existe na tabela de mercado ao vivo: "medido e praticamente nulo" não é o mesmo que "não medido", e não pode virar 20. Métrica ausente continua `null` e o componente sai ND, conforme o §8.
+
+Por que isso importa na prática: um artista que hoje aparece como Descoberta com 40% de cobertura pode cair para Pré-descoberta quando a cobertura fechar. A leitura provisória tende a ser otimista.
+
 ## Mercado ao vivo — o que fica registrado
 
 A equipe escolhe uma das seis descrições padronizadas e o score vem da tabela oficial; ninguém digita nota. Ficam gravados **nível, score, data da avaliação, responsável e uma observação livre**.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, FileSpreadsheet, Loader2, X } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -43,6 +43,7 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
   const [receita, setReceita] = useState<DadosExportacao['receita']>(null)
   const [carregandoReceita, setCarregandoReceita] = useState(false)
   const [baixando, setBaixando] = useState(false)
+  const buscandoReceita = useRef(false)
   const [copiado, setCopiado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [base, setBase] = useState<{
@@ -118,7 +119,12 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
    * leitura em toda exportação quando o padrão é não incluir.
    */
   useEffect(() => {
-    if (!incluirReceita || receita || carregandoReceita) return
+    // A trava de "já estou buscando" é um ref, NÃO estado: como estado ela
+    // entraria nas dependências deste efeito, e o `setCarregando(true)` logo
+    // abaixo re-executaria o efeito, cuja limpeza mataria a busca em andamento —
+    // o resultado voltava e era descartado, e o checkbox não fazia nada.
+    if (!incluirReceita || receita || buscandoReceita.current) return
+    buscandoReceita.current = true
     let vivo = true
     setCarregandoReceita(true)
     ;(async () => {
@@ -157,13 +163,14 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
         setErro(e instanceof Error ? e.message : 'Não foi possível ler a receita.')
         setIncluirReceita(false)
       } finally {
+        buscandoReceita.current = false
         if (vivo) setCarregandoReceita(false)
       }
     })()
     return () => {
       vivo = false
     }
-  }, [incluirReceita, receita, carregandoReceita, slug])
+  }, [incluirReceita, receita, slug])
 
   /** Os dados reunidos, uma vez — o Markdown e a planilha saem dos MESMOS. */
   const dados = useMemo<DadosExportacao | null>(() => {
@@ -242,32 +249,35 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
   }, [markdown])
 
   /**
-   * Baixa a planilha. O SheetJS entra por import dinâmico: ele já é dependência
-   * do projeto (o importador de receita usa), mas é grande, e não deve pesar o
-   * carregamento do perfil de quem nunca clica aqui.
+   * Baixa a planilha. A montagem do CONTEÚDO é aqui (mesmos dados do Markdown);
+   * a FORMATAÇÃO acontece no servidor, porque a biblioteca que grava cor, fonte
+   * e imagem é grande demais para entrar no pacote do navegador.
    */
   const baixar = useCallback(async () => {
     if (!dados) return
     setBaixando(true)
+    setErro(null)
     try {
-      const XLSX = await import('xlsx')
-      const wb = XLSX.utils.book_new()
-      for (const aba of montarPlanilha(dados)) {
-        const ws = XLSX.utils.aoa_to_sheet(aba.linhas)
-        ws['!cols'] = aba.larguras.map((wch) => ({ wch }))
-        // Formato por coluna: a célula guarda a fração, mas chega legível.
-        for (const [col, formato] of Object.entries(aba.formatos ?? {})) {
-          for (let linha = 1; linha < aba.linhas.length; linha++) {
-            const ref = XLSX.utils.encode_cell({ r: linha, c: Number(col) })
-            const celula = ws[ref]
-            if (celula && typeof celula.v === 'number') celula.z = formato
-          }
-        }
-        XLSX.utils.book_append_sheet(wb, ws, aba.nome)
+      const token = await auth.currentUser?.getIdToken()
+      if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+      const res = await fetch(`/api/artistas/${encodeURIComponent(slug)}/planilha`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ abas: montarPlanilha(dados), artista: dados.artista.nome }),
+      })
+      if (!res.ok) {
+        const erroJson = await res.json().catch(() => null)
+        throw new Error(erroJson?.error ?? 'Não foi possível gerar a planilha.')
       }
-      XLSX.writeFile(wb, nomeDoArquivo(slug, 'xlsx'))
-    } catch {
-      setErro('Não foi possível gerar a planilha.')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = nomeDoArquivo(slug, 'xlsx')
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível gerar a planilha.')
     } finally {
       setBaixando(false)
     }

@@ -366,6 +366,12 @@ export interface AbaPlanilha {
   larguras: number[]
   linhas: (string | number | null)[][]
   /**
+   * Linha de contexto sob o logo: período, fonte, aviso. Fica na faixa escura do
+   * topo de propósito — aviso enfiado no meio da tabela é aviso que ninguém lê,
+   * e ele não pode disputar a linha do cabeçalho, que o filtro usa.
+   */
+  subtitulo?: string
+  /**
    * Formato numérico por índice de coluna (código do Excel, ex.: `'0,0%'`).
    *
    * Fração crua numa célula sai como 0,18018087206845476 e obriga quem abre a
@@ -471,13 +477,23 @@ export function montarPlanilha(d: DadosExportacao, geradoEm = new Date()): AbaPl
     ])
   }
 
-  const abas: AbaPlanilha[] = [{ nome: 'Resumo', larguras: [22, 34, 18, 52], linhas: resumo }]
+  const abas: AbaPlanilha[] = [
+    {
+      nome: 'Resumo',
+      larguras: [22, 34, 18, 52],
+      subtitulo: `Exportado em ${geradoEm.toLocaleString('pt-BR')}  ·  "não medido" não é zero`,
+      linhas: resumo,
+    },
+  ]
 
   const faixas = d.detalhe?.porFaixa ?? []
   if (faixas.length) {
     abas.push({
       nome: 'Faixas',
       larguras: [46, 16, 14, 12, 14],
+      subtitulo: st
+        ? `Execuções de ${dia(st.periodo?.de)} a ${dia(st.periodo?.ate)}  ·  fonte OneRPM`
+        : undefined,
       // coluna 4 = taxa de pulo, guardada como fração e exibida como %
       formatos: { 4: '0.0%' },
       linhas: [
@@ -511,12 +527,8 @@ export function montarPlanilha(d: DadosExportacao, geradoEm = new Date()): AbaPl
       nome: 'Receita',
       larguras: [28, 14, 10, 16],
       formatos: { 3: '#,##0.00' },
-      linhas: [
-        ['Período', d.receita.periodo, '', ''],
-        ['ATENÇÃO', 'valores separados por moeda — não some moedas diferentes', '', ''],
-        [],
-        ...linhasReceita,
-      ],
+      subtitulo: `Período: ${d.receita.periodo}  ·  valores separados por MOEDA — não some moedas diferentes`,
+      linhas: linhasReceita,
     })
   }
 

@@ -36,7 +36,13 @@ const LINHAS_MARCA = 3
 
 async function lerLogo(): Promise<Buffer | null> {
   try {
-    // Versão reduzida (720px): a original tem 10070px e engorda o arquivo à toa.
+    /*
+     * Cópia própria do logo, por dois motivos: a original tem 10070px e engorda
+     * o arquivo à toa (305 KB contra 21 KB), e o traço dela é PRETO com
+     * transparência — feito para fundo claro. Sobre a faixa escura do topo ela
+     * simplesmente sumia. Esta versão mantém o alfa e troca o traço pelo tom
+     * claro do painel.
+     */
     return await readFile(
       path.join(process.cwd(), 'src/components/images/LOGO_ImagineMusic-planilha.png'),
     )

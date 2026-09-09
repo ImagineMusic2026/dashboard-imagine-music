@@ -1,15 +1,20 @@
 /**
- * Importa o catálogo OFICIAL da OneRPM (CSV único, enviado por eles quando o
- * catálogo muda) pra coleção `catalogo-faixas` — vira a fonte primária de
- * ISRC → título/álbum/artista/lançamento. O `link` do Deezer já cacheado é
- * PRESERVADO (o catálogo da OneRPM não tem link); docs `naoEncontrado` do
- * Deezer são substituídos. Idempotente — rode de novo quando chegar arquivo novo.
+ * Importa o catálogo OFICIAL da OneRPM (CSVs enviados por eles quando o catálogo
+ * muda) pra coleção `catalogo-faixas` — vira a fonte primária de ISRC →
+ * título/álbum/artista/lançamento. O `link` do Deezer já cacheado é PRESERVADO
+ * (o catálogo da OneRPM não tem link); docs `naoEncontrado` do Deezer são
+ * substituídos. Idempotente — rode de novo quando chegar arquivo novo.
  *
- *   node scripts/importar-catalogo-onerpm.mjs [caminho.csv] [--dry]
+ *   node scripts/importar-catalogo-onerpm.mjs [caminho.csv ...] [--dry]
  *
- * Default: data/catalog_imagine_music.csv. `--dry` só analisa, não grava.
+ * Aceita VÁRIOS arquivos numa rodada — a Imagine tem três contas de selo na
+ * OneRPM e cada uma exporta o seu. São consolidados por ISRC (conferido em
+ * 09/2026: nenhum ISRC aparece em duas contas). Sem argumento, importa os três
+ * de `data/`. `--dry` só analisa, não grava.
  *
- * Particularidades do arquivo (conferidas no envio de 2026-07-03):
+ * Particularidades do arquivo (conferidas nos envios de 2026-07-03 e 2026-09-08):
+ *  - o cabeçalho MUDA entre envios (`track_title` em 07/2026, "Track Title" em
+ *    09/2026) — normalizamos pro mesmo canônico antes de procurar a coluna;
  *  - linhas SEM ISRC (conteúdo antigo/sem distribuição) não casam com o
  *    streaming — são ignoradas;
  *  - o mesmo ISRC repete em álbuns/UPCs diferentes (relançamentos) — dedup
@@ -20,9 +25,16 @@
 import admin from 'firebase-admin'
 import { readFileSync } from 'node:fs'
 
+const PADRAO = [
+  'data/catalog_imagine_music_including_subaccounts_09_2026.csv',
+  'data/catalog_hub_digital_including_subaccounts_09_2026.csv',
+  'data/catalog_irmao_lazaro_09_2026.csv',
+]
+
 const args = process.argv.slice(2)
 const dry = args.includes('--dry')
-const caminho = args.find((a) => !a.startsWith('--')) ?? 'data/catalog_imagine_music.csv'
+const informados = args.filter((a) => !a.startsWith('--'))
+const caminhos = informados.length ? informados : PADRAO
 
 const svc = JSON.parse(readFileSync('./serviceAccountKey.json', 'utf8'))
 admin.initializeApp({ credential: admin.credential.cert(svc) })
@@ -72,40 +84,63 @@ function performers(campo) {
   return out
 }
 
-const rows = parseCSV(readFileSync(caminho, 'utf8'))
-const header = rows[0].map((h) => h.replace(/"/g, ''))
-const idx = Object.fromEntries(header.map((h, i) => [h, i]))
-for (const col of ['track_title', 'isrc', 'album_title', 'upc', 'release_date', 'album_artists', 'track_artists']) {
-  if (!(col in idx)) {
-    console.error(`Coluna "${col}" não encontrada no CSV — o formato mudou? Header: ${header.join(', ')}`)
-    process.exit(1)
-  }
-}
+/** "Track Title" e `track_title` são a MESMA coluna — a OneRPM alterna entre as duas. */
+const canon = (h) => h.replace(/"/g, '').trim().toLowerCase().replace(/\s+/g, '_')
+const COLUNAS = ['track_title', 'isrc', 'album_title', 'upc', 'release_date', 'album_artists', 'track_artists']
 
-const dados = rows.slice(1).filter((r) => r.length > 1)
+/** Rótulo curto da conta de selo, tirado do nome do arquivo. Guardado no doc pra
+ *  explicar depois por que uma faixa conhecida não tem streaming: a conta dela
+ *  pode simplesmente não ter feed SFTP ligado ainda. */
+const contaDe = (caminho) =>
+  (caminho.split(/[\\/]/).pop() ?? '')
+    .replace(/\.csv$/i, '')
+    .replace(/^catalog_/, '')
+    .replace(/_including_subaccounts/, '')
+    .replace(/_\d{2}_\d{4}$/, '') || 'onerpm'
+
+let totalLinhas = 0
 let semIsrc = 0
-const porIsrc = new Map() // isrc -> ocorrências
-for (const r of dados) {
-  // Uppercase obrigatório: o CSV real mistura caixa no MESMO ISRC ("BKu822500019"
-  // vs "BKU822500019") e todo o pipeline de consumo usa maiúsculas (trends-parse).
-  const isrc = limpo(r[idx.isrc]).toUpperCase()
-  if (!isrc) {
-    semIsrc++
-    continue
+const porIsrc = new Map() // isrc -> ocorrências (consolidadas de todos os arquivos)
+
+for (const caminho of caminhos) {
+  const rows = parseCSV(readFileSync(caminho, 'utf8'))
+  const idx = Object.fromEntries(rows[0].map((h, i) => [canon(h), i]))
+  for (const col of COLUNAS) {
+    if (!(col in idx)) {
+      console.error(`Coluna "${col}" não encontrada em ${caminho} — o formato mudou? Header: ${rows[0].join(', ')}`)
+      process.exit(1)
+    }
   }
-  if (!/^[A-Za-z0-9]{12}$/.test(isrc)) {
-    console.warn(`ISRC com formato inesperado ignorado: "${isrc}"`)
-    continue
+
+  const conta = contaDe(caminho)
+  const dados = rows.slice(1).filter((r) => r.length > 1)
+  let aproveitadas = 0
+  for (const r of dados) {
+    // Uppercase obrigatório: o CSV real mistura caixa no MESMO ISRC ("BKu822500019"
+    // vs "BKU822500019") e todo o pipeline de consumo usa maiúsculas (trends-parse).
+    const isrc = limpo(r[idx.isrc]).toUpperCase()
+    if (!isrc) {
+      semIsrc++
+      continue
+    }
+    if (!/^[A-Za-z0-9]{12}$/.test(isrc)) {
+      console.warn(`ISRC com formato inesperado ignorado: "${isrc}"`)
+      continue
+    }
+    const occ = {
+      titulo: limpo(r[idx.track_title]),
+      album: limpo(r[idx.album_title]),
+      upc: limpo(r[idx.upc]),
+      release: limpo(r[idx.release_date]),
+      performers: [...performers(r[idx.album_artists]), ...performers(r[idx.track_artists])],
+      conta,
+    }
+    if (!porIsrc.has(isrc)) porIsrc.set(isrc, [])
+    porIsrc.get(isrc).push(occ)
+    aproveitadas++
   }
-  const occ = {
-    titulo: limpo(r[idx.track_title]),
-    album: limpo(r[idx.album_title]),
-    upc: limpo(r[idx.upc]),
-    release: limpo(r[idx.release_date]),
-    performers: [...performers(r[idx.album_artists]), ...performers(r[idx.track_artists])],
-  }
-  if (!porIsrc.has(isrc)) porIsrc.set(isrc, [])
-  porIsrc.get(isrc).push(occ)
+  totalLinhas += dados.length
+  console.log(`  ${caminho} → conta "${conta}": ${dados.length} linhas, ${aproveitadas} com ISRC`)
 }
 
 /* ── dedup por ISRC ────────────────────────────────────────────────────────── */
@@ -131,12 +166,14 @@ function consolidar(occs) {
   const top = [...vencedor].sort((a, b) => (b.release || '').localeCompare(a.release || ''))[0]
   const artistas = [...new Set(occs.flatMap((o) => o.performers))]
   const releaseMin = occs.map((o) => o.release).filter(Boolean).sort()[0] ?? null
+  const contas = [...new Set(occs.map((o) => o.conta).filter(Boolean))]
   return {
     titulo: top.titulo || null,
     album: top.album || null,
     upc: top.upc || null,
     releaseDate: releaseMin,
     artista: artistas.length ? artistas.join(', ') : null,
+    conta: contas.join(', ') || null,
     divergente: grupos.size > 1,
   }
 }
@@ -153,7 +190,9 @@ for (const [isrc, occs] of porIsrc) {
   faixas.set(isrc, f)
 }
 
-console.log(`linhas: ${dados.length} | sem ISRC (ignoradas): ${semIsrc} | ISRCs únicos: ${faixas.size} | títulos divergentes: ${divergentes}`)
+console.log(
+  `linhas: ${totalLinhas} | sem ISRC (ignoradas): ${semIsrc} | ISRCs únicos: ${faixas.size} | títulos divergentes: ${divergentes}`,
+)
 
 /* ── merge com o cache existente + gravação ────────────────────────────────── */
 
@@ -181,6 +220,7 @@ function montarDoc(isrc, f, prev, st) {
     album: f.album,
     upc: f.upc,
     artista: f.artista,
+    conta: f.conta,
     fonte: 'onerpm',
     atualizadoEm: agora,
   }

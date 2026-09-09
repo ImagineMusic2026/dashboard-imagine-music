@@ -154,8 +154,9 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
 
       {faixas.length === 0 ? (
         <div className="p-8 text-center text-sm text-ink-500">
-          Nenhum fonograma atribuído a este artista. O catálogo oficial da OneRPM veio
-          incompleto — o que faltar pode ser cadastrado à mão.
+          Nenhum fonograma atribuído a este artista. O catálogo da OneRPM usa a grafia do
+          feed de distribuição, que nem sempre bate com o nome cadastrado aqui — o que
+          faltar pode ser cadastrado à mão.
         </div>
       ) : filtradas.length === 0 ? (
         <div className="p-8 text-center text-sm text-ink-500">Nenhuma faixa com esse termo.</div>

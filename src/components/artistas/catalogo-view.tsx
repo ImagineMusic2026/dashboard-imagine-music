@@ -23,9 +23,12 @@ const FILTROS: { key: Filtro; label: string }[] = [
 /**
  * Catálogo do selo por artista — quantos fonogramas cada um tem mapeado.
  *
- * Responde a pergunta que o catálogo incompleto da OneRPM criou: de quem já
- * sabemos a obra e de quem não sabemos. Quem não tem nenhuma faixa é o que
- * precisa ser cobrado da OneRPM ou cadastrado à mão.
+ * Responde de quem já sabemos a obra e de quem não sabemos. Desde 09/09/2026 o
+ * catálogo das três contas de selo está importado, então artista sem nenhuma
+ * faixa aqui não é mais falta de catálogo: ou o nome dele no feed da OneRPM tem
+ * grafia diferente da do roster (vira alias em `trends-aliases`), ou ele não
+ * distribui por lá. A atribuição roda em `scripts/atribuir-fonogramas.mjs`, e
+ * precisa ser reexecutada a cada catálogo novo.
  *
  * Lê o CONTADOR gravado em `artistas/{slug}.fonogramas`, não o catálogo: o
  * roster já vem cacheado, então esta tela custa zero leitura a mais. A lista de

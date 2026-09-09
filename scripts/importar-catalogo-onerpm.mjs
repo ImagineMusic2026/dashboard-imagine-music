@@ -322,4 +322,13 @@ if (descobertos.length) {
   for (const d of descobertos.slice(0, 10))
     console.log(`  ${d.isrc}  ${d.streams} streams  (${d.slugs.join(', ')})`)
 }
+
+// Importar o catálogo NÃO liga as faixas aos artistas — isso é outro passo, e
+// esquecer dele deixa o card de Fonogramas zerado no perfil de todo mundo
+// (aconteceu em 09/09/2026, com 2.387 faixas novas sem dono).
+if (!dry) {
+  console.log('\n⚠ Falta atribuir as faixas aos artistas:')
+  console.log('    node scripts/atribuir-fonogramas.mjs --dry   (confere)')
+  console.log('    node scripts/atribuir-fonogramas.mjs         (grava)')
+}
 process.exit(0)

@@ -83,7 +83,7 @@ for (const slug of process.argv.slice(2).length ? process.argv.slice(2) : ['neto
   console.log(`\n================ ${slug} ================`)
   for (const l of linhas) console.log(`  ${String(l.n).padStart(4)}  ${l.aba.padEnd(12)} ${l.o_que}`)
   console.log(`  ${'-'.repeat(60)}`)
-  console.log(`  ${String(total).padStart(4)}  LEITURAS POR ABERTURA DE PERFIL`)
+  console.log(`  ${String(total).padStart(4)}  se TODAS as abas fossem carregadas juntas (era assim ate 09/09)`)
   if (sobDemanda.length) {
     console.log('\n  só se alguém clicar (não entra no total acima):')
     for (const l of sobDemanda) console.log(`    ${String(l.n).padStart(4)}  ${l.o_que}`)
@@ -92,8 +92,8 @@ for (const slug of process.argv.slice(2).length ? process.argv.slice(2) : ['neto
   const porAba = {}
   for (const l of linhas) porAba[l.aba] = (porAba[l.aba] ?? 0) + l.n
   console.log('\n  se virar abas, a PRIMEIRA carrega:')
-  console.log(`    Visão geral: ${porAba['Visão geral']} leituras`)
-  console.log('  e o resto só se alguém clicar:')
+  console.log(`    Visão geral: ${porAba['Visão geral']} leituras  <-- SO ISTO`)
+  console.log('  e cada aba abaixo só se alguem clicar nela:')
   for (const [aba, n] of Object.entries(porAba)) {
     if (aba !== 'Visão geral') console.log(`    ${aba}: ${n}`)
   }

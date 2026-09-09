@@ -6,7 +6,7 @@ import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plata
 import { Sparkline } from '@/components/artistas/sparkline'
 import { ChartResponsivo } from '@/components/shared/chart-responsivo'
 import { janelaDaSerie } from '@/components/shared/kpi'
-import { abrirCardCanal, rolarAteCard } from '@/lib/artistas/abrir-card'
+import { irParaCard } from '@/lib/artistas/abrir-card'
 import {
   getHistoricoInstagram,
   getHistoricoStreaming,
@@ -177,9 +177,9 @@ export function ComparativoCanaisCard({ slug }: { slug: string }) {
               key={c.key}
               type="button"
               onClick={() => {
-                // Expande o card do canal (eles começam recolhidos) e rola até ele.
-                abrirCardCanal(c.key)
-                rolarAteCard(c.anchor)
+                // Expande o card do canal (eles começam recolhidos) e rola até
+                // ele — trocando de aba antes, quando o card mora em outra.
+                irParaCard(c.anchor)
               }}
               className="w-full flex items-center gap-3 px-5 py-3 hover:bg-bg-800/30 text-left transition-colors"
             >

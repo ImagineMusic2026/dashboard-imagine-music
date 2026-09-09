@@ -21,6 +21,7 @@ import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
 import { ExportarArtistaDialog } from '@/components/artistas/exportar-artista-dialog'
+import { aoTrocarAba } from '@/lib/artistas/abrir-card'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
 import { ContratosArtistaCard } from '@/components/artistas/contratos-artista-card'
 import { DossieArtistaCard } from '@/components/artistas/dossie-artista-card'
@@ -38,6 +39,31 @@ import {
 import { cn } from '@/lib/utils'
 
 type EstadoReal = { st: 'load' } | { st: 'erro' } | { st: 'vazio' } | { st: 'ok'; a: ArtistaDoc }
+
+type AbaPerfil = 'visao' | 'canais' | 'streaming' | 'receita' | 'cadastro'
+
+/**
+ * O perfil é dividido em abas, e SÓ A ABA ATIVA É MONTADA — este é o ponto, não
+ * a organização visual. Cada card lê o seu do Firestore, e a conta está no plano
+ * gratuito: abrir o perfil do maior artista custava 431 leituras com tudo junto
+ * e passa a custar 82 na primeira aba (medido em
+ * `scripts/medir-leituras-perfil.mjs`). Esconder com CSS não serviria — o card
+ * montaria e leria igual.
+ *
+ * A ordem das abas segue o uso: a primeira responde "como esse artista está e o
+ * que merece atenção", que é o que se quer ao abrir. As outras existem para
+ * investigar depois que a primeira apontou onde olhar.
+ *
+ * ⚠️ "O que merece atenção" fica na primeira aba de propósito. É o único bloco
+ * que avisa de problema antes de alguém procurar; atrás de uma aba, ninguém veria.
+ */
+const ABAS: { id: AbaPerfil; rotulo: string }[] = [
+  { id: 'visao', rotulo: 'Visão geral' },
+  { id: 'canais', rotulo: 'Canais' },
+  { id: 'streaming', rotulo: 'Streaming' },
+  { id: 'receita', rotulo: 'Receita' },
+  { id: 'cadastro', rotulo: 'Cadastro' },
+]
 
 const LINKS: { tipo: PlataformaTipo; nome: string; cor: string; get: (a: ArtistaDoc) => RedeSocialDoc | null | undefined }[] = [
   { tipo: 'spotify', nome: 'Spotify', cor: 'text-emerald-400', get: (a) => a.redes?.spotify },
@@ -58,10 +84,25 @@ export function PerfilArtistaReal({
   const router = useRouter()
   // Editar é permissão (admin e marketing por padrão); excluir continua só admin.
   const podeEditar = role !== 'artista' && pode('editarArtistas')
+  const [aba, setAba] = useState<AbaPerfil>('visao')
   const [estado, setEstado] = useState<EstadoReal>({ st: 'load' })
   const [editando, setEditando] = useState(false)
   const [exportando, setExportando] = useState(false)
   const [nonce, setNonce] = useState(0)
+
+  // A aba de Receita some para quem não vê nem receita nem contratos — melhor
+  // que uma aba que abre vazia. Os cards continuam se autoprotegendo por dentro.
+  const abasVisiveis = ABAS.filter(
+    (t) => t.id !== 'receita' || pode('verReceita') || pode('contratos'),
+  )
+
+  /*
+   * Um alerta ou o comparativo podem apontar para um card que está em OUTRA aba
+   * (o alerta de streaming vive na Visão geral e leva ao card da aba Streaming).
+   * `irParaCard` avisa aqui, a aba troca, o card monta e só então a rolagem
+   * acontece — a repetição do scroll em `rolarAteCard` cobre esse atraso.
+   */
+  useEffect(() => aoTrocarAba((destino) => setAba(destino as AbaPerfil)), [])
 
   useEffect(() => {
     let vivo = true
@@ -194,75 +235,117 @@ export function PerfilArtistaReal({
         </div>
       </div>
 
-      {/* Faixa executiva — o artista em 10 segundos (KPIs cross-plataforma). */}
-      <ResumoExecutivoArtista slug={a.slug} nome={a.nome} />
+      <nav
+        className="flex items-center gap-1 overflow-x-auto border-b border-bg-700/40 -mt-2"
+        aria-label="Seções do perfil"
+      >
+        {abasVisiveis.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setAba(t.id)}
+            aria-current={aba === t.id ? 'page' : undefined}
+            className={cn(
+              'shrink-0 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors',
+              aba === t.id
+                ? 'border-violet-500 text-ink-100'
+                : 'border-transparent text-ink-500 hover:text-ink-300',
+            )}
+          >
+            {t.rotulo}
+          </button>
+        ))}
+      </nav>
 
-      {/* O que merece atenção — alertas do próprio artista + diagnóstico do Health. */}
-      <InsightsArtistaCard slug={a.slug} nome={a.nome} />
+      {aba === 'visao' && (
+        <>
+          {/* Faixa executiva — o artista em 10 segundos (KPIs cross-plataforma). */}
+          <ResumoExecutivoArtista slug={a.slug} nome={a.nome} />
 
-      {/* Health Score — score real consolidado (mesma lib da home) */}
-      <HealthScoreArtistaCard slug={a.slug} nome={a.nome} />
+          {/* O que merece atenção — alertas do próprio artista + diagnóstico do Health. */}
+          <InsightsArtistaCard slug={a.slug} nome={a.nome} />
 
-      {/* Estágio (IGE, metodologia IAOS v1.2) — mede PORTE, não saúde; por isso
-          vem colado no Health Score e separado dele. Só staff; o card se
-          autoprotege porque este mesmo perfil é o que o artista vê no portal. */}
-      <EstagioArtistaCard slug={a.slug} nome={a.nome} />
+          {/* Health Score — score real consolidado (mesma lib da home) */}
+          <HealthScoreArtistaCard slug={a.slug} nome={a.nome} />
 
-      {/* Canais — comparativo lado a lado; clique rola até o card (âncoras abaixo). */}
-      <ComparativoCanaisCard slug={a.slug} />
+          {/* Estágio (IGE, metodologia IAOS v1.2) — mede PORTE, não saúde; por isso
+              vem colado no Health Score e separado dele. Só staff; o card se
+              autoprotege porque este mesmo perfil é o que o artista vê no portal. */}
+          <EstagioArtistaCard slug={a.slug} nome={a.nome} />
+        </>
+      )}
 
-      {/* Instagram — métricas reais via Meta (visíveis a todos os membros) */}
-      <div id="card-instagram" className="scroll-mt-20">
-        <InstagramArtistaCard slug={a.slug} />
-      </div>
+      {aba === 'canais' && (
+        <>
+          {/* Canais — comparativo lado a lado; clique rola até o card (âncoras abaixo). */}
+          <ComparativoCanaisCard slug={a.slug} />
 
-      {/* TikTok — métricas reais via Display API (visíveis a todos os membros) */}
-      <div id="card-tiktok" className="scroll-mt-20">
-        <TikTokArtistaCard slug={a.slug} />
-      </div>
+          {/* Instagram — métricas reais via Meta (visíveis a todos os membros) */}
+          <div id="card-instagram" className="scroll-mt-20">
+            <InstagramArtistaCard slug={a.slug} />
+          </div>
 
-      {/* YouTube — base pública (Data API) + Analytics (OAuth) para quem conectar */}
-      <div id="card-youtube" className="scroll-mt-20">
-        <YouTubeArtistaCard slug={a.slug} />
-      </div>
+          {/* TikTok — métricas reais via Display API (visíveis a todos os membros) */}
+          <div id="card-tiktok" className="scroll-mt-20">
+            <TikTokArtistaCard slug={a.slug} />
+          </div>
 
-      {/* Streaming — plays/skips reais via OneRPM (não sensível, visível a todos). */}
-      <div id="card-streaming" className="scroll-mt-20">
-        <StreamingArtistaCard slug={a.slug} />
-      </div>
+          {/* YouTube — base pública (Data API) + Analytics (OAuth) para quem conectar */}
+          <div id="card-youtube" className="scroll-mt-20">
+            <YouTubeArtistaCard slug={a.slug} />
+          </div>
+        </>
+      )}
 
-      {/* Análise de streaming (Fase 1): faixas por skip + geografia. */}
-      <StreamingAnaliticoCard slug={a.slug} />
+      {aba === 'streaming' && (
+        <>
+          {/* Streaming — plays/skips reais via OneRPM (não sensível, visível a todos). */}
+          <div id="card-streaming" className="scroll-mt-20">
+            <StreamingArtistaCard slug={a.slug} />
+          </div>
 
-      {/* Receita — só admin (lê a coleção `receitas`); o card cuida do estado vazio. */}
-      <ReceitaGate>
-        <ReceitaArtistaCard slug={a.slug} fallbackItems={[]} />
-      </ReceitaGate>
+          {/* Análise de streaming (Fase 1): faixas por skip + geografia. */}
+          <StreamingAnaliticoCard slug={a.slug} />
 
-      {/* Projeto — cadastro comercial, SÓ staff (o portal do artista renderiza este
-          mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
-      <ProjetoArtistaCard slug={a.slug} />
+          {/* Fonogramas — a obra do artista (catálogo OneRPM + o que a equipe cadastrou).
+              Só staff; o card se autoprotege pelo mesmo motivo do de Projeto. */}
+          <FonogramasArtistaCard slug={a.slug} />
+        </>
+      )}
 
-      {/* Fonogramas — a obra do artista (catálogo OneRPM + o que a equipe cadastrou).
-          Só staff; o card se autoprotege pelo mesmo motivo do de Projeto. */}
-      <FonogramasArtistaCard slug={a.slug} />
+      {aba === 'receita' && (
+        <>
+          {/* Receita — só admin (lê a coleção `receitas`); o card cuida do estado vazio. */}
+          <ReceitaGate>
+            <ReceitaArtistaCard slug={a.slug} fallbackItems={[]} />
+          </ReceitaGate>
 
-      {/* Contratos — ficha da vigência + link do PDF digitalizado (o painel não
-          tem Storage). Capacidade `contratos`, padrão admin; o card se autoprotege
-          porque este mesmo perfil é o que o artista vê no portal. */}
-      <ContratosArtistaCard slug={a.slug} />
+          {/* Contratos — ficha da vigência + link do PDF digitalizado (o painel não
+              tem Storage). Capacidade `contratos`, padrão admin; o card se autoprotege
+              porque este mesmo perfil é o que o artista vê no portal. */}
+          <ContratosArtistaCard slug={a.slug} />
+        </>
+      )}
 
-      {/* Dossiê das alavancas (IAOS). Só equipe — o componente se autoprotege,
-          porque este perfil é o mesmo que o portal do artista renderiza. */}
-      <DossieArtistaCard slug={a.slug} />
+      {aba === 'cadastro' && (
+        <>
+          {/* Projeto — cadastro comercial, SÓ staff (o portal do artista renderiza este
+              mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
+          <ProjetoArtistaCard slug={a.slug} />
 
-      {/* Diagnóstico — o que o artista respondeu no portal (ou o que a equipe
-          preencheu por ele). Também só staff. */}
-      <DiagnosticoArtistaCard slug={a.slug} nome={a.nome} />
+          {/* Dossiê das alavancas (IAOS). Só equipe — o componente se autoprotege,
+              porque este perfil é o mesmo que o portal do artista renderiza. */}
+          <DossieArtistaCard slug={a.slug} />
 
-      {/* Acesso & integrações — substitui o antigo "Redes sociais": nível de
-          integração (barra) + status por rede, mantendo os @handles/links. */}
-      <AcessoIntegracoesCard artista={a} />
+          {/* Diagnóstico — o que o artista respondeu no portal (ou o que a equipe
+              preencheu por ele). Também só staff. */}
+          <DiagnosticoArtistaCard slug={a.slug} nome={a.nome} />
+
+          {/* Acesso & integrações — substitui o antigo "Redes sociais": nível de
+              integração (barra) + status por rede, mantendo os @handles/links. */}
+          <AcessoIntegracoesCard artista={a} />
+        </>
+      )}
 
       {editando && podeEditar && (
         <EditarArtistaDialog

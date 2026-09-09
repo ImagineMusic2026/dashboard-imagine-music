@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Bell, ClipboardList, CloudOff, Flame, MoonStar, PlayCircle, PlugZap, Star, TrendingDown, TrendingUp, Trophy, UserPlus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
-import { abrirCardCanal, rolarAteCard } from '@/lib/artistas/abrir-card'
+import { irParaCard } from '@/lib/artistas/abrir-card'
 import { corAvatarDe, iniciaisDe } from '@/lib/artistas/client'
 import type { AlertaDerivado, SeveridadeAlerta } from '@/lib/alertas/derivar'
 import { cn } from '@/lib/utils'
@@ -61,10 +61,9 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
         href={a.url}
         onClick={(e) => {
           e.preventDefault()
-          const id = a.url!.slice(1)
-          // Âncoras de card de plataforma ("card-streaming") também expandem o card.
-          if (id.startsWith('card-')) abrirCardCanal(id.slice(5))
-          rolarAteCard(id)
+          // `irParaCard` cuida de tudo: troca a aba do perfil quando o card mora
+          // em outra, manda expandir e rola. O alerta não precisa saber de abas.
+          irParaCard(a.url!.slice(1))
         }}
         className="text-violet-400 hover:text-violet-300 text-sm font-semibold shrink-0 self-start sm:self-center transition-colors"
       >

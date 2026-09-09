@@ -1,12 +1,15 @@
 /**
- * Exportação do perfil de um artista em Markdown, para ser colado numa IA.
+ * Exportação do perfil de um artista, em duas formas com destinos diferentes.
  *
- * O destino define o formato. PDF seria pior: paginação e layout viram ruído e a
- * IA gasta atenção decifrando a forma em vez do conteúdo. Markdown é texto
- * estruturado — cola no chat e pronto.
+ * MARKDOWN (`montarExportacao`) é para colar numa IA. PDF seria pior: paginação
+ * e layout viram ruído e a IA gasta atenção decifrando a forma em vez do
+ * conteúdo. Markdown é texto estruturado — cola no chat e pronto.
+ *
+ * PLANILHA (`montarPlanilha`) é para abrir no Excel, filtrar, somar, fazer
+ * gráfico. Os dois saem exatamente dos MESMOS dados, então nunca divergem.
  *
  * Três regras nortearam o que sai daqui, e cada uma existe para evitar um erro
- * concreto de leitura por parte da IA:
+ * concreto de leitura — por uma IA ou por uma pessoa:
  *
  * 1. TODO número vem com a janela e a fonte. "88,6 milhões de streams" sozinho
  *    não diz se é do mês ou da vida inteira.
@@ -349,8 +352,195 @@ export function montarExportacao(d: DadosExportacao, geradoEm = new Date()): str
   return partes.join('\n')
 }
 
-/** Nome do arquivo baixado — slug e data, para não virar "download (3).md". */
-export function nomeDoArquivo(slug: string, geradoEm = new Date()): string {
+/** Nome do arquivo baixado — slug e data, para não virar "download (3)". */
+export function nomeDoArquivo(slug: string, ext: 'md' | 'xlsx', geradoEm = new Date()): string {
   const d = geradoEm.toISOString().slice(0, 10)
-  return `${slug}-painel-imagine-${d}.md`
+  return `${slug}-painel-imagine-${d}.${ext}`
+}
+
+/* ── planilha ───────────────────────────────────────────────────────────────── */
+
+/** Uma aba: nome, larguras de coluna e as linhas já prontas. */
+export interface AbaPlanilha {
+  nome: string
+  larguras: number[]
+  linhas: (string | number | null)[][]
+  /**
+   * Formato numérico por índice de coluna (código do Excel, ex.: `'0,0%'`).
+   *
+   * Fração crua numa célula sai como 0,18018087206845476 e obriga quem abre a
+   * formatar antes de conseguir ler. Guardar o valor como fração é certo — é o
+   * que soma e compara —, mas ele deve CHEGAR formatado.
+   */
+  formatos?: Record<number, string>
+}
+
+/**
+ * Os mesmos dados em forma de planilha.
+ *
+ * Aqui a regra do "não medido" fica MAIS importante, não menos: célula vazia em
+ * Excel lê como zero para quase todo mundo, e para qualquer soma. Por isso a
+ * ausência continua escrita por extenso, mesmo custando o tipo numérico da
+ * coluna — número medido entra como número, ausência entra como texto, e a
+ * mistura é o próprio aviso.
+ */
+export function montarPlanilha(d: DadosExportacao, geradoEm = new Date()): AbaPlanilha[] {
+  const a = d.artista
+  const m = d.metricas
+  const p = d.projeto
+  const st = m?.streaming
+  const sc = p?.soundcharts
+  const yt = m?.youtube
+
+  /** Número medido vira número (soma, ordena, vira gráfico); ausência vira texto. */
+  const v = (x: number | null | undefined): number | string =>
+    x == null || !Number.isFinite(x) ? AUSENTE : x
+
+  const resumo: (string | number | null)[][] = [
+    ['Seção', 'Campo', 'Valor', 'Janela / observação'],
+    ['Identidade', 'Nome', a.nome, ''],
+    ['Identidade', 'Gênero', a.genero || AUSENTE, ''],
+    ['Identidade', 'Selo', a.label || AUSENTE, ''],
+    ['Identidade', 'Faixas no catálogo', v(a.fonogramas), ''],
+    ['Identidade', 'Exportado em', geradoEm.toLocaleString('pt-BR'), ''],
+
+    ['Audiência', 'Seguidores no Instagram', v(m?.instagram?.seguidores), m?.instagram?.coletadoEm ? `coletado em ${data(m.instagram.coletadoEm)}` : ''],
+    ['Audiência', 'Seguidores no TikTok', v(m?.tiktok?.seguidores), m?.tiktok?.coletadoEm ? `coletado em ${data(m.tiktok.coletadoEm)}` : ''],
+    ['Audiência', 'Inscritos no YouTube', yt?.inscritosOcultos ? 'canal esconde a contagem' : v(yt?.inscritos), yt?.coletadoEm ? `coletado em ${data(yt.coletadoEm)}` : ''],
+    ['Audiência', 'Views totais do canal no YouTube', v(yt?.viewsTotais), ''],
+    ['Audiência', 'Views do YouTube na janela', v(yt?.analytics?.views), yt?.analytics ? `${yt.analytics.periodoDias} dias` : ''],
+  ]
+
+  const janelaSt = st ? `${dia(st.periodo?.de)} a ${dia(st.periodo?.ate)}` : ''
+  resumo.push(
+    ['Streaming', 'Streams na janela', v(st?.streams), janelaSt ? `${janelaSt} · fonte OneRPM` : 'fonte OneRPM'],
+    ['Streaming', 'Streams em 28 dias', v(st?.streams28d), ''],
+    ['Streaming', 'Streams em 7 dias', v(st?.streams7d), ''],
+    ['Streaming', 'Taxa de pulo', st?.skipRate == null ? AUSENTE : st.skipRate, 'fração de 0 a 1 — formate como porcentagem'],
+    ['Streaming', 'Faixas com execução', v(st?.faixas), ''],
+    ['Streaming', 'Último dia com dado', st?.ultimoDia ? dia(st.ultimoDia) : AUSENTE, ''],
+  )
+  for (const x of st?.porPlataforma ?? []) {
+    resumo.push(['Streaming por plataforma', x.plataforma, v(x.streams), janelaSt])
+  }
+  for (const x of (st?.porPais ?? []).slice(0, 10)) {
+    resumo.push(['Streaming por país', x.pais, v(x.streams), janelaSt])
+  }
+
+  if (d.ugc?.totais) {
+    const j = d.ugc.periodo ? `${dia(d.ugc.periodo.de)} a ${dia(d.ugc.periodo.ate)}` : ''
+    resumo.push(
+      ['TikTok (público)', 'Vídeos feitos pelo público', v(d.ugc.totais.criacoesUgc), j],
+      ['TikTok (público)', 'Views desses vídeos', v(d.ugc.totais.viewsUgc), j],
+    )
+  }
+
+  if (sc) {
+    const quando = `consultado em ${data(sc.consultadoEm)}`
+    resumo.push(
+      ['Mercado', 'Ouvintes mensais no Spotify', v(sc.ouvintesSpotify), `${quando} · fonte Soundcharts`],
+      ['Mercado', 'Execuções em rádio (28 dias)', v(sc.airplay28d), `${quando} · ${n(sc.airplayEmissoras28d)} emissoras`],
+      ['Mercado', 'Execuções em rádio (12 meses)', v(sc.airplay365d), `${quando} · ${n(sc.airplayEmissoras365d)} emissoras`],
+      ['Mercado', 'Estágio de carreira (Soundcharts)', sc.careerStage ?? AUSENTE, 'escala GLOBAL — não serve para comparar artistas deste casting entre si'],
+    )
+  }
+
+  if (d.ige) {
+    resumo.push(
+      ['Estágio (IGE)', 'Índice', d.ige.ige ?? AUSENTE, `${d.ige.metodologia}${d.ige.provisorio ? ' · leitura PROVISÓRIA' : ''}`],
+      ['Estágio (IGE)', 'Estágio', d.ige.estagio ?? AUSENTE, ''],
+      ['Estágio (IGE)', 'Cobertura da metodologia', d.ige.cobertura, 'fração de 0 a 1 — formate como porcentagem'],
+    )
+    for (const c of d.ige.componentes) {
+      resumo.push(['Estágio (IGE)', c.rotulo, c.score ?? AUSENTE, `peso ${pct(c.peso, 0)} · ${c.origem}`])
+    }
+  }
+
+  if (d.saude) {
+    resumo.push(['Health Score', 'Score', d.saude.score, ''])
+    for (const pi of d.saude.pilares) resumo.push(['Health Score', pi.rotulo, pi.score, ''])
+  }
+
+  const mav = p?.mercadoAoVivo
+  if (mav) {
+    resumo.push([
+      'Mercado ao vivo',
+      `Nível ${mav.nivel}`,
+      mav.score,
+      `declarado pela equipe${mav.declaradoPor ? ` por ${mav.declaradoPor}` : ''} · não é medição`,
+    ])
+  }
+
+  const abas: AbaPlanilha[] = [{ nome: 'Resumo', larguras: [22, 34, 18, 52], linhas: resumo }]
+
+  const faixas = d.detalhe?.porFaixa ?? []
+  if (faixas.length) {
+    abas.push({
+      nome: 'Faixas',
+      larguras: [46, 16, 14, 12, 14],
+      // coluna 4 = taxa de pulo, guardada como fração e exibida como %
+      formatos: { 4: '0.0%' },
+      linhas: [
+        ['Faixa', 'ISRC', 'Streams', 'Pulos', 'Taxa de pulo'],
+        ...faixas.slice(0, 100).map((f) => [
+          d.titulos[f.isrc] ?? AUSENTE,
+          f.isrc,
+          v(f.streams),
+          v(f.skips),
+          f.streams ? (f.skips ?? 0) / f.streams : AUSENTE,
+        ]),
+      ],
+    })
+  }
+
+  if (d.receita) {
+    const linhasReceita: (string | number | null)[][] = [
+      ['Plataforma', 'Streams', 'Moeda', 'Valor'],
+    ]
+    for (const x of d.receita.porPlataforma) {
+      const moedas = Object.entries(x.porMoeda).filter(([, val]) => val)
+      if (!moedas.length) {
+        linhasReceita.push([x.nome, v(x.streams), AUSENTE, AUSENTE])
+        continue
+      }
+      // Uma linha POR MOEDA: o painel nunca soma moedas diferentes, e numa
+      // planilha juntar tudo numa coluna só convida exatamente esse erro.
+      for (const [moeda, val] of moedas) linhasReceita.push([x.nome, v(x.streams), moeda, val])
+    }
+    abas.push({
+      nome: 'Receita',
+      larguras: [28, 14, 10, 16],
+      formatos: { 3: '#,##0.00' },
+      linhas: [
+        ['Período', d.receita.periodo, '', ''],
+        ['ATENÇÃO', 'valores separados por moeda — não some moedas diferentes', '', ''],
+        [],
+        ...linhasReceita,
+      ],
+    })
+  }
+
+  abas.push({
+    nome: 'Como ler',
+    larguras: [100],
+    linhas: [
+      ['Como ler esta planilha'],
+      [],
+      ['"não medido" NÃO é zero. O dado não foi coletado — o artista pode ter público naquela rede,'],
+      ['só não temos a medição. Não trate como ausência de resultado, e não substitua por zero.'],
+      [],
+      ['Cada linha traz a janela de tempo e a fonte na última coluna. Não compare números de'],
+      ['janelas diferentes entre si.'],
+      [],
+      ['Taxa de pulo e cobertura são guardadas como fração de 0 a 1 e já chegam formatadas como'],
+      ['porcentagem. O valor por trás continua sendo a fração, então cálculos em cima dela funcionam.'],
+      [],
+      ['Os índices IGE e Health Score são metodologia própria da Imagine e não são públicos.'],
+      ['O estágio de carreira da Soundcharts é de escala global e mede outra coisa.'],
+      [],
+      [`Exportado do Painel Imagine em ${geradoEm.toLocaleString('pt-BR')}.`],
+    ],
+  })
+
+  return abas
 }

@@ -1,11 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Download, Loader2, X } from 'lucide-react'
+import { Check, Copy, FileSpreadsheet, Loader2, X } from 'lucide-react'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
 import { getArtista, getProjeto, type ArtistaDoc, type ProjetoDoc } from '@/lib/artistas/client'
-import { montarExportacao, nomeDoArquivo, type DadosExportacao } from '@/lib/artistas/exportar'
+import {
+  montarExportacao,
+  montarPlanilha,
+  nomeDoArquivo,
+  type DadosExportacao,
+} from '@/lib/artistas/exportar'
 import { getMetricasSociaisCached, getStreamingDetalhe } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc, StreamingDetalheDoc } from '@/lib/metricas-sociais/types'
 import { getDiagnostico, type DiagnosticoDoc } from '@/lib/diagnostico/client'
@@ -18,18 +23,17 @@ import { derivarHealthScores } from '@/lib/health/score'
 import { cn } from '@/lib/utils'
 
 /**
- * Exporta o perfil do artista em Markdown, para a equipe colar numa IA e pedir
- * análise.
+ * Exporta o perfil do artista, em duas saídas para dois usos.
  *
- * Duas escolhas que valem registro:
+ * COPIAR põe o Markdown na área de transferência, para colar num assistente de
+ * IA e pedir análise — foi o pedido original da cliente, e por isso é o botão
+ * em destaque. BAIXAR gera a planilha, para quem vai abrir no Excel, filtrar e
+ * fazer gráfico. As duas saem dos mesmos dados.
  *
- * COPIAR vem antes de BAIXAR. O uso real é colar num chat — baixar arquivo só
- * para depois abrir e copiar é um passo a mais para o caso mais comum.
- *
- * A RECEITA é opcional e entra DESMARCADA. Estes dados vão para uma IA de
+ * A RECEITA é opcional e entra DESMARCADA. Estes dados podem ir para uma IA de
  * terceiro, e faturamento não deve viajar junto por descuido. Quem não tem a
  * permissão de receita não vê nem a opção — a fronteira do painel vale aqui
- * igual.
+ * igual. Ela também só é buscada quando alguém marca.
  */
 export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
   const { pode } = useAuth()
@@ -38,6 +42,7 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
   const [incluirReceita, setIncluirReceita] = useState(false)
   const [receita, setReceita] = useState<DadosExportacao['receita']>(null)
   const [carregandoReceita, setCarregandoReceita] = useState(false)
+  const [baixando, setBaixando] = useState(false)
   const [copiado, setCopiado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [base, setBase] = useState<{
@@ -160,8 +165,9 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
     }
   }, [incluirReceita, receita, carregandoReceita, slug])
 
-  const markdown = useMemo(() => {
-    if (!base) return ''
+  /** Os dados reunidos, uma vez — o Markdown e a planilha saem dos MESMOS. */
+  const dados = useMemo<DadosExportacao | null>(() => {
+    if (!base) return null
     const m = base.metricas
     const audiencia = calcularAudiencia({
       instagram: m?.instagram?.seguidores ?? null,
@@ -208,7 +214,7 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
       }
     }
 
-    return montarExportacao({
+    return {
       artista: base.artista,
       metricas: base.metricas,
       projeto: base.projeto,
@@ -220,8 +226,10 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
       diagnosticos: base.diagnosticos,
       // Só entra com permissão E opção marcada — ver o docblock.
       receita: podeReceita && incluirReceita ? receita : null,
-    })
+    }
   }, [base, slug, podeReceita, incluirReceita, receita])
+
+  const markdown = useMemo(() => (dados ? montarExportacao(dados) : ''), [dados])
 
   const copiar = useCallback(async () => {
     try {
@@ -229,19 +237,41 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
       setCopiado(true)
       setTimeout(() => setCopiado(false), 2000)
     } catch {
-      setErro('O navegador bloqueou a cópia. Use "Baixar .md".')
+      setErro('O navegador bloqueou a cópia. Use "Baixar planilha".')
     }
   }, [markdown])
 
-  const baixar = useCallback(() => {
-    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = nomeDoArquivo(slug)
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [markdown, slug])
+  /**
+   * Baixa a planilha. O SheetJS entra por import dinâmico: ele já é dependência
+   * do projeto (o importador de receita usa), mas é grande, e não deve pesar o
+   * carregamento do perfil de quem nunca clica aqui.
+   */
+  const baixar = useCallback(async () => {
+    if (!dados) return
+    setBaixando(true)
+    try {
+      const XLSX = await import('xlsx')
+      const wb = XLSX.utils.book_new()
+      for (const aba of montarPlanilha(dados)) {
+        const ws = XLSX.utils.aoa_to_sheet(aba.linhas)
+        ws['!cols'] = aba.larguras.map((wch) => ({ wch }))
+        // Formato por coluna: a célula guarda a fração, mas chega legível.
+        for (const [col, formato] of Object.entries(aba.formatos ?? {})) {
+          for (let linha = 1; linha < aba.linhas.length; linha++) {
+            const ref = XLSX.utils.encode_cell({ r: linha, c: Number(col) })
+            const celula = ws[ref]
+            if (celula && typeof celula.v === 'number') celula.z = formato
+          }
+        }
+        XLSX.utils.book_append_sheet(wb, ws, aba.nome)
+      }
+      XLSX.writeFile(wb, nomeDoArquivo(slug, 'xlsx'))
+    } catch {
+      setErro('Não foi possível gerar a planilha.')
+    } finally {
+      setBaixando(false)
+    }
+  }, [dados, slug])
 
   return (
     <div
@@ -301,11 +331,16 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
           <button
             type="button"
             onClick={baixar}
-            disabled={!base}
+            disabled={!base || baixando}
+            title="Planilha com abas de resumo, faixas e como ler os dados"
             className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-bg-700/60 text-ink-300 hover:text-ink-100 hover:border-bg-600 disabled:opacity-50 transition-colors"
           >
-            <Download className="w-3.5 h-3.5" aria-hidden />
-            Baixar .md
+            {baixando ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+            ) : (
+              <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden />
+            )}
+            {baixando ? 'Gerando…' : 'Baixar planilha'}
           </button>
           <button
             type="button"

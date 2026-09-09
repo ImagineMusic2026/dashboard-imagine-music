@@ -14,8 +14,8 @@ Os dois medem coisas diferentes e a metodologia separou de propósito: o IGE res
 | Componente | Peso | Origem | Situação |
 | --- | --- | --- | --- |
 | Audiência ajustada | 35% | Instagram + TikTok + YouTube (painel) | Ativo |
-| Consumo musical e audiovisual | 45% | Spotify monthly listeners + YouTube views/28d | Fonte disponível ([[04 - Dados e integrações/Soundcharts]]) |
-| Airplay | 5% | Execuções em rádio/28d | Fonte disponível, mas rasa — ver abaixo |
+| Consumo musical e audiovisual | 45% | Spotify monthly listeners ([[04 - Dados e integrações/Soundcharts]]) + YouTube views/28d | Ativo, após consultar |
+| Airplay | 5% | Execuções em rádio/28d ([[04 - Dados e integrações/Soundcharts]]) | Ativo, mas raso — ver abaixo |
 | Mercado ao vivo | 15% | Declaração da equipe | Ativo |
 
 Os pesos **não são os da v1.2**, que fixa 30/40/20/10. A revisão foi aprovada pela Imagine em 09/09/2026 e está explicada na seção do airplay.
@@ -24,11 +24,11 @@ Faixas do estágio: Pré-descoberta < 20 · Descoberta 20–39,99 · Desenvolvim
 
 ## Cobertura e provisoriedade
 
-Sem o Soundcharts ligado, a cobertura máxima é de **50%** (audiência 35% + mercado ao vivo 15%) — era 40% antes da revisão de pesos. O [[04 - Dados e integrações/Soundcharts]] cobre os quatro componentes e o acesso já foi confirmado, sem custo adicional — mas **a ligação com o painel ainda não foi construída**, então a cobertura segue em 50% na prática.
+Sem o Soundcharts ligado, a cobertura máxima é de **50%** (audiência 35% + mercado ao vivo 15%) — era 40% antes da revisão de pesos. Com o [[04 - Dados e integrações/Soundcharts]] ligado (09/09/2026), a cobertura fecha em 100% para quem já foi consultado. Antes da primeira consulta o artista segue nos 50%, porque consumo e airplay só existem depois que alguém pede — a consulta é sob demanda, por decisão da cliente.
 
 O painel calcula o índice **sobre a cobertura disponível** e mostra três coisas juntas: o percentual coberto, a marca "provisório" e um ND em cada dimensão ausente. Nada é redistribuído em silêncio — a metodologia proíbe o silêncio, não a renormalização declarada.
 
-A marca de provisório continua valendo, mas o motivo mudou. Não é mais falta de dado; é falta das faixas que convertem o dado em nota.
+Duas coisas diferentes deixam o índice provisório hoje: o artista ainda não ter sido consultado (resolve com um clique) e as faixas de conversão seguirem pendentes de homologação (depende da Imagine).
 
 Zerar o ausente seria pior: na simulação sobre o roster (04/09/2026), um artista de 4,9 milhões de audiência cairia em "Descoberta".
 

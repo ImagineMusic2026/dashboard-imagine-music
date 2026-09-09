@@ -9,15 +9,21 @@ plataforma: Soundcharts
 
 É a fonte que faltava para o [[03 - Artistas/Estágio (IGE)]]. Fecha consumo (40% do índice) e airplay (20%), e ainda reforça audiência e mercado ao vivo. Sem ela, o IGE nunca passava de 40% de cobertura.
 
-## Estado: acesso confirmado, ligação não construída
+## Como a consulta acontece
 
-Em 09/09/2026 o acesso foi provado por linha de comando — autentica, responde e devolve os dados dos quatro componentes. **O painel ainda não consulta a Soundcharts.** Não há rota, não há botão, e o card de Estágio continua exibindo 60% do índice como dependente dela. O que existe no produto é um campo onde a equipe digita o ID do artista à mão.
+Sob demanda, num botão dentro do card de Estágio do perfil do artista — **não** há sincronização noturna. A decisão veio da cliente, em 08/09/2026: ela só precisa do dado na hora de gerar o diagnóstico e não quer nada consultando o tempo todo.
 
-Enquanto isso não mudar, dizer que "a consulta acontece sob demanda" é descrever o desenho decidido, não o comportamento atual.
+Cada clique traz ouvintes mensais, airplay e o estágio de carreira, e guarda **quando foi consultado**. A data aparece na tela por um motivo: sem ela, um número de três meses atrás passaria por atual.
 
-## Como a consulta vai acontecer
+Artista nunca consultado aparece com consumo e airplay em branco, e o Estágio sai marcado como provisório — o painel não inventa número para dimensão que ninguém mediu.
 
-Sob demanda, no momento em que alguém pede o diagnóstico — **não** haverá sincronização noturna. A decisão veio da cliente, em 08/09/2026: ela só precisa do dado na hora de gerar o diagnóstico e não quer nada consultando o tempo todo.
+## Onde o resultado fica guardado
+
+Em `projetos/{slug}`, junto do mercado ao vivo, e **não** no documento de métricas sociais. O motivo é de fronteira, não de organização: o documento de métricas é legível pelo próprio artista no portal, e a consulta carrega o estágio de carreira que a Soundcharts atribui — julgamento de porte é leitura da equipe.
+
+A regra do Firestore vale por documento e não esconde campo, então esconder o dado só no componente não bastaria. Foi o mesmo raciocínio que levou o patrimônio para uma subcoleção própria; ver [[06 - Tecnologia/Rotas e fronteiras de acesso]].
+
+Não custa leitura nova: o card de Estágio já pedia esse documento para o mercado ao vivo.
 
 Isso simplifica muito. Não existe rotina agendada, coleção nova nem acúmulo de histórico: o painel pergunta, recebe, grava o resultado junto do diagnóstico e para por aí. Cada consulta guarda **quando foi consultada**, para que um estágio antigo não seja lido como atual.
 
@@ -59,8 +65,18 @@ A credencial é técnica, do tipo próprio para sistemas, criada uma única vez 
 
 O plano tem um assento de usuário só. Convidar mais gente pode gerar cobrança na conta da cliente e não deve ser feito sem autorização dela.
 
+## O que compõe o consumo
+
+A metodologia soma ouvintes mensais do Spotify com views do YouTube em 28 dias. A Soundcharts entrega a primeira parte; a segunda vem da integração de YouTube do próprio painel, porque a Soundcharts não tem canal vinculado para os artistas daqui.
+
+Quando nenhuma das duas partes existe, o consumo fica em branco e o componente sai como não medido. Somar só metade e chamar aquilo de consumo seria pior do que não medir — um artista com YouTube conectado pareceria muito maior que outro sem, por diferença de coleta e não de tamanho.
+
 ## Conferência
 
 Existem duas verificações prontas: uma que confirma se o acesso funciona e lista o que está disponível, e outra que cruza o roster inteiro e devolve o retrato de audiência, airplay e estágio de cada artista. A segunda serve para o dia em que as faixas de corte chegarem — dá para ver em minutos se elas separam o roster ou jogam quase todo mundo no mesmo balde.
+
+## Antes de funcionar em produção
+
+As credenciais precisam entrar como variáveis de ambiente na Vercel. **Variável nova só passa a valer depois de um novo deploy** — salvar não basta, o mesmo tropeço que já aconteceu com o TikTok. Sem elas a consulta responde "não configurado" e o botão mostra o erro em vez de dados.
 
 Veja [[04 - Dados e integrações/Integrações]] e [[03 - Artistas/Estágio (IGE)]].

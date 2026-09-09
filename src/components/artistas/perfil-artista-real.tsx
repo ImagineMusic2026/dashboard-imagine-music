@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, Loader2, Pencil, Star } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Loader2, Pencil, Sparkles, Star } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
@@ -20,6 +20,7 @@ import { ConectarPlataforma } from '@/components/artistas/conectar-plataforma'
 import { ReceitaArtistaCard } from '@/components/artistas/receita-artista-card'
 import { ReceitaGate } from '@/components/auth/receita-gate'
 import { EditarArtistaDialog } from '@/components/artistas/editar-artista-dialog'
+import { ExportarArtistaDialog } from '@/components/artistas/exportar-artista-dialog'
 import { ProjetoArtistaCard } from '@/components/artistas/projeto-artista-card'
 import { ContratosArtistaCard } from '@/components/artistas/contratos-artista-card'
 import { DossieArtistaCard } from '@/components/artistas/dossie-artista-card'
@@ -59,6 +60,7 @@ export function PerfilArtistaReal({
   const podeEditar = role !== 'artista' && pode('editarArtistas')
   const [estado, setEstado] = useState<EstadoReal>({ st: 'load' })
   const [editando, setEditando] = useState(false)
+  const [exportando, setExportando] = useState(false)
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
@@ -179,6 +181,16 @@ export function PerfilArtistaReal({
               <Pencil className="w-3.5 h-3.5" /> Editar
             </button>
           )}
+          {podeEditar && (
+            <button
+              type="button"
+              onClick={() => setExportando(true)}
+              title="Reúne os dados deste artista em texto, para colar num assistente de IA"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Exportar
+            </button>
+          )}
         </div>
       </div>
 
@@ -260,6 +272,10 @@ export function PerfilArtistaReal({
           onSaved={() => setNonce((n) => n + 1)}
           onDeleted={() => router.push('/artistas')}
         />
+      )}
+
+      {exportando && podeEditar && (
+        <ExportarArtistaDialog slug={a.slug} onClose={() => setExportando(false)} />
       )}
     </div>
   )

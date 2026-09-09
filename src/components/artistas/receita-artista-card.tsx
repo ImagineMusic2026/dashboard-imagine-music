@@ -335,13 +335,16 @@ export function ReceitaArtistaCard({
         </div>
       )}
 
-      <div className="px-5 py-3 border-t border-bg-700/30 flex items-center justify-between">
+      {/* Nada de "Exportar relatório completo" aqui: era um `span` sem ação, com
+          cara de botão, prometendo algo que não existia. A exportação de verdade
+          mora no botão "Exportar" do topo do perfil, e sai em Markdown para IA.
+          O rodapé sem importação também não inventa mais data de coleta. */}
+      <div className="px-5 py-3 border-t border-bg-700/30">
         <div className="text-[11px] text-ink-500 num">
           {real
             ? `Importação selecionada · ${real.streams.toLocaleString('pt-BR')} streams no período`
-            : 'Última atualização DDEX: 02/05/2026 02:14 · próxima coleta: em 14h'}
+            : 'Nenhuma importação de receita para este artista ainda.'}
         </div>
-        <span className="text-violet-400/60 text-sm">Exportar relatório completo ↓</span>
       </div>
     </div>
   )

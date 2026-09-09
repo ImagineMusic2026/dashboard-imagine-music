@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Disc3, ExternalLink, Eye, Loader2, Pencil, Plus, Search, Trash2, Video } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
+import { getArtista } from '@/lib/artistas/client'
 import { PlataformaIcon } from '@/components/artistas/plataforma-icon'
 import { ehStaff } from '@/lib/permissions'
 import { FonogramaDialog } from '@/components/artistas/fonograma-dialog'
@@ -44,6 +45,8 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
   const staff = !loading && ehStaff(role)
   const podeEditar = staff && pode('editarArtistas')
   const [faixas, setFaixas] = useState<Fonograma[] | null>(null)
+  const [contagem, setContagem] = useState<number | null>(null)
+  const [carregandoFaixas, setCarregandoFaixas] = useState(false)
   const [tiktok, setTiktok] = useState<TikTokDoArtista | null>(null)
   const [expandido, setExpandido] = useState(false)
   const [busca, setBusca] = useState('')
@@ -51,23 +54,36 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
   const [removendo, setRemovendo] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
+    setCarregandoFaixas(true)
     try {
       setFaixas(await listarFonogramas(slug))
     } catch {
-      // Sem permissão / offline: o card some em vez de sujar o perfil com erro.
+      // Sem permissão / offline: fica sem lista, mas o card não some — o
+      // contador já disse que existe obra.
       setFaixas(null)
+    } finally {
+      setCarregandoFaixas(false)
     }
   }, [slug])
 
   useEffect(() => {
     if (!staff) return
-    carregar()
+    /*
+     * O contador vem do campo DESNORMALIZADO em `artistas/{slug}`, que o perfil
+     * já leu e cacheou — custa zero leitura nova. A LISTA de faixas só carrega
+     * quando alguém pede: para o maior artista do roster são 309 documentos, e
+     * pagá-los em toda abertura de perfil era 42% do custo da tela inteira
+     * (740 leituras, medido em `scripts/medir-leituras-perfil.mjs`).
+     */
+    getArtista(slug)
+      .then((a) => setContagem(a?.fonogramas ?? null))
+      .catch(() => setContagem(null))
     // Um doc só, com o TikTok de TODAS as faixas do artista. Falha ou ausência
     // (a OneRPM só publica isto desde 07/08) some sem quebrar a lista.
     getTikTokDoArtista(slug)
       .then(setTiktok)
       .catch(() => setTiktok(null))
-  }, [staff, slug, carregar])
+  }, [staff, slug])
 
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase()
@@ -80,7 +96,7 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
     )
   }, [faixas, busca])
 
-  if (!staff || faixas === null) return null
+  if (!staff) return null
 
   async function remover(f: Fonograma) {
     setRemovendo(f.isrc)
@@ -92,6 +108,10 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
     }
   }
 
+  // Total conhecido: a lista quando já foi carregada, senão o contador
+  // desnormalizado. Os dois são o mesmo número; o segundo custa zero leitura.
+  const total = faixas?.length ?? contagem ?? 0
+
   const visiveis = expandido || busca.trim() ? filtradas : filtradas.slice(0, PREVIA)
   const ocultas = filtradas.length - visiveis.length
 
@@ -101,7 +121,7 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
         <Disc3 className="w-4 h-4 text-violet-400 shrink-0" />
         <span className="font-bold text-ink-100">Fonogramas</span>
         <span className="text-[10px] num bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded font-semibold">
-          {faixas.length}
+          {total}
         </span>
 
         {/* Resumo do TikTok do artista. Só aparece quando o feed já cobriu ele —
@@ -121,7 +141,7 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
           </Link>
         )}
 
-        {faixas.length >= MIN_BUSCA && (
+        {faixas !== null && total >= MIN_BUSCA && (
           <div className="relative ml-auto">
             <Search
               className="w-3.5 h-3.5 text-ink-500 absolute left-2.5 top-1/2 -translate-y-1/2"
@@ -144,7 +164,7 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
             onClick={() => setDialogo({ modo: 'novo' })}
             className={cn(
               'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-xs font-semibold transition-colors',
-              faixas.length < MIN_BUSCA && 'ml-auto',
+              total < MIN_BUSCA && 'ml-auto',
             )}
           >
             <Plus className="w-3.5 h-3.5" /> Nova
@@ -152,11 +172,30 @@ export function FonogramasArtistaCard({ slug }: { slug: string }) {
         )}
       </div>
 
-      {faixas.length === 0 ? (
+      {total === 0 ? (
         <div className="p-8 text-center text-sm text-ink-500">
           Nenhum fonograma atribuído a este artista. O catálogo da OneRPM usa a grafia do
           feed de distribuição, que nem sempre bate com o nome cadastrado aqui — o que
           faltar pode ser cadastrado à mão.
+        </div>
+      ) : faixas === null ? (
+        /* A lista não vem junto com o perfil de propósito — ver a nota no efeito
+           acima. Aqui o card já sabe QUANTAS faixas existem e só busca quais
+           quando alguém pede. */
+        <div className="p-6 text-center">
+          <button
+            type="button"
+            onClick={carregar}
+            disabled={carregandoFaixas}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-800 hover:bg-bg-700 border border-bg-700/50 text-ink-200 hover:text-ink-100 text-sm font-semibold transition-colors disabled:opacity-50"
+          >
+            {carregandoFaixas ? (
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+            ) : (
+              <Eye className="w-4 h-4" aria-hidden />
+            )}
+            {carregandoFaixas ? 'Carregando…' : `Ver as ${total} faixas`}
+          </button>
         </div>
       ) : filtradas.length === 0 ? (
         <div className="p-8 text-center text-sm text-ink-500">Nenhuma faixa com esse termo.</div>

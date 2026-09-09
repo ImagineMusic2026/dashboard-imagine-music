@@ -29,15 +29,16 @@
  * 15% de propósito: é declaratório e a Soundcharts não corrobora (tem show
  * registrado para 2 dos 97), então não podia virar o segundo maior peso.
  *
- * ⚠️ HOJE só 50% é apurável: consumo e airplay dependem do Soundcharts, cujo
- * ACESSO está confirmado mas a ligação com o painel ainda não foi construída.
- * Por isso o índice SEMPRE carrega a cobertura junto, e o Estágio sai marcado
- * como provisório enquanto ela não fechar em 100%.
+ * Consumo e airplay vêm da Soundcharts, consultada SOB DEMANDA (o botão no card
+ * de Estágio) e guardada em `projetos/{slug}.soundcharts`. Artista nunca
+ * consultado sai com os dois ND — o índice então carrega a cobertura junto e o
+ * Estágio vai marcado como provisório, em vez de fingir completude.
  *
- * O que FALTA é o dado, não a régua: as faixas que convertem ouvintes e
- * execuções em nota estão em `FAIXAS_CONSUMO` e `FAIXAS_AIRPLAY`, calibradas
- * por nós e pendentes de homologação. A de airplay já se sabe errada por ordens
- * de grandeza para este roster — o maior artista tiraria 20 de 100.
+ * ⚠️ As faixas que convertem ouvintes e execuções em nota (`FAIXAS_CONSUMO` e
+ * `FAIXAS_AIRPLAY`) foram calibradas por nós e seguem pendentes de homologação.
+ * A de airplay já se sabe errada por ordens de grandeza para este roster: o
+ * maior artista tiraria 20 de 100. Trocar é editar as duas tabelas, nada mais
+ * no cálculo depende dos valores.
  */
 
 export const METODOLOGIA = 'IAOS-DOC-02 v1.2'

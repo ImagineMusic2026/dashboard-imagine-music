@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { invalidarCachesDeLeitura, memoCurta, memoCurtaPorChave } from '@/lib/cache-leitura'
 import type { OneRpmAggregate } from '@/lib/onerpm/types'
+import type { SoundchartsSnapshot } from '@/lib/soundcharts/tipos'
 import type {
   CrescimentoDigital,
   ExpansaoMercado,
@@ -115,6 +116,18 @@ export interface ProjetoDoc {
     /** Observação livre da equipe sobre a classificação. */
     observacao?: string | null
   }
+
+  /**
+   * Última consulta à Soundcharts — consumo e airplay do IGE.
+   *
+   * Mora aqui, e NÃO em `metricas-sociais/{slug}`, pelo mesmo motivo do mercado
+   * ao vivo: aquele documento é legível pelo próprio artista no portal, e isto
+   * carrega o estágio de carreira que a Soundcharts atribui ("long_tail" para 86
+   * dos 97 do roster). Julgamento de porte é leitura da equipe. Regra do
+   * Firestore é por DOCUMENTO e não esconde campo — esconder no componente não
+   * bastaria. Aqui não custa leitura nova: o card de Estágio já pede este doc.
+   */
+  soundcharts?: SoundchartsSnapshot | null
 
   /* ── Dossiê das alavancas estratégicas (ver `@/lib/artistas/dossie`) ─────
    *

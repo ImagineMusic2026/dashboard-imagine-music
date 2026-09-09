@@ -1,13 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, Compass, Info, Pencil } from 'lucide-react'
+import { ChevronDown, Compass, Info, Pencil, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
+import { auth } from '@/lib/firebase'
 import { MercadoAoVivoDialog } from '@/components/artistas/mercado-ao-vivo-dialog'
 import { ehStaff } from '@/lib/permissions'
 import { getProjeto, type ProjetoDoc } from '@/lib/artistas/client'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import { getMetricasSociaisCached } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
+import type { SoundchartsSnapshot } from '@/lib/soundcharts/tipos'
 import {
   ESTAGIOS,
   calcularAudiencia,
@@ -31,11 +34,13 @@ import { cn } from '@/lib/utils'
  * está para essa escala". A v1.2 separou os dois justamente para não confundir
  * porte com desempenho.
  *
- * ⚠️ Enquanto o Soundcharts não estiver integrado, 50% do índice (consumo e
- * airplay) é ND. O card NÃO esconde isso: mostra a cobertura, marca o estágio
- * como provisório e lista cada dimensão que falta. Um número redondo aqui, sem a
- * cobertura ao lado, viraria decisão errada — a simulação sobre o roster mostrou
- * artista indo de "Descoberta" a "Mainstream" só conforme a leitura do ausente.
+ * Consumo e airplay chegam pela Soundcharts, no botão daqui — a consulta é sob
+ * demanda por pedido da cliente, não por rotina. Antes da primeira consulta os
+ * dois saem ND (50% do índice), e o card NÃO esconde isso: mostra a cobertura,
+ * marca o estágio como provisório e lista cada dimensão que falta. Um número
+ * redondo aqui, sem a cobertura ao lado, viraria decisão errada — a simulação
+ * sobre o roster mostrou artista indo de "Descoberta" a "Mainstream" só conforme
+ * a leitura do ausente.
  *
  * ⚠️ SÓ STAFF: este componente vive dentro de `PerfilArtistaReal`, que o portal
  * do artista renderiza igual, e o mercado ao vivo é classificação da equipe.
@@ -49,6 +54,8 @@ export function EstagioArtistaCard({ slug, nome }: { slug: string; nome: string 
   const [projeto, setProjeto] = useState<ProjetoDoc | null>(null)
   const [carregado, setCarregado] = useState(false)
   const [dialogo, setDialogo] = useState(false)
+  const [consultando, setConsultando] = useState(false)
+  const [erroConsulta, setErroConsulta] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
     const [m, p] = await Promise.all([
@@ -65,6 +72,34 @@ export function EstagioArtistaCard({ slug, nome }: { slug: string; nome: string 
     carregar()
   }, [staff, carregar])
 
+  /**
+   * Consulta a Soundcharts agora. É o "gerar diagnóstico" pedido pela Imagine:
+   * a consulta acontece no clique, não numa rotina — cada uma gasta ~4 das 10
+   * mil requisições mensais do time.
+   */
+  const consultarSoundcharts = useCallback(async () => {
+    setConsultando(true)
+    setErroConsulta(null)
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+      const res = await fetch(`/api/artistas/${slug}/soundcharts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error ?? 'Não foi possível consultar a Soundcharts.')
+      // A rota acabou de reescrever `projetos/{slug}`; sem derrubar o cache o
+      // `carregar` devolveria o valor de antes e o botão pareceria não ter feito nada.
+      invalidarCachesDeLeitura()
+      await carregar()
+    } catch (e) {
+      setErroConsulta(e instanceof Error ? e.message : 'Não foi possível consultar a Soundcharts.')
+    } finally {
+      setConsultando(false)
+    }
+  }, [slug, carregar])
+
   if (!staff || !carregado) return null
 
   const yt = metricas?.youtube
@@ -74,11 +109,21 @@ export function EstagioArtistaCard({ slug, nome }: { slug: string; nome: string 
     youtube: yt && !yt.inscritosOcultos ? (yt.inscritos ?? null) : null,
   })
   const mercado = projeto?.mercadoAoVivo ?? null
-  const resultado = calcularIge(montarComponentes({ audiencia, mercadoAoVivo: mercado }))
+  const sc = projeto?.soundcharts ?? null
+  const resultado = calcularIge(
+    montarComponentes({
+      audiencia,
+      mercadoAoVivo: mercado,
+      consumo: sc?.consumo ?? null,
+      airplay: sc ? sc.airplay28d : null,
+    }),
+  )
 
-  // Sem audiência e sem declaração não há o que mostrar — o card some em vez de
-  // exibir um estágio construído do nada.
-  if (resultado.ige == null) return null
+  // Sem nenhum componente medido não há estágio a mostrar — o card não inventa
+  // um número. Some de vez só para quem não pode consultar: para quem pode, ele
+  // fica como convite, senão o artista sem métrica nenhuma nunca teria por onde
+  // começar (o botão vive dentro deste card).
+  if (resultado.ige == null && !podeDeclarar) return null
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
@@ -93,15 +138,32 @@ export function EstagioArtistaCard({ slug, nome }: { slug: string; nome: string 
       </div>
 
       <div className="p-5 space-y-5">
-        <Cabecalho resultado={resultado} />
-        <Cobertura resultado={resultado} />
-        <Componentes
-          resultado={resultado}
-          audiencia={audiencia}
-          mercado={mercado}
-          podeDeclarar={podeDeclarar}
-          onDeclarar={() => setDialogo(true)}
-        />
+        {resultado.ige == null ? (
+          <p className="text-sm text-ink-500">
+            Nenhum componente medido ainda. Consulte a Soundcharts para trazer consumo e airplay, ou
+            declare o mercado ao vivo.
+          </p>
+        ) : (
+          <>
+            <Cabecalho resultado={resultado} />
+            <Cobertura resultado={resultado} />
+            <Componentes
+              resultado={resultado}
+              audiencia={audiencia}
+              mercado={mercado}
+              podeDeclarar={podeDeclarar}
+              onDeclarar={() => setDialogo(true)}
+            />
+          </>
+        )}
+        {podeDeclarar && (
+          <Soundcharts
+            dados={sc}
+            consultando={consultando}
+            erro={erroConsulta}
+            onConsultar={consultarSoundcharts}
+          />
+        )}
         {resultado.estagio && metricas && (
           <PreviaHealthV12 doc={metricas} slug={slug} nome={nome} estagio={resultado.estagio} />
         )}
@@ -424,4 +486,95 @@ function listar(itens: string[]): string {
 function dataCurta(iso: string): string {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('pt-BR')
+}
+
+/**
+ * Consulta sob demanda à Soundcharts — o "gerar diagnóstico" que a Imagine
+ * pediu. Mostra SEMPRE a data da consulta: sem ela, um número de três meses
+ * atrás passaria por atual, que é o erro que o carimbo existe para evitar.
+ */
+function Soundcharts({
+  dados,
+  consultando,
+  erro,
+  onConsultar,
+}: {
+  dados: SoundchartsSnapshot | null
+  consultando: boolean
+  erro: string | null
+  onConsultar: () => void
+}) {
+  const num = (n: number | null | undefined) =>
+    n == null ? '—' : n.toLocaleString('pt-BR')
+
+  return (
+    <div className="rounded-lg border border-bg-700/40 bg-bg-950/40 p-3.5">
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <span className="text-[11px] font-semibold text-ink-400">Soundcharts</span>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={onConsultar}
+          disabled={consultando}
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-violet-500/15 text-violet-300 border border-violet-500/25 hover:bg-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <RefreshCw className={cn('w-3 h-3', consultando && 'animate-spin')} aria-hidden />
+          {consultando ? 'Consultando…' : dados ? 'Consultar de novo' : 'Consultar agora'}
+        </button>
+      </div>
+
+      {erro && <p className="text-[11px] text-rose-300 mb-2">{erro}</p>}
+
+      {!dados ? (
+        <p className="text-[11px] text-ink-500">
+          Consumo e airplay saem daqui. A consulta só acontece quando você pede.
+        </p>
+      ) : (
+        <>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+            <dt className="text-ink-500">Ouvintes mensais</dt>
+            <dd className="num text-ink-200 text-right">{num(dados.ouvintesSpotify)}</dd>
+            <dt className="text-ink-500">Views YouTube/28d</dt>
+            <dd className="num text-ink-200 text-right">{num(dados.youtubeViews)}</dd>
+            <dt className="text-ink-500">Airplay/28d</dt>
+            <dd className="num text-ink-200 text-right">
+              {num(dados.airplay28d)}
+              {dados.airplayEmissoras28d > 0 && (
+                <span className="text-ink-600"> · {dados.airplayEmissoras28d} emissoras</span>
+              )}
+            </dd>
+            <dt className="text-ink-500">Airplay/12 meses</dt>
+            <dd className="num text-ink-200 text-right">{num(dados.airplay365d)}</dd>
+          </dl>
+
+          {/* Airplay de 28 dias zerado com 12 meses positivo não é ausência de
+              rádio: é a janela curta não pegando. Dizer isso evita a leitura errada. */}
+          {dados.airplay28d === 0 && dados.airplay365d > 0 && (
+            <p className="text-[11px] text-ink-500 mt-2">
+              Sem execução nos últimos 28 dias, mas {num(dados.airplay365d)} no ano — a janela da
+              metodologia é curta para o volume deste roster.
+            </p>
+          )}
+
+          {dados.resolvidoPor === 'nome' && (
+            <div className="flex items-start gap-2 mt-2 text-[11px] text-amber-300/90">
+              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
+              <p>
+                Artista encontrado por nome
+                {dados.resultadosDaBusca && dados.resultadosDaBusca > 1
+                  ? `, entre ${dados.resultadosDaBusca.toLocaleString('pt-BR')} resultados`
+                  : ''}
+                . Pode ser homônimo — cadastrar o Spotify do artista torna a consulta exata.
+              </p>
+            </div>
+          )}
+
+          <p className="text-[10px] text-ink-600 mt-2">
+            Consultado em {dataCurta(dados.consultadoEm)}
+            {dados.careerStage ? ` · estágio global: ${dados.careerStage}` : ''}
+          </p>
+        </>
+      )}
+    </div>
+  )
 }

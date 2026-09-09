@@ -28,3 +28,4 @@ tipo: arquitetura
 - Nenhuma credencial deve entrar neste cofre.
 - Permissões são verificadas na interface, nas rotas internas e nas regras do Firestore.
 - Métricas e listas usam cache de leitura; escritas/importações devem invalidá-lo.
+- Cada tela tem um custo em leituras do Firestore, e o orçamento diário é finito — ver [[06 - Tecnologia/Custo de leitura do Firestore]].

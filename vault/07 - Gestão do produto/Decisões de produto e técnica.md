@@ -6,6 +6,30 @@ tipo: registro-de-decisoes
 
 Registre aqui decisões que evitam rediscussão no futuro. Cada nova entrada deve ter data, contexto, decisão, motivo e consequência.
 
+## 2026-09-09 — Perfil do artista em abas, montando só a aberta
+
+**Decisão:** o perfil deixa de ser uma rolagem com dezesseis cards e passa a ter cinco abas, com apenas a aba ativa montada.
+
+**Motivo:** custo, não estética. Cada card lê os próprios dados e a conta está no plano gratuito. Abrir o perfil do maior artista custava 740 leituras; com os fonogramas sob demanda caiu para 431, e com as abas para 82. Esconder com CSS não resolveria — o componente monta e lê igual.
+
+**Consequência:** alertas e o comparativo apontam para cards que podem estar em outra aba, então a navegação passa a trocar de aba, expandir e rolar, nessa ordem. "O que merece atenção" fica na primeira aba de propósito: é o único bloco que avisa antes de alguém procurar. Ver [[06 - Tecnologia/Custo de leitura do Firestore]] e [[03 - Artistas/Perfil do artista]].
+
+## 2026-09-09 — Exportação em texto para IA, não em PDF
+
+**Decisão:** a exportação do artista sai em texto estruturado (para colar num assistente) e em planilha (para o Excel). PDF foi descartado.
+
+**Motivo:** o destino define o formato. Paginação e diagramação viram ruído para uma IA, que gasta atenção decifrando a forma em vez do conteúdo. A cliente pediu exatamente para jogar os dados num assistente e pedir análise.
+
+**Consequência:** onde não há medição o documento escreve "não medido" em vez de zero, e todo número carrega a janela e a fonte — sem isso a IA conclui ausência de público a partir de ausência de coleta. Ver [[03 - Artistas/Exportar dados do artista]].
+
+## 2026-09-09 — Artistas das contas irmãs entram pelo critério da conta
+
+**Decisão:** os artistas das contas irmãs da Imagine na OneRPM entram no roster; os performers que só assinam álbum na conta principal, não.
+
+**Motivo:** contar faixas seria o critério errado. Entre quem assina álbum na conta principal sem estar no roster há Maiara & Maraisa, Zé Neto & Cristiano e Tierry — eles assinam porque a faixa é dividida, não porque pertencem ao casting.
+
+**Consequência:** roster de 98 para 110, com 288 faixas que estavam sem dono. Os novos nascem sem redes cadastradas e sem streaming, até as credenciais das contas irmãs chegarem. Ver [[03 - Artistas/Gestão de artistas]].
+
 ## 2026-09-09 — Airplay cai para 5% no IGE, contra a v1.2
 
 **Decisão:** os pesos do índice passam a ser audiência 35%, consumo 45%, mercado ao vivo 15% e airplay 5%. A metodologia v1.2 fixa 30/40/20/10.

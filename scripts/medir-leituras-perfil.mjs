@@ -18,7 +18,22 @@
  * artista) e ~420 são as cinco séries diárias de 90 dias. A 740 por perfil, 68
  * aberturas esgotam a cota do dia.
  *
- * ⚠️ Este script LÊ de verdade, então ele mesmo gasta cota. Rode com parcimônia.
+ * ⚠️ ESTE SCRIPT LÊ DE VERDADE PARA CONTAR — ele mesmo gasta a cota que está
+ * medindo, e o perfil de um artista grande custa ~700 leituras por rodada.
+ *
+ * Em 09/09/2026 eu o rodei cinco vezes seguidas enquanto ajustava a saída e,
+ * somado ao trabalho do dia (importação do catálogo, duas rodadas de atribuição
+ * de fonogramas, levantamento dos 97 artistas na Soundcharts), estourei a cota
+ * diária. O painel ficou sem dados até a virada — o mesmo sintoma do apagão de
+ * agosto, e pela mesma causa.
+ *
+ * Então: rode UMA vez, num artista só, e guarde a saída. Ele serve para
+ * dimensionar uma decisão, não para reexecutar a cada ajuste. Se precisar
+ * comparar antes/depois, compare com o número anotado no topo deste arquivo em
+ * vez de medir de novo.
+ *
+ * A cota zera à meia-noite do horário do Pacífico, que é como o Firebase conta
+ * o dia — não é meia-noite de Brasília.
  */
 import admin from 'firebase-admin'
 import { readFileSync } from 'node:fs'

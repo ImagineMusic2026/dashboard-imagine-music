@@ -26,6 +26,7 @@ tipo: indice
 
 - [[03 - Artistas/Gestão de artistas]]
 - [[03 - Artistas/Perfil do artista]]
+- [[03 - Artistas/Exportar dados do artista]]
 - [[03 - Artistas/Health Score]]
 - [[03 - Artistas/Estágio (IGE)]]
 - [[03 - Artistas/Diagnósticos e questionários]]
@@ -51,6 +52,7 @@ tipo: indice
 - [[05 - Fluxos/Importação de dados]]
 - [[05 - Fluxos/Importação de dados - detalhada]]
 - [[06 - Tecnologia/Arquitetura técnica]]
+- [[06 - Tecnologia/Custo de leitura do Firestore]]
 - [[06 - Tecnologia/Rotas e fronteiras de acesso]]
 - [[06 - Tecnologia/Modelo de dados Firestore]]
 - [[06 - Tecnologia/Coletas e jobs diários]]

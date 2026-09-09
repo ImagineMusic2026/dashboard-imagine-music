@@ -6,6 +6,16 @@ tipo: registro-de-decisoes
 
 Registre aqui decisões que evitam rediscussão no futuro. Cada nova entrada deve ter data, contexto, decisão, motivo e consequência.
 
+## 2026-09-09 — Airplay cai para 5% no IGE, contra a v1.2
+
+**Decisão:** os pesos do índice passam a ser audiência 35%, consumo 45%, mercado ao vivo 15% e airplay 5%. A metodologia v1.2 fixa 30/40/20/10.
+
+**Motivo:** medido no roster real, o airplay a 20% não ordenava ninguém — 15 dos 97 artistas têm execução de rádio em doze meses, 81,6% dela num único artista, e os outros 82 empatavam em zero. Um componente onde 85% do roster empata só subtrai a mesma nota de quase todos. A causa provável é a fonte não monitorar rádio regional do Nordeste, não os artistas não tocarem.
+
+A cliente propôs inverter airplay e mercado ao vivo, ou limitar airplay a 5%. Preferimos a segunda: a Soundcharts tem show registrado para apenas 2 dos 97 artistas, então mercado ao vivo continua sendo dado declaratório sem corroboração externa — a mesma ressalva que a levou a limitá-lo a 10% originalmente. Subiu a 15%, não a 20%.
+
+**Consequência:** um artista com airplay medido e quase nulo perde 2,9 pontos em vez de 12. Sem o Soundcharts ligado, a cobertura máxima do índice sobe de 40% para 50%. As faixas de conversão do airplay continuam erradas por ordens de grandeza — peso menor reduz o estrago, não corrige a causa. Ver [[03 - Artistas/Estágio (IGE)]].
+
 ## 2026-09-09 — Soundcharts consultado sob demanda, sem sincronização
 
 **Decisão:** o painel consulta a Soundcharts no momento em que alguém pede o diagnóstico, e não por rotina agendada. Cada resultado guarda a data em que foi consultado.

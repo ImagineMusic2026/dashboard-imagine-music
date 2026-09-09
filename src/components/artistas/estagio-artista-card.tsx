@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils'
  * está para essa escala". A v1.2 separou os dois justamente para não confundir
  * porte com desempenho.
  *
- * ⚠️ Enquanto o Soundcharts não estiver integrado, 60% do índice (consumo e
+ * ⚠️ Enquanto o Soundcharts não estiver integrado, 50% do índice (consumo e
  * airplay) é ND. O card NÃO esconde isso: mostra a cobertura, marca o estágio
  * como provisório e lista cada dimensão que falta. Um número redondo aqui, sem a
  * cobertura ao lado, viraria decisão errada — a simulação sobre o roster mostrou
@@ -376,7 +376,7 @@ function PreviaHealthV12({
       {aberto && (
         <div className="px-4 pb-4 space-y-3 border-t border-bg-700/30 pt-3">
           <p className="text-[11px] text-ink-500 leading-relaxed">
-            Quatro pilares (a audiência saiu — virou os 30% do índice acima), com faixa esperada e
+            Quatro pilares (a audiência saiu — virou os 35% do índice acima), com faixa esperada e
             peso definidos pelo estágio <strong className="text-ink-300">{ESTAGIOS[estagio].titulo}</strong>. O
             número oficial do painel continua sendo {oficial ? oficial.score : 'o outro'} — esta régua
             só entra no lugar dele quando a Imagine homologar as faixas.

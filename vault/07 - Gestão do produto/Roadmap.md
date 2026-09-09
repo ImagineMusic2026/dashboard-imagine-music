@@ -19,7 +19,7 @@ Nenhum destes avança com desenvolvimento — os três dependem de resposta da c
 
 - [x] **Assinatura do Soundcharts.** Resolvida em 09/09/2026: já vinha inclusa no plano PRO, sem custo adicional, e a consulta acontece sob demanda. Sobre a dúvida do **airplay brasileiro**, a resposta é "parcialmente": cobre emissoras brasileiras, mas em doze meses só 15 dos 97 artistas têm execução registrada, quase toda em duas rádios baianas. Ver [[04 - Dados e integrações/Soundcharts]].
 - [ ] **Faixas de corte da v1.2.** A metodologia diz que consumo vale 40%, mas não diz quantos ouvintes mensais valem 20 e quantos valem 100. **Agora é o único bloqueio do índice** — os dados existem, falta a régua que os converte em nota.
-- [ ] **Peso e faixas do airplay.** Com 85% do roster empatando em zero, o componente de 20% não ordena ninguém, só subtrai de todo mundo. Pergunta de desenho para a Imagine, com dado na mão.
+- [x] **Peso do airplay.** Levado à Imagine com a distribuição medida e resolvido em 09/09/2026: caiu de 20% para 5%, com os pontos indo para audiência (35%) e consumo (45%); mercado ao vivo subiu para 15%. As FAIXAS de airplay seguem pendentes.
 - [ ] **O item 4 do documento de cadastro-base.** O arquivo pula do item 3 para o 5 — resíduo de numeração ou alavanca faltando?
 
 ## Próximas decisões

@@ -8,30 +8,48 @@
  *
  * Quatro componentes ponderados:
  *
- *   audiência ajustada  30%  Instagram + TikTok + YouTube (painel)
- *   consumo             40%  Spotify monthly listeners + YouTube views/28d (Soundcharts)
- *   airplay             20%  execuções em rádio/28d (Soundcharts)
- *   mercado ao vivo     10%  classificação declarada pela equipe
+ *   audiência ajustada  35%  Instagram + TikTok + YouTube (painel)
+ *   consumo             45%  Spotify monthly listeners + YouTube views/28d (Soundcharts)
+ *   airplay              5%  execuções em rádio/28d (Soundcharts)
+ *   mercado ao vivo     15%  classificação declarada pela equipe
  *
- * ⚠️ HOJE só 40% é apurável: consumo e airplay dependem do Soundcharts, que ainda
- * não está integrado. Por isso o índice SEMPRE carrega a cobertura junto, e o
- * Estágio sai marcado como provisório enquanto ela não fechar em 100%.
+ * ⚠️ DESVIO APROVADO em 2026-09-09 — a v1.2 fixa 30/40/20/10. Medimos o roster
+ * na Soundcharts e o airplay a 20% não ordenava nada: só 15 de 97 artistas têm
+ * execução de rádio em 12 meses, 82% dela concentrada num único artista, e os
+ * outros 82 empatavam em zero. Um componente onde 85% do roster empata não
+ * distingue ninguém — apenas subtrai a mesma nota de quase todos.
+ *
+ * A causa provável é a fonte não monitorar rádio regional do Nordeste, NÃO os
+ * artistas não tocarem. Por isso o airplay caiu para 5% e continua no índice
+ * como sinal de leitura, em vez de sair: a Imagine quer enxergar a dinâmica.
+ *
+ * Os 15 pontos foram para audiência e consumo, que são hoje a parte sólida —
+ * o consumo cobre 100% do catálogo pelo feed da OneRPM e a Soundcharts entrega
+ * audiência para praticamente todos os artistas. Mercado ao vivo subiu só até
+ * 15% de propósito: é declaratório e a Soundcharts não corrobora (tem show
+ * registrado para 2 dos 97), então não podia virar o segundo maior peso.
+ *
+ * ⚠️ HOJE só 50% é apurável: consumo e airplay dependem do Soundcharts, cujo
+ * ACESSO está confirmado mas a ligação com o painel ainda não foi construída.
+ * Por isso o índice SEMPRE carrega a cobertura junto, e o Estágio sai marcado
+ * como provisório enquanto ela não fechar em 100%.
  *
  * O que FALTA é o dado, não a régua: as faixas que convertem ouvintes e
  * execuções em nota estão em `FAIXAS_CONSUMO` e `FAIXAS_AIRPLAY`, calibradas
- * por nós e pendentes de homologação. Ligar o Soundcharts vira preencher dois
- * números.
+ * por nós e pendentes de homologação. A de airplay já se sabe errada por ordens
+ * de grandeza para este roster — o maior artista tiraria 20 de 100.
  */
 
 export const METODOLOGIA = 'IAOS-DOC-02 v1.2'
 
 export type ComponenteIge = 'audiencia' | 'consumo' | 'airplay' | 'mercadoAoVivo'
 
+/** Desvio da v1.2 (30/40/20/10) aprovado pela Imagine em 2026-09-09 — ver o topo. */
 export const PESOS_IGE: Record<ComponenteIge, number> = {
-  audiencia: 0.3,
-  consumo: 0.4,
-  airplay: 0.2,
-  mercadoAoVivo: 0.1,
+  audiencia: 0.35,
+  consumo: 0.45,
+  airplay: 0.05,
+  mercadoAoVivo: 0.15,
 }
 
 export const ROTULO_COMPONENTE: Record<ComponenteIge, string> = {
@@ -41,7 +59,7 @@ export const ROTULO_COMPONENTE: Record<ComponenteIge, string> = {
   mercadoAoVivo: 'Mercado ao vivo',
 }
 
-/* ── audiência (30%) ───────────────────────────────────────────────────────── */
+/* ── audiência (35%) ───────────────────────────────────────────────────────── */
 
 /**
  * Fator de equilíbrio pela participação da maior plataforma (tabela da v1.2).
@@ -130,7 +148,7 @@ export function calcularAudiencia(s: SinaisAudiencia): ResultadoAudiencia | null
   }
 }
 
-/* ── mercado ao vivo (10%) ─────────────────────────────────────────────────── */
+/* ── mercado ao vivo (15%) ─────────────────────────────────────────────────── */
 
 export interface NivelMercadoAoVivo {
   nivel: number
@@ -284,11 +302,15 @@ export function calcularIge(componentes: ComponenteApurado[]): ResultadoIge {
   }
   const pesoTotal = Object.values(PESOS_IGE).reduce((a, b) => a + b, 0)
   const ige = peso > 0 ? Math.round((soma / peso) * 10) / 10 : null
+  // Margem contra ponto flutuante: `peso` acumula na ordem dos componentes e
+  // `pesoTotal` na ordem do registro. Somas iguais em ordens diferentes podem
+  // divergir no último bit e marcar como provisório um índice completo.
+  const EPS = 1e-9
   return {
     ige,
-    cobertura: peso / pesoTotal,
+    cobertura: Math.min(1, peso / pesoTotal),
     estagio: ige == null ? null : estagioDe(ige),
-    provisorio: peso < pesoTotal,
+    provisorio: peso < pesoTotal - EPS,
     componentes,
     metodologia: METODOLOGIA,
   }
@@ -302,14 +324,14 @@ export interface MercadoAoVivoDeclarado {
   declaradoPorEmail?: string | null
 }
 
-/* ── consumo (40%) e airplay (20%) ────────────────────────────────────────── */
+/* ── consumo (45%) e airplay (5%) ────────────────────────────────────────── */
 
 /**
  * As faixas que convertem métrica bruta em nota.
  *
  * ⚠️ CALIBRAGEM NOSSA, PENDENTE DE HOMOLOGAÇÃO PELA IMAGINE.
  *
- * A v1.2 fixa os PESOS (consumo 40%, airplay 20%) e a escala de saída — os
+ * A v1.2 fixa os PESOS (consumo 40%, airplay 20% — revisados com a Imagine, ver o topo) e a escala de saída — os
  * degraus 5/20/40/60/80/100, que ela publica na tabela de mercado ao vivo —,
  * mas não publica quantas execuções ou quantos ouvintes correspondem a cada
  * degrau. Sem essa conversão o Soundcharts entregaria os números crus e os dois

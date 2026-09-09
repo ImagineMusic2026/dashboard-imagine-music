@@ -13,16 +13,18 @@ Os dois medem coisas diferentes e a metodologia separou de propósito: o IGE res
 
 | Componente | Peso | Origem | Situação |
 | --- | --- | --- | --- |
-| Audiência ajustada | 30% | Instagram + TikTok + YouTube (painel) | Ativo |
-| Consumo musical e audiovisual | 40% | Spotify monthly listeners + YouTube views/28d | Fonte disponível ([[04 - Dados e integrações/Soundcharts]]) |
-| Airplay | 20% | Execuções em rádio/28d | Fonte disponível, mas rasa — ver abaixo |
-| Mercado ao vivo | 10% | Declaração da equipe | Ativo |
+| Audiência ajustada | 35% | Instagram + TikTok + YouTube (painel) | Ativo |
+| Consumo musical e audiovisual | 45% | Spotify monthly listeners + YouTube views/28d | Fonte disponível ([[04 - Dados e integrações/Soundcharts]]) |
+| Airplay | 5% | Execuções em rádio/28d | Fonte disponível, mas rasa — ver abaixo |
+| Mercado ao vivo | 15% | Declaração da equipe | Ativo |
+
+Os pesos **não são os da v1.2**, que fixa 30/40/20/10. A revisão foi aprovada pela Imagine em 09/09/2026 e está explicada na seção do airplay.
 
 Faixas do estágio: Pré-descoberta < 20 · Descoberta 20–39,99 · Desenvolvimento 40–59,99 · Consolidação 60–79,99 · Mainstream 80–100.
 
 ## Cobertura e provisoriedade
 
-Até 09/09/2026 a cobertura máxima era 40%, porque consumo e airplay não tinham fonte. O [[04 - Dados e integrações/Soundcharts]] resolveu isso sem custo adicional: o acesso funciona, é sob demanda e cobre os quatro componentes.
+Sem o Soundcharts ligado, a cobertura máxima é de **50%** (audiência 35% + mercado ao vivo 15%) — era 40% antes da revisão de pesos. O [[04 - Dados e integrações/Soundcharts]] cobre os quatro componentes e o acesso já foi confirmado, sem custo adicional — mas **a ligação com o painel ainda não foi construída**, então a cobertura segue em 50% na prática.
 
 O painel calcula o índice **sobre a cobertura disponível** e mostra três coisas juntas: o percentual coberto, a marca "provisório" e um ND em cada dimensão ausente. Nada é redistribuído em silêncio — a metodologia proíbe o silêncio, não a renormalização declarada.
 
@@ -47,7 +49,7 @@ Fica em `projetos/{slug}`, não em `artistas/{slug}` — é classificação da e
 ## Pendências antes de completar a metodologia
 
 - ~~Soundcharts contratado e integrado (60% do índice).~~ **Resolvido em 09/09/2026** — está no plano PRO, sem custo novo. Ver [[04 - Dados e integrações/Soundcharts]].
-- **Rever o peso de 20% do airplay**, ou as faixas dele, à luz do que a fonte consegue enxergar (ver a seção seguinte).
+- ~~Rever o peso de 20% do airplay.~~ **Resolvido em 09/09/2026** — caiu para 5%, aprovado pela Imagine. As FAIXAS dele seguem erradas por ordens de grandeza.
 - Pesos do Health Score para o estágio Pré-descoberta — a v1.2 define 5 estágios e só 4 linhas de peso.
 - Faixas esperadas por estágio para cada métrica do Health Score — citadas na v1.2, não especificadas.
 - Confirmar o desvio do fator de equilíbrio.
@@ -56,7 +58,7 @@ Veja [[03 - Artistas/Health Score]] e [[04 - Dados e integrações/Integrações
 
 ## Faixas de consumo e airplay
 
-A v1.2 fixa os pesos (consumo 40%, airplay 20%) e a escala de saída, mas **não publica** quantos ouvintes ou execuções correspondem a cada degrau. Sem essa conversão, contratar o Soundcharts sozinho não fecharia o índice: os números chegariam crus e os dois componentes seguiriam ND.
+A v1.2 fixa os pesos (consumo 40%, airplay 20% — revisados com a Imagine, ver acima) e a escala de saída, mas **não publica** quantos ouvintes ou execuções correspondem a cada degrau. Sem essa conversão, contratar o Soundcharts sozinho não fecharia o índice: os números chegariam crus e os dois componentes seguiriam ND.
 
 As faixas abaixo foram calibradas por nós em 05/09/2026, na mesma forma das tabelas que a metodologia já define, em ordens de grandeza compatíveis com um selo regional brasileiro. **Pendentes de homologação pela Imagine** — trocar é editar duas tabelas em `src/lib/iaos/ige.ts`, nada mais no cálculo depende dos valores.
 
@@ -84,7 +86,7 @@ As faixas abaixo foram calibradas por nós em 05/09/2026, na mesma forma das tab
 
 O degrau 5 existe pelo mesmo motivo que existe na tabela de mercado ao vivo: "medido e praticamente nulo" não é o mesmo que "não medido", e não pode virar 20. Métrica ausente continua `null` e o componente sai ND, conforme o §8.
 
-Por que isso importa na prática: um artista que hoje aparece como Descoberta com 40% de cobertura pode cair para Pré-descoberta quando a cobertura fechar. A leitura provisória tende a ser otimista.
+Por que isso importa na prática: um artista que hoje aparece como Descoberta com 50% de cobertura pode cair para Pré-descoberta quando a cobertura fechar. A leitura provisória tende a ser otimista.
 
 ## Airplay medido — a faixa acima não cabe neste roster
 
@@ -94,13 +96,21 @@ Em doze meses, **15 dos 97 artistas** têm alguma execução de rádio registrad
 
 Traduzindo para a tabela acima, em janela de 28 dias: o maior artista do roster tira **20** de 100 no airplay. O segundo tira 5. Todo o resto sai ND ou 5. A faixa de topo, de 50 mil execuções, é cerca de seiscentas vezes o que o maior artista da casa alcança — ela nunca vai ser usada.
 
-Isso deixa duas conclusões separadas, e convém não misturá-las:
+A distribuição entre os quinze é o ponto: das 1.628 execuções do ano, **o primeiro colocado tem 1.329 — 81,6%**. O segundo tem 121. Onze dos quinze somam menos de trinta no ano inteiro, o que dá menos de três por mês. E dois deles são provavelmente homônimos, porque as execuções são de rádio portuguesa e francesa.
 
-**Sobre a tabela.** As faixas foram calibradas por ordem de grandeza plausível, não por dado observado, e a de airplay errou por ordens de grandeza. Quando as faixas oficiais chegarem, esta é a primeira que precisa ser conferida contra o roster real — se ela também partir de milhares de execuções, o componente inteiro vira ruído.
+Uma ressalva que **não pode ser dita errado**: quase toda a execução detectada está em duas emissoras baianas. A explicação provável é que a fonte não monitora as rádios regionais do Nordeste, e não que os artistas não toquem no rádio. As duas frases descrevem o mesmo número e só uma delas é defensável.
 
-**Sobre o peso.** Um componente que vale 20% do índice e no qual 85% do roster empata em zero não ordena ninguém: ele apenas subtrai a mesma quantidade de quase todo mundo. Vale levar isso à Imagine como pergunta de desenho, não como defeito de implementação.
+### O que a Imagine decidiu
 
-E uma ressalva que **não pode ser dita errado**: quase toda a execução detectada está em duas emissoras baianas. A explicação provável é que a fonte não monitora as rádios regionais do Nordeste, e não que os artistas não toquem no rádio. As duas frases descrevem o mesmo número e só uma delas é defensável.
+Levado à cliente em 09/09/2026, com a distribuição acima. A leitura dela: *"como não puxa o regional, seria válido invertermos a dinâmica dos pesos de mercado ao vivo e airplay — ou até limitar airplay a 5%, apenas para identificarmos a relevância dessa dinâmica"*, porque **"você toca bem em shows antes de tocar bem em rádios"**. Ela tinha limitado mercado ao vivo a 10% só por ser dado declaratório.
+
+Antes de responder, medimos se essa ressalva ainda valia: a Soundcharts tem show registrado para **2 dos 97 artistas**. Não dá para corroborar o mercado ao vivo com dado externo, então subir esse peso é subir o peso de algo que a equipe digita.
+
+Por isso a recomendação foi a segunda opção dela, não a inversão — **airplay a 5%**, como sinal de leitura e não como eixo, com os pontos liberados indo para audiência e consumo, que são a parte sólida. Mercado ao vivo sobe, mas até 15%, não a 20%. Aprovado por ela na mesma conversa.
+
+O efeito medido: um artista com airplay medido e quase nulo perde **2,9 pontos** no índice, contra 12 pontos com o peso antigo.
+
+**Sobre a tabela de faixas.** Ela continua errada por ordens de grandeza, e o peso menor reduz o estrago sem corrigir a causa. Quando as faixas oficiais chegarem, esta é a primeira a conferir contra o roster real — se também partir de milhares de execuções, o componente vira ruído de novo.
 
 ## Mercado ao vivo — o que fica registrado
 

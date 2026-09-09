@@ -11,7 +11,15 @@ import {
   nomeDoArquivo,
   type DadosExportacao,
 } from '@/lib/artistas/exportar'
-import { getMetricasSociaisCached, getStreamingDetalhe } from '@/lib/metricas-sociais/client'
+import {
+  getHistoricoHealth,
+  getHistoricoInstagram,
+  getHistoricoStreaming,
+  getHistoricoTikTok,
+  getHistoricoYouTube,
+  getMetricasSociaisCached,
+  getStreamingDetalhe,
+} from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc, StreamingDetalheDoc } from '@/lib/metricas-sociais/types'
 import { getDiagnostico, type DiagnosticoDoc } from '@/lib/diagnostico/client'
 import { getTikTokDoArtista, type TikTokDoArtista } from '@/lib/fonogramas/client'
@@ -23,6 +31,18 @@ import { derivarHealthScores } from '@/lib/health/score'
 import { cn } from '@/lib/utils'
 
 /**
+ * Presets do período, ancorados no que EXISTE: a série mais longa é a de
+ * streaming, que começa em fevereiro de 2026; as redes só têm ~3 meses. Oferecer
+ * "últimos 2 anos" devolveria quase nada e faria parecer que o artista não tinha
+ * público — exatamente a leitura errada que o resto do documento evita.
+ */
+const PERIODOS = [
+  { dias: 28, rotulo: '28 dias' },
+  { dias: 90, rotulo: '90 dias' },
+  { dias: 400, rotulo: 'Tudo' },
+] as const
+
+/**
  * Exporta o perfil do artista, em duas saídas para dois usos.
  *
  * COPIAR põe o Markdown na área de transferência, para colar num assistente de
@@ -30,15 +50,24 @@ import { cn } from '@/lib/utils'
  * em destaque. BAIXAR gera a planilha, para quem vai abrir no Excel, filtrar e
  * fazer gráfico. As duas saem dos mesmos dados.
  *
+ * O PERÍODO afeta só a evolução dia a dia. O resto do documento é retrato de
+ * janelas fixas que não dão para recortar, e cada bloco carimba a própria — um
+ * seletor que mudasse o rótulo sem mudar o dado faria o documento afirmar um
+ * período que ele não tem.
+ *
  * A RECEITA é opcional e entra DESMARCADA. Estes dados podem ir para uma IA de
  * terceiro, e faturamento não deve viajar junto por descuido. Quem não tem a
  * permissão de receita não vê nem a opção — a fronteira do painel vale aqui
  * igual. Ela também só é buscada quando alguém marca.
  */
+
 export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
   const { pode } = useAuth()
   const podeReceita = pode('verReceita')
 
+  const [dias, setDias] = useState<number>(28)
+  const [serie, setSerie] = useState<DadosExportacao['serie']>(null)
+  const [carregandoSerie, setCarregandoSerie] = useState(true)
   const [incluirReceita, setIncluirReceita] = useState(false)
   const [receita, setReceita] = useState<DadosExportacao['receita']>(null)
   const [carregandoReceita, setCarregandoReceita] = useState(false)
@@ -112,6 +141,57 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
       vivo = false
     }
   }, [slug])
+
+  /**
+   * As séries diárias, recarregadas quando o período muda.
+   *
+   * São cinco subcoleções e uma leitura por dia de cada — 28 dias custam ~140
+   * leituras do Firestore. Numa conta no plano gratuito isso não é desprezível,
+   * e é por isso que o padrão é a janela CURTA: quem precisar do histórico
+   * inteiro escolhe, em vez de todo mundo pagar por ele sem querer.
+   */
+  useEffect(() => {
+    let vivo = true
+    setCarregandoSerie(true)
+    ;(async () => {
+      const [ig, tt, yt, st, he] = await Promise.all([
+        getHistoricoInstagram(slug, dias).catch(() => []),
+        getHistoricoTikTok(slug, dias).catch(() => []),
+        getHistoricoYouTube(slug, dias).catch(() => []),
+        getHistoricoStreaming(slug, dias).catch(() => []),
+        getHistoricoHealth(slug, dias).catch(() => []),
+      ])
+      if (!vivo) return
+
+      // Une pelo dia: cada fonte tem a própria cobertura, e um dia que só tem
+      // streaming continua sendo um dia com informação.
+      const porDia = new Map<string, NonNullable<DadosExportacao['serie']>['pontos'][number]>()
+      const garantir = (d: string) => {
+        let p = porDia.get(d)
+        if (!p) {
+          p = { dia: d, instagram: null, tiktok: null, youtube: null, streams: null, health: null }
+          porDia.set(d, p)
+        }
+        return p
+      }
+      for (const x of ig) garantir(x.dia).instagram = x.seguidores ?? null
+      for (const x of tt) garantir(x.dia).tiktok = x.seguidores ?? null
+      for (const x of yt) garantir(x.dia).youtube = x.inscritos ?? null
+      for (const x of st) garantir(x.dia).streams = x.streams ?? null
+      for (const x of he) garantir(x.dia).health = x.score ?? null
+
+      const pontos = Array.from(porDia.values()).sort((a, b) => a.dia.localeCompare(b.dia))
+      setSerie(
+        pontos.length
+          ? { dias, de: pontos[0].dia, ate: pontos[pontos.length - 1].dia, pontos }
+          : null,
+      )
+      setCarregandoSerie(false)
+    })()
+    return () => {
+      vivo = false
+    }
+  }, [slug, dias])
 
   /**
    * A receita só é buscada quando alguém marca a opção — e não junto do resto.
@@ -231,10 +311,11 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
       ige,
       saude,
       diagnosticos: base.diagnosticos,
+      serie,
       // Só entra com permissão E opção marcada — ver o docblock.
       receita: podeReceita && incluirReceita ? receita : null,
     }
-  }, [base, slug, podeReceita, incluirReceita, receita])
+  }, [base, slug, podeReceita, incluirReceita, receita, serie])
 
   const markdown = useMemo(() => (dados ? montarExportacao(dados) : ''), [dados])
 
@@ -325,6 +406,30 @@ export function ExportarArtistaDialog({ slug, onClose }: { slug: string; onClose
         </div>
 
         <div className="px-5 py-4 border-t border-bg-700/40 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="text-[11px] text-ink-500"
+              title="Vale para a evolução dia a dia. Os outros blocos são retratos de janelas fixas e cada um mostra a sua."
+            >
+              Evolução:
+            </span>
+            {PERIODOS.map((p) => (
+              <button
+                key={p.dias}
+                type="button"
+                onClick={() => setDias(p.dias)}
+                className={cn(
+                  'text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors',
+                  dias === p.dias
+                    ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                    : 'text-ink-400 border-bg-700/60 hover:text-ink-200 hover:border-bg-600',
+                )}
+              >
+                {p.rotulo}
+              </button>
+            ))}
+            {carregandoSerie && <Loader2 className="w-3 h-3 animate-spin text-ink-500" aria-hidden />}
+          </div>
           {podeReceita && (
             <label className="flex items-center gap-2 text-[11px] text-ink-400 cursor-pointer">
               <input

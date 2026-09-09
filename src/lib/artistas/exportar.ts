@@ -42,6 +42,29 @@ export interface DadosExportacao {
    * para a IA (nem para gente); com o título, ela consegue falar das músicas.
    */
   titulos: Record<string, string>
+  /**
+   * Evolução dia a dia, recortada pelo período que a pessoa escolheu.
+   *
+   * É o único bloco que o seletor de período afeta, e de propósito: todo o
+   * resto do documento é retrato de uma janela fixa (as faixas, os vídeos do
+   * público, a Soundcharts, o IGE) e não pode ser recortado. Deixar o seletor
+   * mexer no rótulo desses blocos sem mexer no dado faria o documento afirmar
+   * um período que ele não tem — o mesmo erro do zero no lugar do "não medido",
+   * só que na dimensão tempo.
+   */
+  serie: {
+    dias: number
+    de: string | null
+    ate: string | null
+    pontos: {
+      dia: string
+      instagram: number | null
+      tiktok: number | null
+      youtube: number | null
+      streams: number | null
+      health: number | null
+    }[]
+  } | null
   ige: ResultadoIge | null
   saude: { score: number; pilares: { rotulo: string; score: number }[] } | null
   diagnosticos: { tipo: TipoDiagnostico; nome: string; doc: DiagnosticoDoc | null }[]
@@ -193,6 +216,60 @@ export function montarExportacao(d: DadosExportacao, geradoEm = new Date()): str
           const taxa = f.streams ? (f.skips ?? 0) / f.streams : null
           return `| ${d.titulos[f.isrc] ?? f.isrc} | ${n(f.streams)} | ${n(f.skips)} | ${pct(taxa)} |`
         }),
+      ]),
+    )
+  }
+
+  /* ── evolução ───────────────────────────────────────────────────────────── */
+  const s = d.serie
+  if (s?.pontos.length) {
+    // Colunas sem NENHUM valor saem fora: uma coluna inteira de "não medido"
+    // ocupa espaço e não informa nada que a linha de cobertura já não diga.
+    const temIg = s.pontos.some((x) => x.instagram != null)
+    const temTt = s.pontos.some((x) => x.tiktok != null)
+    const temYt = s.pontos.some((x) => x.youtube != null)
+    const temSt = s.pontos.some((x) => x.streams != null)
+    const temHe = s.pontos.some((x) => x.health != null)
+    const colunas = [
+      temIg ? 'Instagram' : null,
+      temTt ? 'TikTok' : null,
+      temYt ? 'YouTube' : null,
+      temSt ? 'Streams/dia' : null,
+      temHe ? 'Health' : null,
+    ].filter(Boolean) as string[]
+
+    const ausentes = [
+      !temIg ? 'Instagram' : null,
+      !temTt ? 'TikTok' : null,
+      !temYt ? 'YouTube' : null,
+      !temSt ? 'streams' : null,
+      !temHe ? 'Health Score' : null,
+    ].filter(Boolean) as string[]
+
+    partes.push(
+      linhas([
+        '',
+        '## Evolução dia a dia',
+        '',
+        `Período: ${dia(s.de)} a ${dia(s.ate)} — ${s.pontos.length} dias com registro.`,
+        ausentes.length
+          ? `Sem série neste período: ${ausentes.join(', ')} — não medido, o que **não** quer dizer que não houve movimento.`
+          : null,
+        '',
+        `| Dia | ${colunas.join(' | ')} |`,
+        `| --- | ${colunas.map(() => '---:').join(' | ')} |`,
+        ...s.pontos.map((x) => {
+          const vals = [
+            temIg ? n(x.instagram) : null,
+            temTt ? n(x.tiktok) : null,
+            temYt ? n(x.youtube) : null,
+            temSt ? n(x.streams) : null,
+            temHe ? n(x.health) : null,
+          ].filter((c) => c !== null)
+          return `| ${dia(x.dia)} | ${vals.join(' | ')} |`
+        }),
+        '',
+        'Seguidores e inscritos são o TOTAL acumulado naquele dia; streams e Health Score são do dia.',
       ]),
     )
   }
@@ -485,6 +562,39 @@ export function montarPlanilha(d: DadosExportacao, geradoEm = new Date()): AbaPl
       linhas: resumo,
     },
   ]
+
+  if (d.serie?.pontos.length) {
+    const s = d.serie
+    const temIg = s.pontos.some((x) => x.instagram != null)
+    const temTt = s.pontos.some((x) => x.tiktok != null)
+    const temYt = s.pontos.some((x) => x.youtube != null)
+    const temSt = s.pontos.some((x) => x.streams != null)
+    const temHe = s.pontos.some((x) => x.health != null)
+    const cab = ['Dia']
+    if (temIg) cab.push('Instagram')
+    if (temTt) cab.push('TikTok')
+    if (temYt) cab.push('YouTube')
+    if (temSt) cab.push('Streams no dia')
+    if (temHe) cab.push('Health Score')
+
+    abas.push({
+      nome: 'Evolução',
+      larguras: [12, ...cab.slice(1).map(() => 16)],
+      subtitulo: `${dia(s.de)} a ${dia(s.ate)}  ·  ${s.pontos.length} dias  ·  seguidores são total acumulado; streams e Health, do dia`,
+      linhas: [
+        cab,
+        ...s.pontos.map((x) => {
+          const linha: (string | number | null)[] = [dia(x.dia)]
+          if (temIg) linha.push(v(x.instagram))
+          if (temTt) linha.push(v(x.tiktok))
+          if (temYt) linha.push(v(x.youtube))
+          if (temSt) linha.push(v(x.streams))
+          if (temHe) linha.push(v(x.health))
+          return linha
+        }),
+      ],
+    })
+  }
 
   const faixas = d.detalhe?.porFaixa ?? []
   if (faixas.length) {

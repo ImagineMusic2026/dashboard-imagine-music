@@ -9,9 +9,15 @@ plataforma: Soundcharts
 
 É a fonte que faltava para o [[03 - Artistas/Estágio (IGE)]]. Fecha consumo (40% do índice) e airplay (20%), e ainda reforça audiência e mercado ao vivo. Sem ela, o IGE nunca passava de 40% de cobertura.
 
-## Como a consulta acontece
+## Estado: acesso confirmado, ligação não construída
 
-Sob demanda, no momento em que alguém pede o diagnóstico — **não** há sincronização noturna. A decisão veio da cliente, em 08/09/2026: ela só precisa do dado na hora de gerar o diagnóstico e não quer nada consultando o tempo todo.
+Em 09/09/2026 o acesso foi provado por linha de comando — autentica, responde e devolve os dados dos quatro componentes. **O painel ainda não consulta a Soundcharts.** Não há rota, não há botão, e o card de Estágio continua exibindo 60% do índice como dependente dela. O que existe no produto é um campo onde a equipe digita o ID do artista à mão.
+
+Enquanto isso não mudar, dizer que "a consulta acontece sob demanda" é descrever o desenho decidido, não o comportamento atual.
+
+## Como a consulta vai acontecer
+
+Sob demanda, no momento em que alguém pede o diagnóstico — **não** haverá sincronização noturna. A decisão veio da cliente, em 08/09/2026: ela só precisa do dado na hora de gerar o diagnóstico e não quer nada consultando o tempo todo.
 
 Isso simplifica muito. Não existe rotina agendada, coleção nova nem acúmulo de histórico: o painel pergunta, recebe, grava o resultado junto do diagnóstico e para por aí. Cada consulta guarda **quando foi consultada**, para que um estágio antigo não seja lido como atual.
 

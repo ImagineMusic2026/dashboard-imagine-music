@@ -6,6 +6,30 @@ tipo: registro-de-decisoes
 
 Registre aqui decisões que evitam rediscussão no futuro. Cada nova entrada deve ter data, contexto, decisão, motivo e consequência.
 
+## 2026-09-09 — Soundcharts consultado sob demanda, sem sincronização
+
+**Decisão:** o painel consulta a Soundcharts no momento em que alguém pede o diagnóstico, e não por rotina agendada. Cada resultado guarda a data em que foi consultado.
+
+**Motivo:** pedido explícito da cliente — ela só precisa do dado na hora de gerar o diagnóstico e não quer nada consultando o tempo todo. Some a rotina noturna, some a coleção de histórico e some a preocupação com cota.
+
+**Consequência:** um estágio antigo não pode ser lido como atual, por isso a data da consulta aparece junto do resultado. Ver [[04 - Dados e integrações/Soundcharts]].
+
+## 2026-09-09 — O estágio de carreira da Soundcharts não confere a régua da metodologia
+
+**Decisão:** não usar o estágio de carreira que a Soundcharts atribui como validação do [[03 - Artistas/Estágio (IGE)]].
+
+**Motivo:** foi testado no roster inteiro e não tem resolução neste recorte — 86 dos 97 artistas caem no mesmo balde, incluindo o maior. Uma escala global não distingue artistas de um selo regional brasileiro.
+
+**Consequência:** a régua da Imagine não tem referência externa de conferência, o que reforça a necessidade das faixas oficiais. Pelo avesso, o resultado é o melhor argumento a favor de a metodologia ser calibrada regionalmente.
+
+## 2026-09-09 — Catálogo da OneRPM consolidado pelas três contas de selo
+
+**Decisão:** o catálogo passa a ser importado das três contas de selo de uma vez, com cada faixa registrando de qual conta veio.
+
+**Motivo:** o catálogo antigo cobria só uma conta e deixava faixas com streaming real sem identificação. Além disso, duas das contas ainda não têm feed de streaming ligado, e sem marcar a origem não haveria como explicar por que uma faixa conhecida aparece sem nenhum play.
+
+**Consequência:** faixa com nome e streaming zerado deixa de parecer defeito. Ver [[04 - Dados e integrações/OneRPM]].
+
 ## 2026-08-13 — Cofre separado por projeto
 
 **Decisão:** manter o Painel Imagine em seu próprio cofre, dentro de `Desktop/Obsidian`.

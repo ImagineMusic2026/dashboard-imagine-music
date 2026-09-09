@@ -18,7 +18,7 @@ Os seis itens que abriram esta lista foram escritos e saem daqui:
 
 ## A detalhar no cofre
 
-- [ ] O que acontece quando a OneRPM muda o formato de um relatório — o histórico de quebras e como o parser reage.
+- [x] O que acontece quando a OneRPM muda o formato de um relatório — escrito em [[04 - Dados e integrações/Quebras de formato da OneRPM]] depois da segunda quebra, em 09/09/2026.
 - [ ] Como a equipe usa a Carga do time na prática (pontos de esforço só valem se alguém preencher o campo).
 
 ## Decisões registradas
@@ -30,8 +30,9 @@ O registro completo, com data, contexto, motivo e consequência, está em [[07 -
 
 ## Aguardando resposta da Imagine
 
-Estas três não são pendência de documentação — são de decisão, e estão no [[07 - Gestão do produto/Roadmap]]:
+Estas não são pendência de documentação — são de decisão, e estão no [[07 - Gestão do produto/Roadmap]]:
 
-- Assinatura do Soundcharts (trava 60% do IGE).
-- Faixas de corte da metodologia v1.2 (sem elas o índice não fecha nem com o Soundcharts pago).
+- ~~Assinatura do Soundcharts.~~ Resolvida em 09/09/2026: já estava inclusa no plano PRO, sem custo novo. Ver [[04 - Dados e integrações/Soundcharts]].
+- **Faixas de corte da metodologia v1.2** — agora é o único bloqueio do IGE, e a de airplay já se sabe que está errada por ordens de grandeza.
+- Peso de 20% do airplay, à luz de 85% do roster empatar em zero nesse componente.
 - O item 4 do documento de cadastro-base, que não veio no arquivo.

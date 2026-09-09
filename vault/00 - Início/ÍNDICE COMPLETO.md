@@ -39,6 +39,8 @@ tipo: indice
 - [[04 - Dados e integrações/TikTok]]
 - [[04 - Dados e integrações/YouTube]]
 - [[04 - Dados e integrações/OneRPM]]
+- [[04 - Dados e integrações/Quebras de formato da OneRPM]]
+- [[04 - Dados e integrações/Soundcharts]]
 - [[04 - Dados e integrações/Dados de streaming e receita]]
 
 ## Fluxos e tecnologia

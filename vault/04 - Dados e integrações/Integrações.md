@@ -10,6 +10,7 @@ O painel possui uma área para conectar e sincronizar fontes de dados do artista
 ## Plataformas presentes
 
 - [[04 - Dados e integrações/OneRPM]] — distribuição, catálogo, tendências e receita.
+- [[04 - Dados e integrações/Soundcharts]] — audiência, consumo, airplay e shows; consultada sob demanda, não sincronizada.
 - YouTube — conexão, descoberta de canal e sincronização.
 - TikTok — conexão, sincronização e insights.
 - Meta / Instagram — descoberta e sincronização de métricas.

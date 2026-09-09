@@ -14,15 +14,19 @@ Os dois medem coisas diferentes e a metodologia separou de propósito: o IGE res
 | Componente | Peso | Origem | Situação |
 | --- | --- | --- | --- |
 | Audiência ajustada | 30% | Instagram + TikTok + YouTube (painel) | Ativo |
-| Consumo musical e audiovisual | 40% | Spotify monthly listeners + YouTube views/28d | Pendente de Soundcharts |
-| Airplay | 20% | Execuções em rádio/28d | Pendente de Soundcharts |
+| Consumo musical e audiovisual | 40% | Spotify monthly listeners + YouTube views/28d | Fonte disponível ([[04 - Dados e integrações/Soundcharts]]) |
+| Airplay | 20% | Execuções em rádio/28d | Fonte disponível, mas rasa — ver abaixo |
 | Mercado ao vivo | 10% | Declaração da equipe | Ativo |
 
 Faixas do estágio: Pré-descoberta < 20 · Descoberta 20–39,99 · Desenvolvimento 40–59,99 · Consolidação 60–79,99 · Mainstream 80–100.
 
 ## Cobertura e provisoriedade
 
-Enquanto o Soundcharts não estiver integrado, a cobertura máxima é 40%. O painel calcula o índice **sobre a cobertura disponível** e mostra três coisas juntas: o percentual coberto, a marca "provisório" e um ND em cada dimensão ausente. Nada é redistribuído em silêncio — a metodologia proíbe o silêncio, não a renormalização declarada.
+Até 09/09/2026 a cobertura máxima era 40%, porque consumo e airplay não tinham fonte. O [[04 - Dados e integrações/Soundcharts]] resolveu isso sem custo adicional: o acesso funciona, é sob demanda e cobre os quatro componentes.
+
+O painel calcula o índice **sobre a cobertura disponível** e mostra três coisas juntas: o percentual coberto, a marca "provisório" e um ND em cada dimensão ausente. Nada é redistribuído em silêncio — a metodologia proíbe o silêncio, não a renormalização declarada.
+
+A marca de provisório continua valendo, mas o motivo mudou. Não é mais falta de dado; é falta das faixas que convertem o dado em nota.
 
 Zerar o ausente seria pior: na simulação sobre o roster (04/09/2026), um artista de 4,9 milhões de audiência cairia em "Descoberta".
 
@@ -42,7 +46,8 @@ Fica em `projetos/{slug}`, não em `artistas/{slug}` — é classificação da e
 
 ## Pendências antes de completar a metodologia
 
-- Soundcharts contratado e integrado (60% do índice).
+- ~~Soundcharts contratado e integrado (60% do índice).~~ **Resolvido em 09/09/2026** — está no plano PRO, sem custo novo. Ver [[04 - Dados e integrações/Soundcharts]].
+- **Rever o peso de 20% do airplay**, ou as faixas dele, à luz do que a fonte consegue enxergar (ver a seção seguinte).
 - Pesos do Health Score para o estágio Pré-descoberta — a v1.2 define 5 estágios e só 4 linhas de peso.
 - Faixas esperadas por estágio para cada métrica do Health Score — citadas na v1.2, não especificadas.
 - Confirmar o desvio do fator de equilíbrio.
@@ -80,6 +85,22 @@ As faixas abaixo foram calibradas por nós em 05/09/2026, na mesma forma das tab
 O degrau 5 existe pelo mesmo motivo que existe na tabela de mercado ao vivo: "medido e praticamente nulo" não é o mesmo que "não medido", e não pode virar 20. Métrica ausente continua `null` e o componente sai ND, conforme o §8.
 
 Por que isso importa na prática: um artista que hoje aparece como Descoberta com 40% de cobertura pode cair para Pré-descoberta quando a cobertura fechar. A leitura provisória tende a ser otimista.
+
+## Airplay medido — a faixa acima não cabe neste roster
+
+Com a fonte disponível, deu para conferir a tabela de airplay contra a realidade. Ela não se sustenta.
+
+Em doze meses, **15 dos 97 artistas** têm alguma execução de rádio registrada. Os outros 82 empatam em zero. E entre os 15, a distância é enorme: o primeiro colocado soma 1.329 execuções e o segundo, 121.
+
+Traduzindo para a tabela acima, em janela de 28 dias: o maior artista do roster tira **20** de 100 no airplay. O segundo tira 5. Todo o resto sai ND ou 5. A faixa de topo, de 50 mil execuções, é cerca de seiscentas vezes o que o maior artista da casa alcança — ela nunca vai ser usada.
+
+Isso deixa duas conclusões separadas, e convém não misturá-las:
+
+**Sobre a tabela.** As faixas foram calibradas por ordem de grandeza plausível, não por dado observado, e a de airplay errou por ordens de grandeza. Quando as faixas oficiais chegarem, esta é a primeira que precisa ser conferida contra o roster real — se ela também partir de milhares de execuções, o componente inteiro vira ruído.
+
+**Sobre o peso.** Um componente que vale 20% do índice e no qual 85% do roster empata em zero não ordena ninguém: ele apenas subtrai a mesma quantidade de quase todo mundo. Vale levar isso à Imagine como pergunta de desenho, não como defeito de implementação.
+
+E uma ressalva que **não pode ser dita errado**: quase toda a execução detectada está em duas emissoras baianas. A explicação provável é que a fonte não monitora as rádios regionais do Nordeste, e não que os artistas não toquem no rádio. As duas frases descrevem o mesmo número e só uma delas é defensável.
 
 ## Mercado ao vivo — o que fica registrado
 

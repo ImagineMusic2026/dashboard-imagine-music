@@ -329,7 +329,7 @@ export function montarExportacao(d: DadosExportacao, geradoEm = new Date()): str
         '',
         `- Índice: ${i.ige == null ? AUSENTE : i.ige.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} de 100`,
         `- Estágio: ${i.estagio ?? AUSENTE}`,
-        `- Cobertura da metodologia: ${pct(i.cobertura, 0)}${i.provisorio ? ' — leitura PROVISÓRIA, calculada só sobre as dimensões medidas' : ''}`,
+        `- Cobertura da metodologia: ${pct(i.cobertura, 0)}${i.provisorio ? ' — o índice foi calculado só sobre as dimensões medidas; as que faltam aparecem como "não medido" na tabela abaixo' : ''}`,
         '',
         '| Dimensão | Peso | Nota | Origem |',
         '| --- | ---: | ---: | --- |',

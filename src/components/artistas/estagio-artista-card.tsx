@@ -201,12 +201,18 @@ function Cabecalho({ resultado }: { resultado: ResultadoIge }) {
             <span className={cn('text-sm font-bold px-2.5 py-1 rounded-lg border', meta.cor)}>
               {meta.titulo}
             </span>
+            {/* O §8 da metodologia exige sinalizar índice calculado sobre cobertura
+                parcial — sem isso, 87,1 em "Mainstream" com o mercado ao vivo em
+                branco se apresenta como número fechado. Mas o sinal diz QUANTO
+                dado existe, e não "provisório": a diferença é entre informar
+                precisão do cadastro e parecer software inacabado. Some sozinho
+                quando a cobertura chega a 100%. */}
             {resultado.provisorio && (
               <span
-                className="text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                title="A metodologia manda marcar o estágio como provisório enquanto a cobertura não fecha em 100%."
+                className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-bg-800 text-ink-400 border border-bg-700/60"
+                title="O índice foi calculado sobre as dimensões que já têm medição. As que faltam aparecem como ND logo abaixo."
               >
-                provisório
+                {Math.round(resultado.cobertura * 100)}% dos dados
               </span>
             )}
           </div>
@@ -409,8 +415,16 @@ function PreviaHealthV12({
         className="w-full flex items-center gap-2 flex-wrap px-4 py-3 hover:bg-bg-800/30 transition-colors text-left"
       >
         <span className="text-sm font-semibold text-ink-100">Health Score na régua v1.2</span>
-        <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/25">
-          prévia
+        {/* "comparação", não "prévia": este bloco existe para confrontar as duas
+            réguas, e o número oficial segue sendo o do card de Health Score.
+            "Prévia" dava ar de funcionalidade inacabada quando a intenção é o
+            contrário — mas a etiqueta precisa continuar existindo, senão a
+            equipe vê dois Health Scores diferentes sem saber qual vale. */}
+        <span
+          className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/25"
+          title="Comparação com a régua atual. O número oficial da equipe continua sendo o do card de Health Score."
+        >
+          comparação
         </span>
         <div className="flex-1" />
         <span className="num text-lg font-bold text-ink-100">{previa.score}</span>

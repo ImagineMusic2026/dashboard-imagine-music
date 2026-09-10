@@ -87,6 +87,7 @@ export function ReceitaArtistaCard({
   const [verFaixas, setVerFaixas] = useState(false)
   const [verTodasFaixas, setVerTodasFaixas] = useState(false)
   const [verTodasPlataformas, setVerTodasPlataformas] = useState(false)
+  const [carregandoVersao, setCarregandoVersao] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -127,6 +128,49 @@ export function ReceitaArtistaCard({
     setVerTodasFaixas(false)
     setVerTodasPlataformas(false)
   }, [selecionadoId])
+
+  /*
+   * A lista de meses chega LEVE — sem o detalhe por plataforma, que é o que
+   * pesa (~300 KB por mês; o maior artista tem 33). O mês escolhido é buscado
+   * aqui, uma vez, e guardado no lugar do item leve.
+   *
+   * O consolidado é exceção: vem inteiro na primeira carga, porque é o que abre
+   * por padrão e ninguém deveria esperar para ver o total.
+   */
+  useEffect(() => {
+    if (estado.tipo !== 'real' || !selecionadoId) return
+    const atual = estado.versoes.find((v) => v.importacaoId === selecionadoId)
+    if (!atual || atual.agregado || atual.receitaPorPlataforma?.length) return
+
+    let vivo = true
+    setCarregandoVersao(true)
+    ;(async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken()
+        if (!token) return
+        const res = await fetch(
+          `/api/artistas/${encodeURIComponent(slug)}/receitas?versao=${encodeURIComponent(selecionadoId)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        )
+        const data = await res.json().catch(() => null)
+        if (!vivo || !res.ok || !data?.versao) return
+        const cheia = data.versao as ReceitaArtistaHistoricoItem
+        setEstado((e) =>
+          e.tipo === 'real'
+            ? {
+                ...e,
+                versoes: e.versoes.map((v) => (v.importacaoId === cheia.importacaoId ? cheia : v)),
+              }
+            : e,
+        )
+      } finally {
+        if (vivo) setCarregandoVersao(false)
+      }
+    })()
+    return () => {
+      vivo = false
+    }
+  }, [estado, selecionadoId, slug])
 
   if (estado.tipo === 'carregando') {
     return (
@@ -198,8 +242,12 @@ export function ReceitaArtistaCard({
               <select
                 value={real.importacaoId}
                 onChange={(e) => setSelecionadoId(e.target.value)}
-                className="mt-2 max-w-full bg-bg-800/70 border border-bg-700/50 rounded-lg px-2 py-1.5 text-[12px] text-ink-200 focus:outline-none focus:border-amber-500/40"
+                // O detalhe do mês escolhido é buscado sob demanda; travar o
+                // seletor enquanto chega evita trocar de novo no meio do caminho.
+                disabled={carregandoVersao}
+                className="mt-2 max-w-full bg-bg-800/70 border border-bg-700/50 rounded-lg px-2 py-1.5 text-[12px] text-ink-200 focus:outline-none focus:border-amber-500/40 disabled:opacity-60"
                 aria-label="Selecionar importação de receita"
+                aria-busy={carregandoVersao}
               >
                 {versoes.map((h) => (
                   <option key={h.importacaoId} value={h.importacaoId}>

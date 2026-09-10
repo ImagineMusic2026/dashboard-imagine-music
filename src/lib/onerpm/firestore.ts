@@ -445,12 +445,66 @@ function historicoItemDeDoc(d: admin.firestore.QueryDocumentSnapshot): ReceitaAr
  * os meses são os docs de `receitas-importadas`. Devolver os dois deixa o card abrir
  * no total e permitir drilar num mês.
  */
+/**
+ * Campos LEVES de uma importação: o suficiente para montar o seletor de meses.
+ *
+ * O peso de um doc de importação está em `receita.agregado` (~300 KB) e
+ * `receita.receitaPorPlataforma` (~135 KB), e o card mostra UMA versão por vez.
+ * Carregar as 33 do maior artista custava 8,8 MB e 7 segundos para exibir ~300 KB.
+ * Sem estes dois campos, a mesma lista cabe em poucos quilobytes.
+ */
+const CAMPOS_LEVES = [
+  'slug',
+  'importacaoId',
+  'periodoKey',
+  'arquivoNome',
+  'tamanhoBytes',
+  'criadoEm',
+  'criadoEmMs',
+  'criadoPorEmail',
+  'receita.periodo',
+  'receita.totais',
+  'receita.totalBRL',
+  'receita.streams',
+  'receita.moedas',
+  'receita.nome',
+  'receita.slug',
+  'receita.label',
+  'receita.fonte',
+  'receita.repassePorMoeda',
+] as const
+
+/**
+ * Uma importação específica, inteira. É o que o card busca quando alguém troca
+ * de mês no seletor — o peso vem só quando é pedido.
+ */
+export async function carregarImportacaoDeReceita(
+  slug: string,
+  importacaoId: string,
+): Promise<ReceitaArtistaHistoricoItem | null> {
+  const s = (slug ?? '').trim()
+  const id = (importacaoId ?? '').trim()
+  if (!s || !id) throw new OneRpmImportacaoError('Artista ou importação inválidos.')
+
+  const snap = await adminDb
+    .collection(RECEITAS_IMPORTADAS)
+    .where('slug', '==', s)
+    .where('importacaoId', '==', id)
+    .limit(1)
+    .get()
+  const doc = snap.docs[0]
+  return doc ? historicoItemDeDoc(doc) : null
+}
+
 export async function carregarReceitasArtista(slug: string): Promise<ReceitaArtistaPayload> {
   const s = (slug ?? '').trim()
   if (!s) throw new OneRpmImportacaoError('Artista inválido.')
 
   const [histSnap, atualSnap] = await Promise.all([
-    adminDb.collection(RECEITAS_IMPORTADAS).where('slug', '==', s).get(),
+    // `select` com os campos leves: a lista de meses não precisa do detalhe de
+    // cada um, e é ele que pesa. O mês escolhido vem depois, por
+    // `carregarImportacaoDeReceita`.
+    adminDb.collection(RECEITAS_IMPORTADAS).where('slug', '==', s).select(...CAMPOS_LEVES).get(),
     adminDb.collection(RECEITAS).doc(s).get(),
   ])
 

@@ -15,7 +15,7 @@ Firestore é o banco central. Leituras no cliente respeitam regras; dados sensí
 | `projetos/{slug}`                          | Dados comerciais internos: conta do selo, e-mail, serviços e anotações. | Somente staff lê.                           |
 | `receitas/{slug}`                          | Receita OneRPM agregada.                                                | Sensível; exige `verReceita`.               |
 | `users/{uid}`                              | Perfil, papel, ativo, vínculo e overrides.                              | Pessoa lê a si; staff lê a equipe.          |
-| `convites/{token}`                         | Convites de acesso.                                                     | Link por token; listagem restrita.          |
+| `convites/{token}`                         | Convites de acesso. O de colaborador traz `permissoes` (as áreas).      | Link por token; listagem restrita.          |
 | `agenda/{id}`                              | Releases, shows, contratos e reuniões.                                  | Quem tem `agenda` lê e altera.              |
 | `integracoes/{doc}`                        | Status de Meta, TikTok, YouTube e OneRPM.                               | Staff lê; servidor escreve.                 |
 | `configuracoes/{doc}`                      | Configurações gerais e a do quadro de atividades.                       | Membro ativo lê; admin escreve.             |

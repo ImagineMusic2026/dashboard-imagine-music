@@ -56,9 +56,13 @@ Em aberto, atrasadas, paradas há 7 dias ou mais, sem responsável, entregues no
 
 Quem possui a capacidade **atividades** cria, edita, move e exclui demandas. Por padrão admin e marketing a possuem; artista **não** — são demandas internas do time.
 
+O **colaborador** com a área Atividades enxerga só as demandas em que é o responsável, e nelas faz tudo, inclusive excluir. O que ele cria fica com ele, e ele não repassa. Nas demandas dele, uma antecessora ou demanda mãe da equipe aparece como "demanda da equipe", sem opção de remover. Os indicadores e o cronograma dele contam só o que é dele.
+
 Configurar o quadro (colunas, campos, visões, modelos) é só **admin**: mudar uma coluna afeta o quadro de todo mundo ao mesmo tempo.
 
-Comentário só pode ser editado ou apagado pelo próprio autor (ou pelo admin).
+Comentário só pode ser editado ou apagado pelo próprio autor (ou pelo admin). As regras conferem a autoria inteira: o nome gravado tem de ser o do perfil de quem comenta, a data é a do servidor, e editar mexe só no texto.
+
+Links da demanda só viram link clicável quando são endereço da web, e-mail (`mailto:`) ou telefone (`tel:`). Esquemas que executam algo ao clicar nunca são gravados.
 
 ## Notas de operação
 

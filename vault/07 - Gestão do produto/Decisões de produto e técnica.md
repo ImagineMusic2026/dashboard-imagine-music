@@ -6,6 +6,26 @@ tipo: registro-de-decisoes
 
 Registre aqui decisões que evitam rediscussão no futuro. Cada nova entrada deve ter data, contexto, decisão, motivo e consequência.
 
+## 2026-10-21 — Colaborador é um papel à parte, fora da equipe
+
+**Contexto:** a cliente quis dar acesso a um designer só ao quadro de Atividades e sugeriu uma opção "Outros" com caixas do que a pessoa pode ver. A matriz de permissões já existia, mas só valia em cima de marketing, e ser da equipe dá acesso fixo a artistas, métricas e ao time.
+
+**Decisão:** novo papel `colaborador`, fora de `isStaff()`, que só recebe as áreas marcadas no convite. Nas Atividades ele vê e mexe só nas demandas em que é o responsável (resposta da cliente).
+
+**Motivo:** convidar como marketing e desligar chaves deixaria o designer lendo o roster, os projetos, as métricas e a lista do time pelo navegador. Esconder menu não é fronteira; a regra do Firestore é por documento.
+
+**Consequência:** cada área nova para o colaborador exige antes uma fronteira própria nas regras. Por isso a fase 1 tem só Atividades.
+
+## 2026-10-21 — Convite não pode ser alterado pelo convidado
+
+**Contexto:** ao desenhar o colaborador, a leitura das regras mostrou que quem tinha o link de um convite podia trocar o papel do próprio convite para admin antes do aceite, e gravar um mapa de permissões próprio no perfil. Até um artista convidado podia se dar acesso à receita de todo o roster.
+
+**Decisão:** o convidado só marca o convite como aceito, no mesmo lote em que o perfil nasce. O perfil não aceita campos além dos do convite, e as permissões têm de ser exatamente as do convite. Receita, importação e agenda passaram a exigir ser da equipe.
+
+**Motivo:** o papel vinha do convite, e o convite era editável por quem o recebia.
+
+**Consequência:** o aceite agora é uma gravação única (perfil e convite juntos). Os casos de abuso ficaram cobertos por um teste de regras no emulador.
+
 ## 2026-09-09 — Perfil do artista em abas, montando só a aberta
 
 **Decisão:** o perfil deixa de ser uma rolagem com dezesseis cards e passa a ter cinco abas, com apenas a aba ativa montada.

@@ -28,6 +28,7 @@ import {
   salvarChecklist,
   salvarDependencias,
   salvarLinks,
+  urlSegura,
   type Atividade,
   type ItemChecklist,
   type LinkDemanda,
@@ -48,6 +49,7 @@ import {
   prioridadeMeta,
   tipoDe,
 } from '@/lib/atividades/tipos'
+import { ehStaff } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const campo =
@@ -83,6 +85,8 @@ export function AtividadeDetalhe({
   bloqueado: boolean
 }) {
   const { appUser } = useAuth()
+  // Só a equipe abre o perfil do artista; para o colaborador o nome é texto.
+  const equipe = ehStaff(appUser?.role ?? null)
   const {
     config,
     todas,
@@ -108,6 +112,9 @@ export function AtividadeDetalhe({
   const [novoItem, setNovoItem] = useState('')
   const [novaSub, setNovaSub] = useState('')
   const [novoLink, setNovoLink] = useState({ titulo: '', url: '' })
+  // Aviso do campo de link fica junto dele: o erro do quadro aparece atrás
+  // deste painel, e a pessoa clicaria em adicionar sem ver por que nada houve.
+  const [erroLink, setErroLink] = useState<string | null>(null)
   const [salvandoAlgo, setSalvandoAlgo] = useState(false)
   const painel = useRef<HTMLElement>(null)
 
@@ -117,7 +124,12 @@ export function AtividadeDetalhe({
   const filhos = filhosDe(todas, a.id)
   const feito = progresso(a)
   const situacao = situacaoDaBarra(a, todas, config)
-  const problemas = useMemo(() => conflitosDe(todas, config).get(a.id) ?? [], [todas, config, a.id])
+  // Para o colaborador `todas` são só as demandas dele: antecessora que não
+  // está ali é da equipe, não excluída.
+  const problemas = useMemo(
+    () => conflitosDe(todas, config, todas, { universoParcial: !equipe }).get(a.id) ?? [],
+    [todas, config, a.id, equipe],
+  )
   const mae = a.paiId ? todas.find((x) => x.id === a.paiId) : null
 
   // Booleano, não o objeto `config`: a configuração é recriada a cada leitura do
@@ -262,8 +274,13 @@ export function AtividadeDetalhe({
 
   async function adicionarLink(e: FormEvent) {
     e.preventDefault()
-    const url = novoLink.url.trim()
-    if (!url) return
+    if (!novoLink.url.trim()) return
+    const url = urlSegura(novoLink.url)
+    if (!url) {
+      setErroLink('Use um endereço da web, um e-mail (mailto:) ou um telefone (tel:).')
+      return
+    }
+    setErroLink(null)
     const links: LinkDemanda[] = [
       ...(a.links ?? []),
       { id: idLocal(), titulo: novoLink.titulo.trim() || url, url },
@@ -345,6 +362,9 @@ export function AtividadeDetalhe({
                 <p className="text-[11px] text-ink-500 mb-1 truncate">
                   Subtarefa de <span className="text-ink-300">{mae.titulo}</span>
                 </p>
+              )}
+              {!mae && a.paiId && !equipe && (
+                <p className="text-[11px] text-ink-500 mb-1 truncate">Subtarefa de um projeto da equipe</p>
               )}
               <h2 className="text-lg font-bold text-ink-100 leading-snug">{a.titulo}</h2>
             </div>
@@ -449,7 +469,7 @@ export function AtividadeDetalhe({
               <div>
                 <dt className="text-ink-500 mb-0.5">Artista</dt>
                 <dd className="text-ink-200 truncate">
-                  {a.artistaSlug && a.artistaNome ? (
+                  {equipe && a.artistaSlug && a.artistaNome ? (
                     <Link
                       href={`/artistas/${a.artistaSlug}`}
                       className="text-violet-400 hover:text-violet-300"
@@ -637,19 +657,30 @@ export function AtividadeDetalhe({
               <ul className="space-y-1.5 mb-2">
                 {(a.dependeDe ?? []).map((depId) => {
                   const dep = todas.find((x) => x.id === depId)
+                  // O colaborador só enxerga as demandas dele: a antecessora que
+                  // não aparece é da equipe. Ele vê que ela existe, mas não a tira
+                  // — quem montou a sequência foi a equipe.
+                  const daEquipe = !dep && !equipe
                   return (
                     <li key={depId} className="flex items-center gap-2">
                       <span className="text-[13px] flex-1 truncate text-ink-200">
-                        {dep?.titulo ?? <span className="text-ink-600 italic">demanda excluída</span>}
+                        {dep?.titulo ??
+                          (daEquipe ? (
+                            <span className="text-ink-500 italic">demanda da equipe</span>
+                          ) : (
+                            <span className="text-ink-600 italic">demanda excluída</span>
+                          ))}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => alternarDependencia(depId)}
-                        aria-label={`Remover dependência de "${dep?.titulo ?? depId}"`}
-                        className="p-0.5 rounded text-ink-600 hover:text-red-400 transition-colors shrink-0"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      {!daEquipe && (
+                        <button
+                          type="button"
+                          onClick={() => alternarDependencia(depId)}
+                          aria-label={`Remover dependência de "${dep?.titulo ?? depId}"`}
+                          className="p-0.5 rounded text-ink-600 hover:text-red-400 transition-colors shrink-0"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </li>
                   )
                 })}
@@ -679,17 +710,27 @@ export function AtividadeDetalhe({
           {campoLigado(config, 'links') && (
             <Secao icone={Link2} titulo="Links" contagem={(a.links ?? []).length}>
               <ul className="space-y-1.5 mb-2">
-                {(a.links ?? []).map((l) => (
+                {(a.links ?? []).map((l) => {
+                  // Link gravado antes da trava (ou por fora do painel) com
+                  // esquema que não é web aparece como texto, nunca como href.
+                  const href = urlSegura(l.url)
+                  return (
                   <li key={l.id} className="flex items-center gap-2 group">
-                    <a
-                      href={l.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[13px] text-violet-400 hover:text-violet-300 truncate flex items-center gap-1.5 flex-1"
-                    >
-                      <ExternalLink className="w-3 h-3 shrink-0" aria-hidden />
-                      {l.titulo}
-                    </a>
+                    {href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[13px] text-violet-400 hover:text-violet-300 truncate flex items-center gap-1.5 flex-1"
+                      >
+                        <ExternalLink className="w-3 h-3 shrink-0" aria-hidden />
+                        {l.titulo}
+                      </a>
+                    ) : (
+                      <span className="text-[13px] text-ink-400 truncate flex-1" title={l.url}>
+                        {l.titulo}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => removerLink(l.id)}
@@ -699,7 +740,8 @@ export function AtividadeDetalhe({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
               <form onSubmit={adicionarLink} className="grid grid-cols-[1fr_1.4fr_auto] gap-2">
                 <input
@@ -713,9 +755,14 @@ export function AtividadeDetalhe({
                 <input
                   type="url"
                   value={novoLink.url}
-                  onChange={(e) => setNovoLink({ ...novoLink, url: e.target.value })}
+                  onChange={(e) => {
+                    setNovoLink({ ...novoLink, url: e.target.value })
+                    setErroLink(null)
+                  }}
                   placeholder="https://…"
                   aria-label="Endereço do link"
+                  aria-invalid={!!erroLink}
+                  aria-describedby={erroLink ? 'erro-link' : undefined}
                   className={cn(campo, 'py-1.5 text-[13px]')}
                 />
                 <button
@@ -726,6 +773,11 @@ export function AtividadeDetalhe({
                   <Plus className="w-4 h-4" />
                 </button>
               </form>
+              {erroLink && (
+                <p id="erro-link" role="alert" className="text-[12px] text-amber-300 mt-1.5">
+                  {erroLink}
+                </p>
+              )}
             </Secao>
           )}
 

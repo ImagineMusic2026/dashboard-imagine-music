@@ -10,8 +10,10 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react'
+import { useAuth } from '@/components/auth/auth-provider'
 import { useQuadro } from '@/components/atividades/quadro-contexto'
 import { diasEntre, somarDias, type Atividade } from '@/lib/atividades/client'
+import { ehColaborador } from '@/lib/permissions'
 import {
   agrupamentoMeta,
   barraDe,
@@ -127,8 +129,14 @@ export function CronogramaView({
   // O terceiro argumento é o universo: as antecessoras são procuradas no quadro
   // INTEIRO, mesmo que a iteração seja só sobre o recorte. Sem isso, filtrar por
   // um artista fazia toda dependência de fora do filtro virar "depende de uma
-  // demanda que não existe mais".
-  const conflitos = useMemo(() => conflitosDe(visiveis, config, todas), [visiveis, config, todas])
+  // demanda que não existe mais". Para o colaborador nem o quadro inteiro é o
+  // quadro inteiro (só as demandas dele), então antecessora de fora não acusa.
+  const { role } = useAuth()
+  const universoParcial = ehColaborador(role)
+  const conflitos = useMemo(
+    () => conflitosDe(visiveis, config, todas, { universoParcial }),
+    [visiveis, config, todas, universoParcial],
+  )
   const critico = useMemo(
     () => (mostrarCritico ? caminhoCritico(visiveis) : new Set<string>()),
     [visiveis, mostrarCritico],

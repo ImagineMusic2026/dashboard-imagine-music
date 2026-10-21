@@ -31,6 +31,7 @@ import {
   type Prioridade,
   type TemplateDemanda,
 } from '@/lib/atividades/tipos'
+import { ehColaborador } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const campo =
@@ -64,6 +65,10 @@ export function AtividadeDialog({
   const { config, todas, artistas, equipe, etiquetasConhecidas, aplicarLocal, recarregar } =
     useQuadro()
   const editando = !!atividade
+  // O colaborador só mexe nas demandas em que é o responsável — então ele é
+  // sempre o responsável do que cria, e não repassa (a demanda sumiria da tela
+  // dele e a regra do Firestore recusaria).
+  const colaborador = ehColaborador(appUser?.role ?? null)
 
   const [modelo, setModelo] = useState<TemplateDemanda | null>(null)
   /** Título cru do modelo, com `{artista}` ainda por resolver. */
@@ -85,7 +90,9 @@ export function AtividadeDialog({
   const [etiquetas, setEtiquetas] = useState<string[]>(atividade?.etiquetas ?? [])
   const [novaEtiqueta, setNovaEtiqueta] = useState('')
   const [artistaSlug, setArtistaSlug] = useState(atividade?.artistaSlug ?? '')
-  const [responsavelUid, setResponsavelUid] = useState(atividade?.responsavelUid ?? '')
+  const [responsavelUid, setResponsavelUid] = useState(
+    atividade?.responsavelUid ?? (colaborador ? (appUser?.uid ?? '') : ''),
+  )
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -206,7 +213,20 @@ export function AtividadeDialog({
     }
     setSalvando(true)
     try {
-      const resp = equipe.find((u) => u.uid === responsavelUid)
+      const uidResponsavel = colaborador ? appUser.uid : responsavelUid
+      const resp = equipe.find((u) => u.uid === uidResponsavel)
+      // Nome que vai junto: o da lista quando a pessoa ou o artista está nela;
+      // senão, se a escolha NÃO mudou, o que a demanda já tinha. Sem isso, editar
+      // uma demanda cujo artista saiu do roster (ou cujo responsável foi
+      // desativado) apagava o nome dela para o time todo.
+      const artistaNome =
+        artistaEscolhido?.nome ??
+        (artistaSlug && artistaSlug === atividade?.artistaSlug ? (atividade?.artistaNome ?? null) : null)
+      const responsavelNome = resp
+        ? resp.nome || resp.email
+        : uidResponsavel && uidResponsavel === atividade?.responsavelUid
+          ? (atividade?.responsavelNome ?? null)
+          : null
       const dados = {
         titulo: titulo.trim(),
         descricao,
@@ -222,9 +242,9 @@ export function AtividadeDialog({
         esforco: marco ? null : esforco || null,
         marco,
         artistaSlug: artistaSlug || null,
-        artistaNome: artistaEscolhido?.nome ?? null,
-        responsavelUid: responsavelUid || null,
-        responsavelNome: resp ? resp.nome || resp.email : null,
+        artistaNome,
+        responsavelUid: uidResponsavel || null,
+        responsavelNome,
         paiId: atividade?.paiId ?? null,
         dependeDe: atividade?.dependeDe ?? [],
         checklist: atividade?.checklist ?? [],
@@ -469,7 +489,9 @@ export function AtividadeDialog({
                   id="at-resp"
                   value={responsavelUid}
                   onChange={(e) => setResponsavelUid(e.target.value)}
-                  className={campo}
+                  disabled={colaborador}
+                  title={colaborador ? 'As suas demandas ficam sempre com você.' : undefined}
+                  className={cn(campo, colaborador && 'opacity-70 cursor-not-allowed')}
                 >
                   <option value="">— A definir —</option>
                   {equipe.map((u) => (

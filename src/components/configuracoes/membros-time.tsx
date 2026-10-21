@@ -49,8 +49,9 @@ export function MembrosTime({ modo = 'time' }: { modo?: 'time' | 'artistas' }) {
 
   const ehAdmin = role === 'admin'
   const carregando = users === null
-  // O time de trabalho é admin + marketing; artistas são logins de portal (área
-  // própria, fora da equipe). `modo` escolhe qual recorte esta instância mostra —
+  // O time de trabalho é admin + marketing, mais os colaboradores de fora (que
+  // só entram nas áreas deles); artistas são logins de portal (área própria,
+  // fora da equipe). `modo` escolhe qual recorte esta instância mostra —
   // assim a aba "Time" e a aba "Artistas" reusam o mesmo componente e fetch.
   const ehArtistas = modo === 'artistas'
   // Convidar pro TIME é só admin; convidar ARTISTA segue a permissão
@@ -67,7 +68,7 @@ export function MembrosTime({ modo = 'time' }: { modo?: 'time' | 'artistas' }) {
         descricao={
           ehArtistas
             ? `${lista.length} ${lista.length === 1 ? 'artista' : 'artistas'} · acesso só ao próprio portal`
-            : `${lista.length} ${lista.length === 1 ? 'ativo' : 'ativos'} · admin e marketing`
+            : `${lista.length} ${lista.length === 1 ? 'ativo' : 'ativos'} · admin, marketing e colaboradores`
         }
         membros={carregando ? null : lista}
         erro={erro}

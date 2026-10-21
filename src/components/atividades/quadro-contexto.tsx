@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
-import { listarArtistas, type ArtistaDoc } from '@/lib/artistas/client'
+import { listarArtistas } from '@/lib/artistas/client'
 import { carregarConfig } from '@/lib/atividades/config'
 import {
   concluida,
@@ -18,18 +18,21 @@ import {
   estaAtrasada,
   excluirAtividade,
   invalidarAtividades,
+  listarArtistasDoColaborador,
   listarAtividades,
-  listarEquipe,
+  listarResponsaveis,
   moverAtividade,
   ordemAoSoltar,
   progressoDe,
   reprogramar,
   salvarChecklist,
   transicao,
+  type ArtistaOpcao,
   type Atividade,
   type ItemChecklist,
 } from '@/lib/atividades/client'
 import { CONFIG_PADRAO, type ConfigQuadro, type Prioridade } from '@/lib/atividades/tipos'
+import { ehColaborador } from '@/lib/permissions'
 import type { AppUser } from '@/lib/users'
 
 /**
@@ -95,7 +98,8 @@ interface QuadroCtx {
   noEscopo: Atividade[]
   carregando: boolean
   erro: string | null
-  artistas: ArtistaDoc[]
+  artistas: ArtistaOpcao[]
+  /** Quem pode ser responsável (para o colaborador, só ele mesmo). */
   equipe: AppUser[]
   filtros: FiltrosQuadro
   setFiltros: (f: FiltrosQuadro) => void
@@ -128,9 +132,13 @@ export function useQuadro(): QuadroCtx {
 
 export function QuadroProvider({ children }: { children: ReactNode }) {
   const { user, appUser } = useAuth()
+  // O colaborador enxerga só as demandas em que é o responsável (a regra do
+  // Firestore recorta do mesmo jeito) e não lê o roster nem o time.
+  const colaborador = ehColaborador(appUser?.role ?? null)
+  const soDoResponsavel = colaborador ? (appUser?.uid ?? null) : null
   const [config, setConfig] = useState<ConfigQuadro | null>(null)
   const [todas, setTodas] = useState<Atividade[] | null>(null)
-  const [artistas, setArtistas] = useState<ArtistaDoc[]>([])
+  const [artistas, setArtistas] = useState<ArtistaOpcao[]>([])
   const [equipe, setEquipe] = useState<AppUser[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [excluindo, setExcluindo] = useState<string | null>(null)
@@ -144,27 +152,40 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
 
   const carregar = useCallback(async () => {
     try {
-      setTodas(await listarAtividades())
+      setTodas(await listarAtividades(soDoResponsavel))
       setErro(null)
     } catch {
       setErro(
         'Não consegui carregar o quadro. Confirme que as regras do Firestore estão publicadas.',
       )
     }
-  }, [])
+  }, [soDoResponsavel])
 
   useEffect(() => {
     carregar()
     carregarConfig()
       .then(setConfig)
       .catch(() => setConfig(CONFIG_PADRAO))
+  }, [carregar])
+
+  // Listas dos seletores. Para a equipe, o roster e quem pode receber demanda
+  // (equipe + colaboradores). Para o colaborador, os artistas vêm do servidor
+  // (só slug e nome) e o responsável é sempre ele.
+  useEffect(() => {
+    if (colaborador) {
+      listarArtistasDoColaborador()
+        .then(setArtistas)
+        .catch(() => setArtistas([]))
+      setEquipe(appUser ? [appUser] : [])
+      return
+    }
     listarArtistas()
       .then(setArtistas)
       .catch(() => setArtistas([]))
-    listarEquipe()
+    listarResponsaveis()
       .then(setEquipe)
       .catch(() => setEquipe([]))
-  }, [carregar])
+  }, [colaborador, appUser])
 
   /**
    * Relê as DEMANDAS. Não relê a configuração de propósito: ela só muda quando

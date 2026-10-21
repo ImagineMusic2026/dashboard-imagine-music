@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
+import { ehStaff } from '@/lib/permissions'
 import { carregarAlertas } from '@/lib/alertas/client'
 import { type AlertaDerivado } from '@/lib/alertas/derivar'
 import { filtrarPorPrefs, NOTIF_PREFS_EVENT } from '@/lib/alertas/preferencias'
@@ -18,7 +19,8 @@ export function useQtdAlertas(): number | null {
   const [qtd, setQtd] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!role) {
+    // Alertas saem do roster e das métricas, que só a equipe lê.
+    if (!ehStaff(role)) {
       setTodos(null)
       setQtd(null)
       return

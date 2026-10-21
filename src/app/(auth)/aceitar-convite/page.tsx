@@ -2,13 +2,13 @@
 
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ArrowRight, RefreshCw } from 'lucide-react'
 import { FirebaseError } from 'firebase/app'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
-import { getConvite, marcarConviteAceito, type Convite } from '@/lib/invites'
+import { auth } from '@/lib/firebase'
+import { aceitarConvite, getConvite, type Convite } from '@/lib/invites'
+import { rotaInicial } from '@/lib/permissions'
 import { roleMeta } from '@/lib/users'
 import { cn } from '@/lib/utils'
 import { BrandLogo } from '@/components/shared/logo'
@@ -32,7 +32,6 @@ function Marca() {
 }
 
 function AceitarConviteInner() {
-  const router = useRouter()
   const params = useSearchParams()
   const token = params.get('token')
 
@@ -72,17 +71,13 @@ function AceitarConviteInner() {
     setEnviando(true)
     try {
       const cred = await createUserWithEmailAndPassword(auth, convite.email, senha)
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        email: convite.email,
-        nome: convite.nome,
-        role: convite.role,
-        ativo: true,
-        conviteToken: token,
-        // Só para artista: amarra o login ao slug do artista (validado nas regras).
-        ...(convite.artistaSlug ? { artistaSlug: convite.artistaSlug } : {}),
-      })
-      await marcarConviteAceito(token)
-      router.push('/home')
+      await aceitarConvite({ ...convite, token }, cred.user.uid)
+      // Recarrega a página em vez de navegar: o perfil foi lido quando a conta
+      // nasceu, ANTES do setDoc acima, e ficaria vazio até um reload. Com o
+      // reload a guarda já sabe o papel e leva cada um à tela certa.
+      window.location.assign(
+        rotaInicial({ role: convite.role, permissoes: convite.permissoes }) ?? '/home',
+      )
     } catch (err) {
       console.error(err)
       setErro(mensagemErro(err))

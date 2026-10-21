@@ -15,6 +15,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
+import { useAuth } from '@/components/auth/auth-provider'
 import { useQuadro } from '@/components/atividades/quadro-contexto'
 import { corAvatarDe, iniciaisDe } from '@/lib/artistas/client'
 import { filhosDe, type Atividade } from '@/lib/atividades/client'
@@ -28,6 +29,7 @@ import {
   tipoDe,
   esforcoMeta,
 } from '@/lib/atividades/tipos'
+import { ehStaff } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 /** A partir de quantos dias parada a demanda ganha o selo de travada. */
@@ -61,6 +63,9 @@ export function AtividadeCard({
 }) {
   const { config, todas, mover, remover, excluindo, progresso, atrasada, concluida, paradaHa } =
     useQuadro()
+  // Só a equipe abre o perfil do artista; para o colaborador o nome é texto.
+  const { role } = useAuth()
+  const equipe = ehStaff(role)
   const a = atividade
 
   const i = config.etapas.findIndex((e) => e.key === a.etapa)
@@ -202,7 +207,7 @@ export function AtividadeCard({
               gradient={corAvatarDe(a.artistaSlug ?? a.artistaNome)}
               size="sm"
             />
-            {a.artistaSlug ? (
+            {equipe && a.artistaSlug ? (
               <Link
                 href={`/artistas/${a.artistaSlug}`}
                 className="text-[12px] text-violet-400 hover:text-violet-300 truncate"

@@ -3,13 +3,15 @@ import {
   collection,
   doc,
   getDocs,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import { memoCurta } from '@/lib/cache-leitura'
-import { ehStaff } from '@/lib/permissions'
+import { ehColaborador, ehStaff, temPermissao } from '@/lib/permissions'
 import { listAppUsers, type AppUser } from '@/lib/users'
 import {
   chavesFinais,
@@ -170,29 +172,47 @@ export function idLocal(): string {
 /* Leitura                                                                     */
 /* -------------------------------------------------------------------------- */
 
-async function lerAtividades(): Promise<Atividade[]> {
+async function lerAtividades(soDoResponsavel: string | null): Promise<Atividade[]> {
   // Sem `orderBy` na consulta de propósito: a ordenação é composta (etapa +
   // ordem), cada visão reordena do seu jeito, e assim não exige índice composto.
-  const snap = await getDocs(collection(db, COL))
+  //
+  // O colaborador lê só as demandas em que é o responsável, e a regra do
+  // Firestore só aceita a consulta dele se o `where` PROVAR esse recorte — sem
+  // ele, a leitura inteira volta negada.
+  const ref = collection(db, COL)
+  const snap = await getDocs(
+    soDoResponsavel ? query(ref, where('responsavelUid', '==', soDoResponsavel)) : ref,
+  )
   return snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as Omit<Atividade, 'id'>) }))
     .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
 }
 
-const cacheAtividades = memoCurta(lerAtividades)
+const cacheAtividades = memoCurta(() => lerAtividades(null))
+const cachesDoResponsavel = new Map<string, { ler: () => Promise<Atividade[]>; invalidar: () => void }>()
 
 /**
  * O quadro inteiro. Cacheado como as outras leituras de coleção: a cota gratuita
  * do Firestore já derrubou o painel uma vez, e esta é a tela que a pessoa abre e
  * reabre o dia todo. Escrever atualiza o estado local e invalida o cache — mover
  * um card NÃO relê a coleção.
+ *
+ * Com `soDoResponsavel`, só as demandas daquela pessoa (é a leitura do
+ * colaborador), num cache separado do quadro inteiro.
  */
-export function listarAtividades(): Promise<Atividade[]> {
-  return cacheAtividades.ler()
+export function listarAtividades(soDoResponsavel?: string | null): Promise<Atividade[]> {
+  if (!soDoResponsavel) return cacheAtividades.ler()
+  let cache = cachesDoResponsavel.get(soDoResponsavel)
+  if (!cache) {
+    cache = memoCurta(() => lerAtividades(soDoResponsavel))
+    cachesDoResponsavel.set(soDoResponsavel, cache)
+  }
+  return cache.ler()
 }
 
 export function invalidarAtividades(): void {
   cacheAtividades.invalidar()
+  cachesDoResponsavel.forEach((c) => c.invalidar())
 }
 
 /** Quem pode aparecer como responsável: equipe Imagine ativa. */
@@ -205,6 +225,52 @@ const cacheEquipe = memoCurta(lerEquipe)
 
 export function listarEquipe(): Promise<AppUser[]> {
   return cacheEquipe.ler()
+}
+
+/**
+ * Quem pode receber uma demanda no quadro: a equipe ativa MAIS os
+ * colaboradores ativos com a área Atividades. Separado de `listarEquipe`
+ * porque o dossiê do artista também usa aquela lista, e lá colaborador não
+ * entra.
+ */
+async function lerResponsaveis(): Promise<AppUser[]> {
+  const todos = await listAppUsers()
+  return todos.filter(
+    (u) =>
+      u.ativo !== false &&
+      (ehStaff(u.role) || (ehColaborador(u.role) && temPermissao(u, 'atividades'))),
+  )
+}
+
+const cacheResponsaveis = memoCurta(lerResponsaveis)
+
+export function listarResponsaveis(): Promise<AppUser[]> {
+  return cacheResponsaveis.ler()
+}
+
+/** Artista como o seletor do quadro precisa: só o endereço e o nome. */
+export interface ArtistaOpcao {
+  slug: string
+  nome: string
+}
+
+/**
+ * Artistas para o seletor do COLABORADOR. Ele não lê a coleção `artistas` (a
+ * regra é da equipe), então pede ao servidor só slug e nome — nada do cadastro.
+ */
+async function lerArtistasDoColaborador(): Promise<ArtistaOpcao[]> {
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+  const res = await fetch('/api/atividades/opcoes', { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new Error('Não foi possível carregar os artistas.')
+  const data = (await res.json()) as { artistas?: ArtistaOpcao[] }
+  return data.artistas ?? []
+}
+
+const cacheArtistasDoColaborador = memoCurta(lerArtistasDoColaborador)
+
+export function listarArtistasDoColaborador(): Promise<ArtistaOpcao[]> {
+  return cacheArtistasDoColaborador.ler()
 }
 
 /* -------------------------------------------------------------------------- */
@@ -249,6 +315,39 @@ export function diasEntre(a: string, b: string): number {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * O endereço que pode virar `href` na tela. Só web, e-mail e telefone: o valor
+ * é clicado por quem abre a demanda, e agora há gente de fora do time gravando
+ * no quadro (`javascript:` num link seria código rodando na sessão de um admin).
+ * Sem esquema ganha `https://` — quem cola "drive.google.com/..." quer o Drive,
+ * e "localhost:3000" é host com porta, não esquema. Outro esquema (`spotify:`,
+ * `javascript:`) devolve `null`: a tela mostra como texto, sem link.
+ */
+export function urlSegura(bruta: string): string | null {
+  const url = bruta.trim()
+  if (!url) return null
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(url)) return url
+  if (/^[a-z][a-z0-9+.-]*:(?!\d)/i.test(url)) return null
+  return `https://${url}`
+}
+
+/** Esquemas que executam algo ao clicar — nunca são gravados. */
+const ESQUEMA_PERIGOSO = /^(javascript|data|vbscript):/i
+
+/**
+ * Normaliza a lista para gravar. Só descarta o que é perigoso: um link antigo
+ * com outro esquema (`spotify:`, por exemplo) continua guardado — a tela é que
+ * não o transforma em link. Descartar tudo que não fosse web apagaria, sem
+ * aviso, links que a equipe já usa.
+ */
+function linksSeguros(links: LinkDemanda[]): LinkDemanda[] {
+  return links.flatMap((l) => {
+    const url = l.url.trim()
+    if (!url || ESQUEMA_PERIGOSO.test(url.replace(/\s+/g, ''))) return []
+    return [{ id: l.id || idLocal(), titulo: l.titulo.trim() || url, url }]
+  })
+}
+
+/**
  * O Firestore recusa `undefined`. Este é o único ponto por onde os dados do
  * formulário entram no banco, então é aqui que tudo vira valor ou `null`.
  */
@@ -256,9 +355,7 @@ function limpar(dados: DadosAtividade) {
   const checklist = (dados.checklist ?? [])
     .filter((i) => i.texto.trim())
     .map((i) => ({ id: i.id || idLocal(), texto: i.texto.trim(), feito: !!i.feito }))
-  const links = (dados.links ?? [])
-    .filter((l) => l.url.trim())
-    .map((l) => ({ id: l.id || idLocal(), titulo: l.titulo.trim() || l.url.trim(), url: l.url.trim() }))
+  const links = linksSeguros(dados.links ?? [])
   return {
     titulo: dados.titulo.trim(),
     descricao: dados.descricao?.trim() || null,
@@ -377,7 +474,7 @@ export async function salvarChecklist(id: string, checklist: ItemChecklist[]): P
 }
 
 export async function salvarLinks(id: string, links: LinkDemanda[]): Promise<void> {
-  await updateDoc(doc(db, COL, id), { links, atualizadoEm: serverTimestamp() })
+  await updateDoc(doc(db, COL, id), { links: linksSeguros(links), atualizadoEm: serverTimestamp() })
   invalidarAtividades()
 }
 

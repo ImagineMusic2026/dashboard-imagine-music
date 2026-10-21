@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Loader2, RotateCcw } from 'lucide-react'
+import { Check, Loader2, Lock, RotateCcw } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import {
@@ -11,18 +11,30 @@ import {
   type AppUser,
   type Capacidade,
 } from '@/lib/users'
-import { CAPACIDADES, temPermissao } from '@/lib/permissions'
+import { CAPACIDADES, CONCEDIVEIS, ehColaborador, temPermissao } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 /**
  * Permissões. O acesso parte do PAPEL (padrão), mas o admin pode conceder ou
  * restringir capacidades POR PESSOA — um override gravado em
  * `users/{uid}.permissoes`, honrado nas 3 camadas (UI, API e regras do Firestore).
+ *
+ * O colaborador só tem switch nas áreas que o papel pode receber; nas outras
+ * aparece um cadeado. E ele não tem "padrão": o padrão dele é não ver nada, e
+ * restaurar tiraria o acesso que o convite deu.
  */
 
 function iniciaisDe(u: AppUser): string {
   const base = u.nome?.trim() || u.email
   return base.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase()
+}
+
+function podeTer(u: AppUser, cap: Capacidade): boolean {
+  return !!CONCEDIVEIS[u.role]?.includes(cap)
+}
+
+function mostraPadrao(u: AppUser): boolean {
+  return !ehColaborador(u.role) && !!u.permissoes && Object.keys(u.permissoes).length > 0
 }
 
 export function MatrizPermissoes() {
@@ -133,7 +145,7 @@ export function MatrizPermissoes() {
                   </thead>
                   <tbody className="divide-y divide-bg-700/30">
                     {users.map((u) => {
-                      const temOverride = u.permissoes && Object.keys(u.permissoes).length > 0
+                      const temOverride = mostraPadrao(u)
                       return (
                         <tr key={u.uid} className="group hover:bg-bg-800/30 transition-colors">
                           <td className="sticky left-0 z-10 bg-bg-900 group-hover:bg-bg-800 border-r border-bg-700/40 py-3 px-5">
@@ -150,6 +162,21 @@ export function MatrizPermissoes() {
                           {CAPACIDADES.map((c) => {
                             const ligado = temPermissao(u, c.cap)
                             const ehOverride = u.permissoes?.[c.cap] !== undefined
+                            if (!podeTer(u, c.cap)) {
+                              return (
+                                <td key={c.cap} className="py-3 px-3 text-center">
+                                  <span
+                                    className="inline-flex text-ink-600"
+                                    title={`Não disponível para ${roleMeta[u.role].label.toLowerCase()}`}
+                                  >
+                                    <Lock className="w-3.5 h-3.5" aria-hidden />
+                                    <span className="sr-only">
+                                      {`${c.label}: não disponível para ${roleMeta[u.role].label.toLowerCase()}`}
+                                    </span>
+                                  </span>
+                                </td>
+                              )
+                            }
                             return (
                               <td key={c.cap} className="py-3 px-3 text-center">
                                 <Switch
@@ -190,7 +217,7 @@ export function MatrizPermissoes() {
               {/* Mobile: um card por pessoa, capacidades empilhadas — sem scroll lateral. */}
               <div className="sm:hidden divide-y divide-bg-700/30">
                 {users.map((u) => {
-                  const temOverride = u.permissoes && Object.keys(u.permissoes).length > 0
+                  const temOverride = mostraPadrao(u)
                   return (
                     <div key={u.uid} className="p-4 space-y-3">
                       <div className="flex items-center gap-3">
@@ -214,7 +241,7 @@ export function MatrizPermissoes() {
                         )}
                       </div>
                       <div className="rounded-lg border border-bg-700/40 divide-y divide-bg-700/30">
-                        {CAPACIDADES.map((c) => {
+                        {CAPACIDADES.filter((c) => podeTer(u, c.cap)).map((c) => {
                           const ligado = temPermissao(u, c.cap)
                           const ehOverride = u.permissoes?.[c.cap] !== undefined
                           return (

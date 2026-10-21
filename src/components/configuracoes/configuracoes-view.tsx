@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAuth } from '@/components/auth/auth-provider'
 import { ConfigQuadroTab } from '@/components/atividades/config-quadro'
 import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
 import { MatrizPermissoes } from '@/components/configuracoes/matriz-permissoes'
 import { NotificacoesPrefs } from '@/components/configuracoes/notificacoes-prefs'
 import { PerfilTab } from '@/components/configuracoes/perfil-tab'
+import { ehStaff } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 type Aba = 'time' | 'artistas' | 'permissoes' | 'quadro' | 'notificacoes' | 'perfil'
@@ -23,7 +25,13 @@ const ABAS: { key: Aba; label: string }[] = [
 const ABAS_VALIDAS = new Set(ABAS.map((a) => a.key))
 
 export function ConfiguracoesView() {
+  const { role } = useAuth()
   const [aba, setAba] = useState<Aba>('time')
+  // O colaborador só cuida do próprio perfil: as outras abas são o time, os
+  // logins de artista, a matriz e a configuração do quadro inteiro. Uma aba
+  // pedida fora disso (ex.: `?aba=time`) cai na primeira que ele tem.
+  const abas = ehStaff(role) ? ABAS : ABAS.filter((a) => a.key === 'perfil')
+  const abaAtual = abas.some((a) => a.key === aba) ? aba : abas[0].key
 
   // `?aba=quadro` abre direto na configuração do quadro — é o link que o botão
   // "Configurar quadro" da tela de Atividades usa. Lido de `window` e não de
@@ -41,14 +49,14 @@ export function ConfiguracoesView() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <aside className="lg:col-span-1">
           <nav className="bg-bg-900 border border-bg-700/40 rounded-xl p-2 flex gap-1 overflow-x-auto lg:block lg:space-y-1 lg:sticky lg:top-24">
-            {ABAS.map((item) => (
+            {abas.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => setAba(item.key)}
                 className={cn(
                   'shrink-0 lg:w-full text-left whitespace-nowrap px-3 py-2 rounded-lg text-sm transition-colors border',
-                  aba === item.key
+                  abaAtual === item.key
                     ? 'bg-violet-500/10 text-violet-400 font-semibold border-violet-500/20'
                     : 'text-ink-300 hover:bg-bg-800 border-transparent',
                 )}
@@ -60,22 +68,22 @@ export function ConfiguracoesView() {
         </aside>
 
         <div className="lg:col-span-2 space-y-4">
-          {aba === 'time' && (
+          {abaAtual === 'time' && (
             <>
               <MembrosTime modo="time" />
               <ConvitesPendentes modo="time" />
             </>
           )}
-          {aba === 'artistas' && (
+          {abaAtual === 'artistas' && (
             <>
               <MembrosTime modo="artistas" />
               <ConvitesPendentes modo="artistas" />
             </>
           )}
-          {aba === 'permissoes' && <MatrizPermissoes />}
-          {aba === 'quadro' && <ConfigQuadroTab />}
-          {aba === 'notificacoes' && <NotificacoesPrefs />}
-          {aba === 'perfil' && <PerfilTab />}
+          {abaAtual === 'permissoes' && <MatrizPermissoes />}
+          {abaAtual === 'quadro' && <ConfigQuadroTab />}
+          {abaAtual === 'notificacoes' && <NotificacoesPrefs />}
+          {abaAtual === 'perfil' && <PerfilTab />}
         </div>
       </div>
     </div>

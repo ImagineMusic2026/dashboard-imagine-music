@@ -24,6 +24,7 @@ import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/components/auth/auth-provider'
 import { BrandLogo } from '@/components/shared/logo'
 import { useQtdAlertas } from '@/lib/alertas/use-qtd-alertas'
+import { ehStaff, rotaPermitida } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 type NavItem = {
@@ -102,14 +103,15 @@ export function Sidebar({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, role } = useAuth()
+  const { user, role, appUser } = useAuth()
   const [qtdArtistas, setQtdArtistas] = useState<number | null>(null)
   const qtdAlertas = useQtdAlertas()
 
   // Contagem real de artistas no cadastro (Firestore). A coleção `artistas` é
-  // legível por qualquer membro ativo, então o badge aparece p/ admin e marketing.
+  // legível pela equipe, então o badge aparece p/ admin e marketing — o
+  // colaborador nem pede (a regra negaria, e o item nem aparece pra ele).
   useEffect(() => {
-    if (!role) {
+    if (!ehStaff(role)) {
       setQtdArtistas(null)
       return
     }
@@ -135,6 +137,11 @@ export function Sidebar({
     return pathname === href || pathname.startsWith(href + '/')
   }
 
+  // Para a equipe tudo passa (cada tela tem o próprio gate); o colaborador vê
+  // só as áreas dele e Configurações (o próprio perfil).
+  const principal = navPrincipal.filter((i) => rotaPermitida(appUser, i.href))
+  const dados = navDados.filter((i) => rotaPermitida(appUser, i.href))
+
   return (
     <aside
       className={cn(
@@ -155,7 +162,7 @@ export function Sidebar({
         <div className="text-[10px] tracking-[0.15em] text-ink-500 px-3 mb-2 font-semibold">
           PRINCIPAL
         </div>
-        {navPrincipal.map((item) => {
+        {principal.map((item) => {
           let it = item
           if (item.href === '/artistas' && qtdArtistas != null) {
             it = { ...item, badge: { text: String(qtdArtistas), tone: 'neutral' as const } }
@@ -170,7 +177,7 @@ export function Sidebar({
         <div className="text-[10px] tracking-[0.15em] text-ink-500 px-3 mb-2 mt-6 font-semibold">
           DADOS
         </div>
-        {navDados.map((item) => (
+        {dados.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} onNavegar={onFechar} />
         ))}
       </nav>

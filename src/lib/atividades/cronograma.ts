@@ -304,6 +304,12 @@ export function conflitosDe(
    * existe e está a um clique de distância, no filtro limpo.
    */
   universo: Atividade[] = lista,
+  /**
+   * `universoParcial`: o universo NÃO é o quadro inteiro (é o do colaborador,
+   * que só lê as demandas dele). Aí uma antecessora fora dele é da equipe, não
+   * excluída — e acusar "não existe mais" seria mentira.
+   */
+  opcoes: { universoParcial?: boolean } = {},
 ): Map<string, Conflito[]> {
   const porId = new Map(universo.map((a) => [a.id, a]))
   const emCiclo = idsEmCiclo(universo)
@@ -316,7 +322,9 @@ export function conflitosDe(
     for (const depId of a.dependeDe ?? []) {
       const dep = porId.get(depId)
       if (!dep) {
-        problemas.push({ tipo: 'ausente', outraId: depId, mensagem: 'Depende de uma demanda que não existe mais.' })
+        if (!opcoes.universoParcial) {
+          problemas.push({ tipo: 'ausente', outraId: depId, mensagem: 'Depende de uma demanda que não existe mais.' })
+        }
         continue
       }
       if (emCiclo.has(a.id) && emCiclo.has(dep.id)) {

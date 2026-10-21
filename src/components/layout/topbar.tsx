@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation'
 import { Bell, Menu, Search } from 'lucide-react'
 import { getArtista } from '@/lib/artistas/client'
 import { useQtdAlertas } from '@/lib/alertas/use-qtd-alertas'
+import { ehStaff } from '@/lib/permissions'
+import { useAuth } from '@/components/auth/auth-provider'
 import { BuscaGlobal } from '@/components/layout/busca-global'
 
 const routeLabels: Record<string, string> = {
@@ -26,9 +28,14 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const pathname = usePathname()
   const qtdAlertas = useQtdAlertas()
   const [buscaAberta, setBuscaAberta] = useState(false)
+  // Busca global e sino varrem artistas, métricas e alertas — coisa da equipe.
+  // O colaborador não tem nenhum dos dois.
+  const { role } = useAuth()
+  const equipe = ehStaff(role)
 
   // Atalho ⌘K / Ctrl+K abre a busca global.
   useEffect(() => {
+    if (!equipe) return
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
@@ -37,7 +44,7 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [equipe])
 
   const segments = pathname.split('/').filter(Boolean)
   const slugArtista = segments[0] === 'artistas' && segments[1] ? segments[1] : null
@@ -92,20 +99,23 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
       </div>
 
       <div className="flex-1 flex justify-center">
-        <button
-          type="button"
-          onClick={() => setBuscaAberta(true)}
-          aria-label="Buscar"
-          className="relative w-full max-w-md bg-bg-800 border border-bg-700/40 rounded-lg text-sm pl-9 pr-3 sm:pr-12 py-2 text-ink-500 hover:border-violet-500/40 hover:text-ink-300 transition-colors text-left"
-        >
-          <Search className="w-4 h-4 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <span className="block truncate">Buscar artista, alerta, conteúdo...</span>
-          <span className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-ink-500 num bg-bg-700/50 px-1.5 py-0.5 rounded">
-            ⌘K
-          </span>
-        </button>
+        {equipe && (
+          <button
+            type="button"
+            onClick={() => setBuscaAberta(true)}
+            aria-label="Buscar"
+            className="relative w-full max-w-md bg-bg-800 border border-bg-700/40 rounded-lg text-sm pl-9 pr-3 sm:pr-12 py-2 text-ink-500 hover:border-violet-500/40 hover:text-ink-300 transition-colors text-left"
+          >
+            <Search className="w-4 h-4 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <span className="block truncate">Buscar artista, alerta, conteúdo...</span>
+            <span className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-ink-500 num bg-bg-700/50 px-1.5 py-0.5 rounded">
+              ⌘K
+            </span>
+          </button>
+        )}
       </div>
 
+      {equipe && (
       <div className="shrink-0">
         <Link
           href="/alertas"
@@ -120,9 +130,10 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
           )}
         </Link>
       </div>
+      )}
     </header>
 
-      <BuscaGlobal aberto={buscaAberta} onFechar={() => setBuscaAberta(false)} />
+      {equipe && <BuscaGlobal aberto={buscaAberta} onFechar={() => setBuscaAberta(false)} />}
     </>
   )
 }

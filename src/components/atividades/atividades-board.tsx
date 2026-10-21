@@ -288,7 +288,9 @@ function QuadroTela() {
             </select>
           )}
 
-          {campoLigado(config, 'responsavel') && (
+          {/* O colaborador só vê as demandas dele: filtrar por responsável não
+              recortaria nada. */}
+          {campoLigado(config, 'responsavel') && role !== 'colaborador' && (
             <select
               value={filtros.responsavel}
               onChange={(e) => setFiltros({ ...filtros, responsavel: e.target.value })}

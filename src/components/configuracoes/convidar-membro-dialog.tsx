@@ -8,7 +8,8 @@ import { listarArtistas, type ArtistaDoc } from '@/lib/artistas/client'
 import { copiarTexto } from '@/lib/clipboard'
 import { criarConvite } from '@/lib/invites'
 import { enviarEmailConvite } from '@/lib/email'
-import { roleMeta, type Role } from '@/lib/users'
+import { AREAS_COLABORADOR, CONCEDIVEIS } from '@/lib/permissions'
+import { roleMeta, type Capacidade, type Role } from '@/lib/users'
 import { cn } from '@/lib/utils'
 
 function mensagemErro(err: unknown): string {
@@ -35,6 +36,10 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
   const [role, setRole] = useState<Role>(ehAdmin ? roleInicial : 'artista')
   const [artistaSlug, setArtistaSlug] = useState('')
   const [artistas, setArtistas] = useState<ArtistaDoc[]>([])
+  // Áreas do colaborador. Atividades já vem marcada: é o motivo de existir o
+  // papel (o designer que só toca as demandas dele).
+  const [areas, setAreas] = useState<Partial<Record<Capacidade, boolean>>>({ atividades: true })
+  const semArea = role === 'colaborador' && !CONCEDIVEIS.colaborador.some((c) => areas[c])
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -64,6 +69,10 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
       setErro('Selecione o artista que este login vai representar.')
       return
     }
+    if (semArea) {
+      setErro('Marque ao menos uma área para o colaborador.')
+      return
+    }
     setEnviando(true)
     try {
       const convite = await criarConvite({
@@ -72,6 +81,7 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
         role,
         criadoPor: user.uid,
         artistaSlug: role === 'artista' ? artistaSlug : undefined,
+        permissoes: role === 'colaborador' ? areas : undefined,
       })
       const url = `${window.location.origin}/aceitar-convite?token=${convite.token}`
       setLink(url)
@@ -221,7 +231,7 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
             {ehAdmin && (
               <div>
                 <div className="block text-sm font-medium text-ink-300 mb-1.5">Papel</div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(roleMeta) as Role[]).map((r) => (
                     <button
                       key={r}
@@ -238,14 +248,51 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-ink-500 mt-2">
-                  {role === 'admin'
-                    ? 'Acesso total — vê tudo e gerencia o time.'
-                    : role === 'marketing'
-                      ? 'Acesso parcial — sem dados sensíveis de receita.'
-                      : 'Portal restrito — vê somente o próprio perfil de artista.'}
-                </p>
+                <p className="text-[11px] text-ink-500 mt-2">{roleMeta[role].descricao}</p>
               </div>
+            )}
+
+            {role === 'colaborador' && (
+              <fieldset className="rounded-lg border border-bg-700/50 bg-bg-950/60 px-4 py-3 space-y-3">
+                <legend className="px-1 text-sm font-medium text-ink-300">
+                  O que essa pessoa pode acessar
+                </legend>
+                {CONCEDIVEIS.colaborador.map((cap) => {
+                  const area = AREAS_COLABORADOR[cap]
+                  const marcada = !!areas[cap]
+                  return (
+                    <label key={cap} className="flex items-start gap-2.5 cursor-pointer select-none group">
+                      <input
+                        type="checkbox"
+                        checked={marcada}
+                        onChange={(e) => setAreas((atual) => ({ ...atual, [cap]: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'w-4 h-4 rounded border grid place-items-center shrink-0 mt-0.5 transition-colors',
+                          'peer-focus-visible:ring-2 peer-focus-visible:ring-violet-500/40',
+                          marcada ? 'bg-violet-500 border-violet-500' : 'border-bg-700 group-hover:border-bg-600'
+                        )}
+                      >
+                        {marcada && <Check className="w-3 h-3 text-white" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm text-ink-200">{area?.label ?? cap}</span>
+                        {area?.descricao && (
+                          <span className="block text-[11px] text-ink-500 mt-0.5 leading-relaxed">
+                            {area.descricao}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  )
+                })}
+                <p className="text-[11px] text-ink-500 leading-relaxed">
+                  Colaborador não vê artistas, métricas, receita nem o time da Imagine.
+                </p>
+              </fieldset>
             )}
 
             {role === 'artista' && (
@@ -318,7 +365,7 @@ export function ConvidarMembroDialog({ onClose, onConcluido, roleInicial = 'mark
 
             <button
               type="submit"
-              disabled={enviando || (role === 'artista' && !artistaSlug)}
+              disabled={enviando || (role === 'artista' && !artistaSlug) || semArea}
               aria-busy={enviando}
               className="w-full bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
             >

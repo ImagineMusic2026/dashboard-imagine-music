@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ConfirmarAcaoDialog } from '@/components/configuracoes/confirmar-acao-dialog'
+import { ehStaff } from '@/lib/permissions'
 import { removerAppUser, setUserAtivo, updateUserRole, type AppUser } from '@/lib/users'
 
 type Confirmacao = 'desativar' | 'remover'
@@ -49,17 +50,22 @@ export function MembroAcoes({
           sideOffset={6}
           className="w-52 bg-bg-800 border border-bg-700/60 text-ink-200 shadow-xl ring-0 origin-top-right duration-150 ease-out data-[open]:animate-in data-[open]:fade-in-0 data-[open]:zoom-in-95 data-[open]:slide-in-from-top-1 data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:zoom-out-95"
         >
-          <DropdownMenuItem
-            className="gap-2 px-2 py-1.5 text-ink-200 focus:bg-bg-700 focus:text-ink-100 cursor-pointer"
-            onClick={() =>
-              executar(() =>
-                updateUserRole(membro.uid, membro.role === 'admin' ? 'marketing' : 'admin')
-              )
-            }
-          >
-            <Shield className="w-4 h-4" />
-            {membro.role === 'admin' ? 'Tornar Marketing' : 'Tornar Admin'}
-          </DropdownMenuItem>
+          {/* Trocar entre admin e marketing é coisa da equipe. Num colaborador
+              (ou num login de artista) "Tornar Admin" daria o painel inteiro a
+              quem foi convidado para uma área só. */}
+          {ehStaff(membro.role) && (
+            <DropdownMenuItem
+              className="gap-2 px-2 py-1.5 text-ink-200 focus:bg-bg-700 focus:text-ink-100 cursor-pointer"
+              onClick={() =>
+                executar(() =>
+                  updateUserRole(membro.uid, membro.role === 'admin' ? 'marketing' : 'admin')
+                )
+              }
+            >
+              <Shield className="w-4 h-4" />
+              {membro.role === 'admin' ? 'Tornar Marketing' : 'Tornar Admin'}
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem
             className="gap-2 px-2 py-1.5 text-ink-200 focus:bg-bg-700 focus:text-ink-100 cursor-pointer"

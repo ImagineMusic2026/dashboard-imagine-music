@@ -11,6 +11,11 @@ import type { AppUser, Capacidade, Role } from '@/lib/users'
  * guardas das rotas de API (`exigirPermissao`) e regras do Firestore (`podeCap`).
  * Capacidades ESTRUTURAIS do papel (acessar o painel, portal do artista, ver o
  * próprio perfil) não são editáveis e seguem como `ehStaff`/`ehArtista`.
+ *
+ * O colaborador é o caso à parte: não é equipe (`ehStaff` é false), não tem
+ * nada por padrão e só recebe as capacidades de `CONCEDIVEIS.colaborador`. Um
+ * override fora dessa lista é IGNORADO em `temPermissao` — é isso que impede um
+ * switch ligado por engano na matriz de abrir uma rota de API para ele.
  */
 
 /** Padrão de cada capacidade por papel (o que vale sem override). */
@@ -45,6 +50,18 @@ const PADRAO: Record<Role, Record<Capacidade, boolean>> = {
     editarArtistas: true,
     conexoesArtista: true,
     convidarArtistas: true,
+  },
+  // Colaborador nasce sem nada: o convite liga as áreas dele (ver CONCEDIVEIS).
+  colaborador: {
+    verReceita: false,
+    agenda: false,
+    atividades: false,
+    contratos: false,
+    integracoes: false,
+    importar: false,
+    editarArtistas: false,
+    conexoesArtista: false,
+    convidarArtistas: false,
   },
   artista: {
     verReceita: false,
@@ -96,6 +113,36 @@ export const CAPACIDADES: { cap: Capacidade; label: string; descricao: string }[
   },
 ]
 
+const TODAS = CAPACIDADES.map((c) => c.cap)
+
+/**
+ * Capacidades que cada papel PODE ter, com override ou sem. Fora desta lista a
+ * capacidade é negada mesmo com o switch ligado.
+ *
+ * O colaborador só recebe o que tem fronteira própria nas regras do Firestore
+ * (`colaboradorAtividades` em firestore.rules) — por isso, hoje, só Atividades.
+ * Abrir outra área para ele é transformar uma leitura que hoje é "de equipe"
+ * em capacidade nas regras ANTES de entrar aqui.
+ */
+export const CONCEDIVEIS: Record<Role, readonly Capacidade[]> = {
+  admin: TODAS,
+  marketing: TODAS,
+  colaborador: ['atividades'],
+  artista: [],
+}
+
+/**
+ * Como cada área aparece para o colaborador (no convite e na lista do time).
+ * Texto próprio porque o alcance dele é outro: no quadro, ele só enxerga as
+ * demandas em que é o responsável.
+ */
+export const AREAS_COLABORADOR: Partial<Record<Capacidade, { label: string; descricao: string }>> = {
+  atividades: {
+    label: 'Atividades',
+    descricao: 'Só as demandas em que for o responsável: ver, criar, editar, mover, comentar e excluir.',
+  },
+}
+
 /** O padrão do papel para uma capacidade (sem considerar override). */
 export function padraoDoPapel(role: Role | null, cap: Capacidade): boolean {
   return role ? PADRAO[role][cap] : false
@@ -107,18 +154,75 @@ export function temPermissao(
   cap: Capacidade,
 ): boolean {
   if (!user) return false
+  // Antes do override: o que o papel não pode ter não vira permissão por um
+  // switch ligado. Papel desconhecido também para aqui.
+  if (!CONCEDIVEIS[user.role]?.includes(cap)) return false
   const override = user.permissoes?.[cap]
-  // `?? PADRAO[role]?.[cap] ?? false`: papel desconhecido (ex.: artista logado
-  // numa rota de staff) nunca passa.
   return override ?? PADRAO[user.role]?.[cap] ?? false
 }
 
-/** Equipe Imagine (admin ou marketing) — acesso ao painel (estrutural, não editável). */
+/**
+ * Equipe Imagine (admin ou marketing) — acesso ao painel (estrutural, não editável).
+ * NUNCA incluir o colaborador aqui: o painel inteiro, as rotas e as regras do
+ * Firestore tratam "equipe" como quem enxerga artistas, métricas e o time.
+ */
 export function ehStaff(role: Role | null): boolean {
   return role === 'admin' || role === 'marketing'
+}
+
+/** Colaborador — entra no painel, mas só nas áreas liberadas para ele. */
+export function ehColaborador(role: Role | null): boolean {
+  return role === 'colaborador'
 }
 
 /** Artista — portal restrito ao próprio perfil (estrutural, não editável). */
 export function ehArtista(role: Role | null): boolean {
   return role === 'artista'
+}
+
+/** Tela de cada capacidade que o colaborador pode receber. */
+const ROTA_POR_CAP: Partial<Record<Capacidade, string>> = {
+  atividades: '/atividades',
+}
+
+/** Telas do painel que valem para quem tem login, seja qual for a área. */
+const ROTAS_DE_TODOS = ['/configuracoes']
+
+function dentroDe(pathname: string, rota: string): boolean {
+  return pathname === rota || pathname.startsWith(`${rota}/`)
+}
+
+/** Telas que o colaborador alcança: as das áreas liberadas, na ordem do menu. */
+function rotasDoColaborador(user: Pick<AppUser, 'role' | 'permissoes'>): string[] {
+  return CONCEDIVEIS.colaborador
+    .filter((c) => temPermissao(user, c))
+    .map((c) => ROTA_POR_CAP[c])
+    .filter((r): r is string => !!r)
+}
+
+/**
+ * A pessoa pode abrir esta tela do painel? Para a equipe é sempre sim — cada
+ * página continua com o próprio gate. Para o colaborador, só as áreas dele e
+ * as telas de todos (o próprio perfil).
+ */
+export function rotaPermitida(
+  user: Pick<AppUser, 'role' | 'permissoes'> | null,
+  pathname: string,
+): boolean {
+  if (!user) return false
+  if (ehStaff(user.role)) return true
+  if (!ehColaborador(user.role)) return false
+  return [...rotasDoColaborador(user), ...ROTAS_DE_TODOS].some((r) => dentroDe(pathname, r))
+}
+
+/**
+ * Para onde a pessoa vai ao entrar. `null` = colaborador sem nenhuma área
+ * liberada (a guarda mostra o aviso em vez de uma tela vazia).
+ */
+export function rotaInicial(user: Pick<AppUser, 'role' | 'permissoes'> | null): string | null {
+  if (!user) return null
+  if (ehStaff(user.role)) return '/home'
+  if (ehArtista(user.role)) return '/meu-perfil'
+  if (ehColaborador(user.role)) return rotasDoColaborador(user)[0] ?? null
+  return null
 }

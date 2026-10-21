@@ -23,10 +23,29 @@ service cloud.firestore {
       return isAtivo() && userData().role == 'admin';
     }
 
+    function papel() {
+      return userData().get('role', '');
+    }
+
+    // Override da pessoa em `permissoes[nome]`, senão o padrão informado.
+    function cap(nome, padrao) {
+      return userData().get('permissoes', {}).get(nome, padrao);
+    }
+
     // Equipe Imagine (admin ou marketing) — enxerga o painel completo.
+    // NUNCA incluir 'colaborador' aqui: cerca de 30 regras e os helpers de
+    // capacidade com padrão true (questionários, links públicos, convites)
+    // partem de isStaff(), e o colaborador passaria a ler e gravar tudo isso.
     function isStaff() {
       return isAtivo()
         && (userData().get('role', '') == 'admin' || userData().get('role', '') == 'marketing');
+    }
+
+    // Colaborador: pessoa de fora do time fixo (ex.: um designer). Fica FORA de
+    // isStaff() de propósito e só entra nas áreas marcadas no convite — hoje,
+    // só o quadro de atividades, e nele só as demandas em que é o responsável.
+    function isColaborador() {
+      return isAtivo() && papel() == 'colaborador';
     }
 
     // Artista ativo cujo login está amarrado a ESTE slug (e só a ele).
@@ -40,18 +59,18 @@ service cloud.firestore {
     // existir, senão o padrão do papel (passado como `padrao`). `isAtivo()`
     // curto-circuita antes de tocar userData() (seguro p/ sem-doc/sem-login).
     // Espelha `temPermissao` (@/lib/permissions) e os guards da API.
+    //
+    // Receita, importação e agenda também levam `isStaff()` na frente: sem ele,
+    // um override solto em qualquer login ativo (até de artista) liberava a
+    // coleção inteira. O portal do artista não lê nenhuma das três.
     function podeVerReceita() {
-      return isAtivo()
-        && userData().get('permissoes', {}).get('verReceita', userData().get('role', '') == 'admin');
+      return isStaff() && cap('verReceita', papel() == 'admin');
     }
     function podeImportar() {
-      return isAtivo()
-        && userData().get('permissoes', {}).get('importar', userData().get('role', '') == 'admin');
+      return isStaff() && cap('importar', papel() == 'admin');
     }
     function podeAgenda() {
-      return isAtivo()
-        && userData().get('permissoes', {}).get('agenda',
-             userData().get('role', '') == 'admin' || userData().get('role', '') == 'marketing');
+      return isStaff() && cap('agenda', true);
     }
     // Quadro de atividades (kanban do atendimento). Padrão: admin e marketing.
     // O `isStaff()` na frente evita que um override solto num login de artista
@@ -59,6 +78,21 @@ service cloud.firestore {
     function podeAtividades() {
       return isStaff()
         && userData().get('permissoes', {}).get('atividades', true);
+    }
+    // Colaborador com a área Atividades marcada. Padrão FECHADO: só vale o que
+    // o convite (ou o admin, depois) ligou. As regras do quadro ainda recortam
+    // por `responsavelUid` — ele nunca enxerga a demanda dos outros.
+    function colaboradorAtividades() {
+      return isColaborador() && cap('atividades', false) == true;
+    }
+    // Áreas que um convite de colaborador pode trazer. Espelha
+    // `CONCEDIVEIS.colaborador` (@/lib/permissions): só o que tem regra própria
+    // aqui embaixo. Pelo menos uma marcada — colaborador sem área não entra.
+    function permissoesColaboradorValidas(p) {
+      return p is map
+        && p.keys().hasOnly(['atividades'])
+        && p.values().hasOnly([true, false])
+        && p.values().hasAny([true]);
     }
     // Contratos do artista (ficha + link do documento). Padrão só ADMIN — traz
     // vigência, percentual e o documento assinado. O admin libera na matriz quem
@@ -95,9 +129,15 @@ service cloud.firestore {
 
       // Admin gerencia membros diretamente, OU a própria pessoa cria seu doc
       // ao aceitar um convite válido (a role vem do convite — sem auto-promoção).
+      // `hasOnly` e a igualdade de `permissoes` com o convite fecham o outro
+      // caminho de escalada: sem eles, o convidado gravava junto um mapa de
+      // permissões próprio (ex.: verReceita) no aceite.
       allow create: if isAdmin()
         || (
           request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(
+               ['email', 'nome', 'role', 'ativo', 'conviteToken', 'artistaSlug', 'permissoes'])
+          && request.resource.data.get('ativo', true) == true
           && request.resource.data.email == request.auth.token.email
           && exists(/databases/$(database)/documents/convites/$(request.resource.data.conviteToken))
           && convite(request.resource.data.conviteToken).status == 'pendente'
@@ -105,6 +145,14 @@ service cloud.firestore {
           && convite(request.resource.data.conviteToken).role == request.resource.data.role
           && request.resource.data.get('artistaSlug', '')
                == convite(request.resource.data.conviteToken).get('artistaSlug', '')
+          && request.resource.data.get('permissoes', {})
+               == convite(request.resource.data.conviteToken).get('permissoes', {})
+          // O perfil só nasce junto com o convite virando 'aceito', no MESMO lote.
+          // Separados, o convite podia ficar 'pendente' para sempre (aba fechada,
+          // rede caída, ou a segunda escrita pulada de propósito) e o mesmo link
+          // recriava o acesso de quem o admin removesse depois.
+          && getAfter(/databases/$(database)/documents/convites/$(request.resource.data.conviteToken))
+               .data.status == 'aceito'
         );
 
       // Admin gerencia o perfil; a PRÓPRIA pessoa pode mexer só no seu `favoritos`
@@ -131,12 +179,43 @@ service cloud.firestore {
 
       // Admin convida qualquer papel; `convidarArtistas` só cria convite de
       // artista (sem caminho pra marketing emitir convite de admin/marketing).
-      allow create: if isAdmin()
-        || (podeConvidarArtistas() && request.resource.data.role == 'artista');
+      // Só o convite de colaborador carrega `permissoes` (as áreas marcadas no
+      // convite); nos outros papéis o campo não existe — o aceite copia esse
+      // mapa para o perfil, então ele precisa nascer validado aqui.
+      allow create: if (
+          isAdmin()
+          && request.resource.data.role in ['admin', 'marketing', 'colaborador', 'artista']
+          && (
+            (request.resource.data.role == 'colaborador'
+              && permissoesColaboradorValidas(request.resource.data.get('permissoes', null)))
+            || (request.resource.data.role != 'colaborador'
+              && !('permissoes' in request.resource.data))
+          )
+        )
+        || (
+          podeConvidarArtistas()
+          && request.resource.data.role == 'artista'
+          && !('permissoes' in request.resource.data)
+        );
 
-      // Admin gerencia; OU o convidado marca o próprio convite como aceito.
+      // Admin gerencia; OU o convidado marca o próprio convite como aceito —
+      // e SÓ isso. Sem a trava de campos, quem tinha o link trocava o `role`
+      // do convite para admin antes de criar o perfil (o create de `users`
+      // confia no role do convite).
       allow update: if isAdmin()
-        || (isSignedIn() && request.auth.token.email == resource.data.email);
+        || (
+          isSignedIn()
+          && request.auth.token.email == resource.data.email
+          && resource.data.status == 'pendente'
+          && request.resource.data.status == 'aceito'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'aceitoEm'])
+          // ...e só no lote que cria o perfil a partir DESTE convite (ver o
+          // create de `users`): aceitar sem perfil, ou com o perfil de outro
+          // convite, não vale.
+          && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
+          && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('conviteToken', '')
+               == token
+        );
 
       allow delete: if isAdmin()
         || (podeConvidarArtistas() && resource.data.role == 'artista');
@@ -332,9 +411,68 @@ service cloud.firestore {
     // Atividades (kanban do fluxo de atendimento). Dado manual da equipe, igual à
     // agenda: quem tem a permissão `atividades` (staff por padrão) lê e escreve
     // direto do client. Artista NÃO entra — são as demandas internas do time.
+    //
+    // O colaborador entra recortado: lê, cria, edita, move e exclui SÓ a demanda
+    // em que ele é o responsável. A consulta dele PRECISA trazer
+    // where('responsavelUid', '==', uid), senão o Firestore nega a lista inteira.
+    // Ele não repassa a demanda (o responsável fica sendo ele antes e depois) e
+    // não reescreve a autoria (`criadoPor`/`criadoEm`).
+    function atividadeDoColaborador(dados) {
+      return colaboradorAtividades() && dados.responsavelUid == request.auth.uid;
+    }
+    function comentaNaDemanda(atividadeId) {
+      return colaboradorAtividades()
+        && get(/databases/$(database)/documents/atividades/$(atividadeId)).data.get('responsavelUid', null)
+             == request.auth.uid;
+    }
+
+    // A demanda mãe e as antecessoras do colaborador também têm de ser dele.
+    // Sem isso ele penduraria demandas num projeto da equipe (o progresso da
+    // mãe é a média das filhas) ou desmontaria a sequência que a equipe montou.
+    // O que não muda passa direto; o que muda é conferido um de cada vez, que é
+    // como o quadro grava. `getAfter` enxerga a demanda criada no mesmo lote (o
+    // projeto montado por modelo); `get`, a que está saindo (a excluída no lote).
+    function eraDele(atividadeId) {
+      return get(/databases/$(database)/documents/atividades/$(atividadeId)).data.get('responsavelUid', null)
+        == request.auth.uid;
+    }
+    function ficaDele(atividadeId) {
+      return getAfter(/databases/$(database)/documents/atividades/$(atividadeId)).data.get('responsavelUid', null)
+        == request.auth.uid;
+    }
+    function paiDoColaboradorOk(id, novoPai, antigoPai) {
+      return novoPai == antigoPai
+        || (
+          (antigoPai == null || eraDele(antigoPai))
+          && (novoPai == null || (novoPai != id && ficaDele(novoPai)))
+        );
+    }
+    function antecessorasDoColaboradorOk(id, novas, antigas) {
+      let entram = novas.removeAll(antigas);
+      let saem = antigas.removeAll(novas);
+      return (entram.size() == 0 || (entram.size() == 1 && entram[0] != id && ficaDele(entram[0])))
+        && (saem.size() == 0 || (saem.size() == 1 && eraDele(saem[0])));
+    }
+
     match /atividades/{id} {
-      allow read: if podeAtividades();
-      allow create, update, delete: if podeAtividades();
+      allow read: if podeAtividades() || atividadeDoColaborador(resource.data);
+      allow create: if podeAtividades()
+        || (
+          atividadeDoColaborador(request.resource.data)
+          && request.resource.data.criadoPor == request.auth.uid
+          && paiDoColaboradorOk(id, request.resource.data.get('paiId', null), null)
+          && antecessorasDoColaboradorOk(id, request.resource.data.get('dependeDe', []), [])
+        );
+      allow update: if podeAtividades()
+        || (
+          atividadeDoColaborador(resource.data)
+          && atividadeDoColaborador(request.resource.data)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['criadoPor', 'criadoEm'])
+          && paiDoColaboradorOk(id, request.resource.data.get('paiId', null), resource.data.get('paiId', null))
+          && antecessorasDoColaboradorOk(id,
+               request.resource.data.get('dependeDe', []), resource.data.get('dependeDe', []))
+        );
+      allow delete: if podeAtividades() || atividadeDoColaborador(resource.data);
 
       // Comentários da demanda. Ficam numa SUBCOLEÇÃO (e não num array no
       // documento, como o checklist e o histórico) porque uma demanda tocada
@@ -347,11 +485,28 @@ service cloud.firestore {
       // fala do outro não é edição de dado, é troca de autoria. O `autorUid` é
       // conferido na criação justamente para que essa dona não possa ser
       // forjada.
+      //
+      // O colaborador só conversa nas demandas dele: a regra lê a demanda mãe
+      // para conferir o responsável.
+      //
+      // A autoria é toda conferida: o nome exibido tem de ser o do perfil de
+      // quem grava (é o que `comentar` manda: nome, ou o e-mail sem nome), a
+      // data é a do servidor, e editar mexe só no texto. Antes o nome e a
+      // edição ficavam livres, e dava para publicar com o nome de outra pessoa
+      // e depois trocar o `autorUid` para o dela.
       match /comentarios/{comentarioId} {
-        allow read: if podeAtividades();
-        allow create: if podeAtividades()
-          && request.resource.data.autorUid == request.auth.uid;
-        allow update, delete: if podeAtividades()
+        allow read: if podeAtividades() || comentaNaDemanda(id);
+        allow create: if (podeAtividades() || comentaNaDemanda(id))
+          && request.resource.data.keys().hasOnly(
+               ['texto', 'autorUid', 'autorNome', 'em', 'editadoEm', 'criadoEm'])
+          && request.resource.data.autorUid == request.auth.uid
+          && request.resource.data.autorNome
+               in [userData().get('nome', ''), userData().get('email', '')]
+          && request.resource.data.criadoEm == request.time;
+        allow update: if (podeAtividades() || comentaNaDemanda(id))
+          && (resource.data.autorUid == request.auth.uid || isAdmin())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['texto', 'editadoEm']);
+        allow delete: if (podeAtividades() || comentaNaDemanda(id))
           && (resource.data.autorUid == request.auth.uid || isAdmin());
       }
     }

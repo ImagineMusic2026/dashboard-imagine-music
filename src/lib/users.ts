@@ -5,9 +5,11 @@ import { auth, db } from '@/lib/firebase'
  * Papéis (roles) da plataforma.
  * - admin: acesso total (vê tudo, gerencia o time).
  * - marketing: acesso parcial (sem dados sensíveis de receita).
+ * - colaborador: gente de fora do time fixo (ex.: um designer). NÃO é equipe:
+ *   entra só nas áreas marcadas no convite (ver `CONCEDIVEIS` em permissions).
  * - artista: portal restrito — vê SOMENTE o próprio perfil (via artistaSlug).
  */
-export type Role = 'admin' | 'marketing' | 'artista'
+export type Role = 'admin' | 'marketing' | 'colaborador' | 'artista'
 
 /**
  * Capacidades que o admin pode conceder/restringir POR PESSOA, sobrescrevendo o
@@ -40,21 +42,34 @@ export type AppUser = {
   favoritos?: string[]
 }
 
-export const roleMeta: Record<Role, { label: string; classe: string; gradient: string }> = {
+// A ordem das chaves é a ordem dos botões no convite (`Object.keys`).
+export const roleMeta: Record<
+  Role,
+  { label: string; classe: string; gradient: string; descricao: string }
+> = {
   admin: {
     label: 'Admin',
     classe: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
     gradient: 'from-violet-500 to-purple-600',
+    descricao: 'Acesso total — vê tudo e gerencia o time.',
   },
   marketing: {
     label: 'Marketing',
     classe: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
     gradient: 'from-amber-500 to-orange-600',
+    descricao: 'Acesso parcial — sem dados sensíveis de receita.',
+  },
+  colaborador: {
+    label: 'Colaborador',
+    classe: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+    gradient: 'from-sky-500 to-blue-600',
+    descricao: 'Pessoa de fora do time. Acessa só as áreas marcadas abaixo.',
   },
   artista: {
     label: 'Artista',
     classe: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30',
     gradient: 'from-fuchsia-500 to-pink-600',
+    descricao: 'Portal restrito — vê somente o próprio perfil de artista.',
   },
 }
 
@@ -75,7 +90,7 @@ export async function listAppUsers(): Promise<AppUser[]> {
     .sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? ''))
 }
 
-/** Altera o papel de um membro (admin/marketing). */
+/** Altera o papel de um membro (admin ↔ marketing; colaborador não troca por aqui). */
 export async function updateUserRole(uid: string, role: Role): Promise<void> {
   await updateDoc(doc(db, USERS, uid), { role })
 }

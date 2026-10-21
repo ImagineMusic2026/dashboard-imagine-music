@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
+import { ehArtista, ehStaff } from '@/lib/permissions'
 import { exigirSessaoAtiva } from '@/lib/server-auth'
+import type { Role } from '@/lib/users'
 import { getCatalogoFaixas, salvarCatalogoFaixasLote } from '@/lib/metricas-sociais/firestore'
 import type { CatalogoFaixaDoc } from '@/lib/onerpm/catalogo-faixas'
 import { resolverISRCDeezer } from '@/lib/onerpm/deezer'
@@ -18,11 +20,17 @@ const MAX_RESOLVER = 50 // máx. de buscas no Deezer por request (bound de tempo
  * faixas manda os ISRCs visíveis e recebe título + link (o link só existe
  * quando veio do Deezer — o catálogo da OneRPM não tem link). Os títulos NÃO
  * ficam no detalhe (que o cron reconstrói) — ficam neste cache à parte.
- * Qualquer membro ativo pode chamar (título de faixa não é sensível).
+ * Equipe e artista podem chamar (título de faixa não é sensível). O colaborador
+ * não: nenhuma tela dele pede título de faixa, e cada chamada pode disparar
+ * dezenas de buscas no Deezer.
  */
 export async function POST(req: Request) {
   const auth = await exigirSessaoAtiva(req)
   if (auth instanceof NextResponse) return auth
+  const role = auth.role as Role
+  if (!ehStaff(role) && !ehArtista(role)) {
+    return NextResponse.json({ error: 'Você não tem permissão para esta ação.' }, { status: 403 })
+  }
 
   let body: { isrcs?: unknown }
   try {

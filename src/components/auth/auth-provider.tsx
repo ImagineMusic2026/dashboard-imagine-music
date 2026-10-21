@@ -1,8 +1,9 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import { getAppUser, setFavorito, type AppUser, type Capacidade, type Role } from '@/lib/users'
 import { temPermissao } from '@/lib/permissions'
 
@@ -63,8 +64,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  // Quem estava logado por último nesta aba (ver a troca abaixo).
+  const uidAnterior = useRef<string | null>(null)
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      // Trocou a pessoa sem recarregar a página (sair e entrar com outro login):
+      // os caches de leitura guardam o que a ANTERIOR podia ver — o quadro
+      // inteiro da equipe, por exemplo, que o colaborador não pode receber.
+      const uid = u?.uid ?? null
+      if (uid !== uidAnterior.current) {
+        uidAnterior.current = uid
+        invalidarCachesDeLeitura()
+      }
+      // Enquanto o perfil da nova sessão não chega, a guarda segura a tela: sem
+      // isto ela veria um usuário logado com o perfil da sessão anterior (ou
+      // nenhum) por um instante.
+      setLoading(true)
       setUser(u)
       if (u) {
         try {

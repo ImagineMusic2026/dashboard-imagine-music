@@ -14,7 +14,7 @@ import {
 import { FirebaseError } from 'firebase/app'
 import { useAuth } from '@/components/auth/auth-provider'
 import { carregarConfig, chaveDe, salvarConfig } from '@/lib/atividades/config'
-import { listarAtividades, type Atividade } from '@/lib/atividades/client'
+import { listarAtividades, listarResponsaveis, type Atividade } from '@/lib/atividades/client'
 import {
   CAMPOS,
   CONFIG_PADRAO,
@@ -35,6 +35,7 @@ import {
   type TipoConfig,
   type Visao,
 } from '@/lib/atividades/tipos'
+import { ehColaborador } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const campo =
@@ -57,6 +58,10 @@ const campo =
  * 2. **A chave nunca muda ao renomear.** A chave é o que está gravado em cada
  *    demanda; o rótulo é só o nome na tela. Trocar "Briefing" por "Roteiro"
  *    é seguro e instantâneo.
+ * 3. **Responsável não desliga com colaborador no time.** O colaborador só
+ *    enxerga as demandas em que é o responsável; sem o campo, não há como
+ *    atribuir nada a ele e o quadro dele fica vazio sem explicação. Foi o que
+ *    aconteceu no primeiro convite de colaborador da Imagine.
  *
  * Nada é salvo até apertar "Salvar" — a pessoa mexe à vontade e compara.
  */
@@ -84,6 +89,9 @@ function ConfigQuadroAdmin() {
   // `null` = ainda não sei (carregando ou falhou). Diferente de "zero demandas":
   // ver `usoPorEtapa` abaixo.
   const [atividades, setAtividades] = useState<Atividade[] | null>(null)
+  // Colaboradores ativos com acesso às Atividades. `null` = não sei, e aí o
+  // campo Responsável fica travado do mesmo jeito (ver `usoDesconhecido`).
+  const [colaboradores, setColaboradores] = useState<number | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -97,7 +105,14 @@ function ConfigQuadroAdmin() {
       // Continua `null` no erro: melhor travar a remoção do que apagar uma
       // coluna cheia por não ter conseguido conferir.
       .catch(() => setAtividades(null))
+    listarResponsaveis()
+      .then((pessoas) => setColaboradores(pessoas.filter((u) => ehColaborador(u.role)).length))
+      .catch(() => setColaboradores(null))
   }, [])
+
+  // O campo Responsável só pode ser DESLIGADO quando não há colaborador para
+  // ficar sem demanda. Ligar continua sempre permitido.
+  const travaResponsavel = colaboradores === null || colaboradores > 0
 
   /**
    * Ainda não sabemos quantas demandas usam cada chave?
@@ -365,24 +380,66 @@ function ConfigQuadroAdmin() {
         descricao="Desligar um campo o esconde do formulário, do card e das visões — o dado já gravado não é apagado."
       >
         <ul className="grid sm:grid-cols-2 gap-2">
-          {CAMPOS.map(({ campo: c, label, descricao }) => (
-            <li key={c}>
-              <label className="flex items-start gap-2.5 bg-bg-950/60 border border-bg-700/40 rounded-lg p-2.5 cursor-pointer hover:border-bg-700 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.campos[c] !== false}
-                  onChange={(e) =>
-                    alterar({ campos: { ...config.campos, [c]: e.target.checked } as Record<CampoOpcional, boolean> })
-                  }
-                  className="mt-0.5 w-3.5 h-3.5 rounded accent-violet-500 shrink-0"
-                />
-                <span>
-                  <span className="block text-[13px] font-medium text-ink-200">{label}</span>
-                  <span className="block text-[11px] text-ink-500">{descricao}</span>
-                </span>
-              </label>
-            </li>
-          ))}
+          {CAMPOS.map(({ campo: c, label, descricao }) => {
+            const ligado = config.campos[c] !== false
+            const travado = c === 'responsavel' && travaResponsavel
+            // Travado e ligado: não desliga. Travado e desligado (como ficou na
+            // Imagine): o aviso pede para ligar, e ligar é permitido.
+            const bloqueado = travado && ligado
+            const quantos =
+              colaboradores === null
+                ? null
+                : `${colaboradores} ${colaboradores === 1 ? 'colaborador' : 'colaboradores'}`
+            return (
+              <li key={c}>
+                <label
+                  className={cn(
+                    'flex items-start gap-2.5 bg-bg-950/60 border rounded-lg p-2.5 transition-colors',
+                    bloqueado
+                      ? 'border-bg-700/40 cursor-not-allowed'
+                      : 'border-bg-700/40 cursor-pointer hover:border-bg-700',
+                    travado && !ligado && 'border-amber-500/40',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={ligado}
+                    disabled={bloqueado}
+                    aria-describedby={travado ? `campo-${c}-aviso` : undefined}
+                    onChange={(e) =>
+                      alterar({ campos: { ...config.campos, [c]: e.target.checked } as Record<CampoOpcional, boolean> })
+                    }
+                    className="mt-0.5 w-3.5 h-3.5 rounded accent-violet-500 shrink-0 disabled:cursor-not-allowed"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium text-ink-200">{label}</span>
+                    <span className="block text-[11px] text-ink-500">{descricao}</span>
+                    {travado && ligado && (
+                      <span id={`campo-${c}-aviso`} className="block text-[11px] text-ink-400 mt-1.5">
+                        {quantos
+                          ? `Fica ligado: há ${quantos} no time, e colaborador só enxerga as demandas em que é o responsável.`
+                          : 'Fica ligado: não consegui conferir se há colaboradores no time, e colaborador só enxerga as demandas em que é o responsável.'}
+                      </span>
+                    )}
+                    {travado && !ligado && (
+                      <span
+                        id={`campo-${c}-aviso`}
+                        role="alert"
+                        className="flex items-start gap-1.5 text-[11px] text-amber-300 mt-1.5"
+                      >
+                        <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-px" aria-hidden />
+                        <span>
+                          {quantos
+                            ? `Há ${quantos} no time e, com este campo desligado, nenhum deles enxerga demanda alguma: colaborador só vê as demandas em que é o responsável. Ligue o campo e salve.`
+                            : 'Não consegui conferir se há colaboradores no time. Com este campo desligado, nenhum colaborador enxerga demanda alguma. Ligue o campo e salve.'}
+                        </span>
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </li>
+            )
+          })}
         </ul>
       </Bloco>
 

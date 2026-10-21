@@ -67,6 +67,7 @@ Links da demanda só viram link clicável quando são endereço da web, e-mail (
 ## Notas de operação
 
 - Uma coluna, tipo ou área **em uso** não pode ser removida na configuração — a tela mostra quantas demandas dependem dela e bloqueia. Remover deixaria demandas invisíveis.
+- O campo **Responsável** não pode ser desligado enquanto houver colaborador ativo com acesso às Atividades: ele só enxerga as demandas em que é o responsável, e sem o campo o quadro dele fica vazio. Se o campo já estiver desligado, a configuração mostra o aviso e deixa ligar. Foi o que travou o primeiro designer da Imagine em 21/10/2026.
 - Renomear uma coluna é seguro a qualquer momento: a chave gravada nas demandas não muda, só o rótulo na tela.
 - Arrastar a barra de uma demanda que tem sucessoras **não** empurra ninguém sozinho; o cronograma oferece o empurrão numa faixa de confirmação.
 - Excluir uma demanda solta as subtarefas dela (viram demandas de topo) e remove as setas que apontavam pra ela.

@@ -15,10 +15,10 @@ Todas leem a **mesma** coleção e o mesmo recorte de filtros. Trocar de visão 
 
 | Visão | Responde |
 | --- | --- |
-| Quadro | Em que etapa cada demanda está. Kanban, arrastar entre colunas, raias por artista/responsável/área, limite de WIP por coluna. |
+| Quadro | Em que etapa cada demanda está. Kanban, arrastar entre colunas, raias por artista/responsável/área, limite de WIP por coluna. O card é enxuto de propósito: título, artista e responsável. |
 | Cronograma | Quando cada coisa acontece. Barras de início a prazo, dependências entre demandas, marcos, caminho crítico, arrastar para reprogramar. |
 | Lista | Muita demanda de uma vez, ordenável por prazo, prioridade, progresso ou responsável. |
-| Calendário | O que vence no mês, pela data de entrega. |
+| Calendário | O que vence no mês, pela data de entrega. O dia mostra até 6 demandas; o "+N" abre o resto ali mesmo. |
 | Carga do time | Quanto cada pessoa está segurando, em pontos de esforço, mais o tempo médio por etapa. |
 
 ## Demanda
@@ -48,6 +48,14 @@ Um modelo com etapas cria a demanda mãe **e** todas as subtarefas de uma vez, j
 
 De fábrica vêm: lançamento de single, campanha de conteúdo, show e demanda avulsa.
 
+## O card do quadro
+
+O card mostra **título, artista e responsável** — nada mais. Tipo, área, prioridade, descrição, progresso, etiquetas, prazo, esforço e os selos de subtarefa, comentário, link e dependência vivem no detalhe, que abre ao clicar no título. A decisão é de 03/11/2026: o card cheio passava de 200px e meia dúzia de demandas já jogavam a rolagem do quadro pra fora da tela.
+
+Duas exceções ficaram, porque não custam altura e custam caro de perder: a barra colorida da esquerda (cor da etapa, vermelha quando atrasou) e o selo **Atrasada**, que impede o atraso de ser sinalizado só por cor.
+
+A coluna também tem **teto de altura** e rola por dentro. Sem ele o quadro crescia com os cards e a barra de rolagem horizontal — a que anda entre as etapas — ia parar no pé da página.
+
 ## Indicadores
 
 Em aberto, atrasadas, paradas há 7 dias ou mais, sem responsável, entregues no mês, tempo médio do início à entrega e o gargalo (coluna mais cheia). Todos respeitam os filtros da tela e saem da lista já carregada — nenhum custa leitura extra. Os que são clicáveis acendem o filtro correspondente.
@@ -72,6 +80,8 @@ Links da demanda só viram link clicável quando são endereço da web, e-mail (
 - Arrastar a barra de uma demanda que tem sucessoras **não** empurra ninguém sozinho; o cronograma oferece o empurrão numa faixa de confirmação.
 - Excluir uma demanda solta as subtarefas dela (viram demandas de topo) e remove as setas que apontavam pra ela.
 - Se a conferência de uso não carregar, a remoção de coluna também fica bloqueada — "não sei quantas demandas há aqui" é tratado como "não deixa", que é o lado seguro.
+- No calendário o dia mostra até **6** demandas (eram 3) e a célula cresce com o conteúdo a partir de um piso de 140px — um mês tranquilo continua compacto, e a semana que tem um dia cheio é a única que estica. O **+N demandas** é um botão: abre as escondidas na própria célula e vira "mostrar menos".
+- Desligar um campo na configuração continua valendo para o formulário, o detalhe e as outras visões; no card do quadro só **artista** e **responsável** têm efeito, porque os demais já não aparecem lá.
 - O **caminho crítico** é a corrente de dependências mais longa pela duração planejada, não o cálculo de folga total do MS Project. Para um cronograma de lançamento aponta o mesmo gargalo, mas a diferença está registrada para não ser cobrada como defeito.
 
 Veja [[02 - Acesso e equipe/Perfis e permissões]] e [[06 - Tecnologia/Modelo de dados Firestore]].

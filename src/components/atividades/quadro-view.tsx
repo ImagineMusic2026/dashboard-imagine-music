@@ -10,6 +10,16 @@ import { cor } from '@/lib/atividades/tipos'
 import { cn } from '@/lib/utils'
 
 /**
+ * Teto de altura da coluna, pra o quadro inteiro caber numa tela: o desconto
+ * cobre o cabeçalho da página, os indicadores e a faixa de filtros acima dele.
+ * O piso existe pra uma coluna vazia não virar uma tira de 40px.
+ */
+const ALTURA_COLUNA = 'max-h-[calc(100vh-25rem)] min-h-[16rem]'
+
+/** Com raias, várias faixas dividem a mesma tela — cada uma ganha menos altura. */
+const ALTURA_COLUNA_RAIA = 'max-h-[22rem]'
+
+/**
  * O kanban.
  *
  * Duas coisas que ele ganhou ao virar uma visão entre outras:
@@ -21,6 +31,11 @@ import { cn } from '@/lib/utils'
  * - **Limite de WIP.** Uma coluna com teto configurado avisa quando passa dele.
  *   O aviso não bloqueia: travar o arrasto esconderia o problema em vez de
  *   mostrá-lo, e a demanda urgente entraria de qualquer jeito por fora.
+ *
+ * E uma terceira, de 03/11/2026: a coluna tem **teto de altura** e rola por
+ * dentro. Antes ela crescia com os cards, o quadro ficava mais alto que a tela
+ * e a barra de rolagem horizontal — a que anda entre as etapas — ia parar no pé
+ * da página: pra alcançar a última coluna era preciso descer tudo primeiro.
  */
 export function QuadroView({
   agrupamento,
@@ -119,10 +134,11 @@ export function QuadroView({
                         // O teto existe para uma coluna solta não virar uma
                         // faixa de tela inteira com um card no meio.
                         'flex-1 basis-[272px] min-w-[268px] max-w-[420px] bg-bg-900/40 border rounded-xl flex flex-col transition-colors',
+                        comRaias ? ALTURA_COLUNA_RAIA : ALTURA_COLUNA,
                         alvo === chaveAlvo ? 'border-violet-500/50 bg-violet-500/5' : 'border-bg-700/30',
                       )}
                     >
-                      <div className="px-3 py-3 border-b border-bg-700/30">
+                      <div className="px-3 py-3 border-b border-bg-700/30 shrink-0">
                         <div className="flex items-center gap-2">
                           <span className={cn('w-1.5 h-1.5 rounded-full', paleta.bar)} aria-hidden />
                           <span
@@ -161,7 +177,10 @@ export function QuadroView({
                         )}
                       </div>
 
-                      <div className="p-2 space-y-2 flex-1 min-h-[100px]">
+                      {/* O min-h definido (e não "auto") é o que autoriza o
+                          encolhimento do item flex — sem ele a lista empurraria
+                          a coluna pra além do teto em vez de rolar. */}
+                      <div className="p-2 space-y-2 flex-1 min-h-[100px] overflow-y-auto overscroll-contain">
                         {cards.map((a) => (
                           <AtividadeCard
                             key={a.id}
@@ -192,7 +211,7 @@ export function QuadroView({
                         <button
                           type="button"
                           onClick={() => onNovo(etapa.key)}
-                          className="m-2 mt-0 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold text-ink-500 hover:text-violet-300 hover:bg-bg-800/60 transition-colors"
+                          className="m-2 mt-0 shrink-0 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold text-ink-500 hover:text-violet-300 hover:bg-bg-800/60 transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5" aria-hidden />
                           Adicionar em {etapa.label}

@@ -25,6 +25,15 @@ const MESES = [
 ]
 
 /**
+ * Quantas demandas o dia mostra antes de recolher o resto num "+N".
+ *
+ * Eram 3, e num dia de lançamento o calendário virava um "+4 demandas" que não
+ * dizia quais. A célula não tem altura fixa: ela cresce com o conteúdo até este
+ * teto, então um mês tranquilo continua compacto.
+ */
+const POR_DIA = 6
+
+/**
  * O calendário: as entregas do mês.
  *
  * Aqui a demanda aparece pela data de ENTREGA, não pela janela inteira. É a
@@ -36,6 +45,9 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
   const { config, visiveis, atrasada, concluida, filtrando } = useQuadro()
   const hoje = hojeISO()
   const [mesBase, setMesBase] = useState(() => hoje.slice(0, 7))
+  // Dias abertos pelo "+N": a chave é a data ISO, então o que sobra de outro mês
+  // não atrapalha — aquele dia só volta a existir quando o mês dele voltar.
+  const [abertos, setAbertos] = useState<Set<string>>(new Set())
 
   const [ano, mes] = mesBase.split('-').map(Number)
 
@@ -75,6 +87,15 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
   }, [visiveis])
 
   const semData = visiveis.filter((a) => !a.prazo && !(a.marco && a.inicio))
+
+  function alternarDia(iso: string) {
+    setAbertos((atual) => {
+      const proximo = new Set(atual)
+      if (proximo.has(iso)) proximo.delete(iso)
+      else proximo.add(iso)
+      return proximo
+    })
+  }
 
   function andar(passo: number) {
     const d = new Date(ano, mes - 1 + passo, 1, 12)
@@ -129,13 +150,15 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
           <div key={i} className="grid grid-cols-7 border-b border-bg-700/20 last:border-b-0">
             {semana.map(({ iso, doMes }) => {
               const doDia = porDia.get(iso) ?? []
+              const aberto = abertos.has(iso)
+              const escondidas = doDia.length - POR_DIA
               const ehHoje = iso === hoje
               const fds = [0, 6].includes(deISO(iso).getDay())
               return (
                 <div
                   key={iso}
                   className={cn(
-                    'min-h-[104px] p-1.5 border-r border-bg-700/20 last:border-r-0 space-y-1',
+                    'min-h-[140px] p-1.5 border-r border-bg-700/20 last:border-r-0 space-y-1',
                     !doMes && 'bg-bg-950/40',
                     fds && doMes && 'bg-bg-950/20',
                   )}
@@ -153,7 +176,7 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
                     {Number(iso.split('-')[2])}
                   </div>
 
-                  {doDia.slice(0, 3).map((a) => {
+                  {(aberto ? doDia : doDia.slice(0, POR_DIA)).map((a) => {
                     const etapa = etapaDe(config, a.etapa)
                     return (
                       <button
@@ -180,8 +203,20 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
                     )
                   })}
 
-                  {doDia.length > 3 && (
-                    <p className="text-[9px] text-ink-500 px-1">+{doDia.length - 3} demandas</p>
+                  {escondidas > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => alternarDia(iso)}
+                      aria-expanded={aberto}
+                      aria-label={
+                        aberto
+                          ? `Recolher as demandas de ${dataLonga(iso)}`
+                          : `Ver mais ${escondidas} demanda${escondidas === 1 ? '' : 's'} de ${dataLonga(iso)}`
+                      }
+                      className="w-full text-left text-[9px] font-semibold text-ink-500 hover:text-violet-300 px-1 py-0.5 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+                    >
+                      {aberto ? 'mostrar menos' : `+${escondidas} demanda${escondidas === 1 ? '' : 's'}`}
+                    </button>
                   )}
                 </div>
               )

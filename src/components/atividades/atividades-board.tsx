@@ -243,6 +243,26 @@ function QuadroTela() {
           />
         </div>
 
+        {/* O artista fica na barra da frente, e não atrás de "Filtros": é o
+            recorte que a equipe mais faz ("o que tem do fulano?"), e escondido
+            ele pedia dois cliques toda vez. A borda acende quando há um
+            escolhido, pra ninguém esquecer o quadro recortado. */}
+        {campoLigado(config, 'artista') && (
+          <select
+            value={filtros.artista}
+            onChange={(e) => setFiltros({ ...filtros, artista: e.target.value })}
+            aria-label="Filtrar por artista"
+            className={cn(seletor, 'max-w-[220px]', filtros.artista && 'border-violet-500/40 text-violet-200')}
+          >
+            <option value="">Todos os artistas</option>
+            {artistas.map((a) => (
+              <option key={a.slug} value={a.slug}>
+                {a.nome}
+              </option>
+            ))}
+          </select>
+        )}
+
         <button
           type="button"
           onClick={() => setMaisFiltros((v) => !v)}
@@ -272,22 +292,6 @@ function QuadroTela() {
 
       {maisFiltros && (
         <div className="flex flex-wrap items-center gap-2 bg-bg-900/40 border border-bg-700/30 rounded-xl p-3">
-          {campoLigado(config, 'artista') && (
-            <select
-              value={filtros.artista}
-              onChange={(e) => setFiltros({ ...filtros, artista: e.target.value })}
-              aria-label="Filtrar por artista"
-              className={seletor}
-            >
-              <option value="">Todos os artistas</option>
-              {artistas.map((a) => (
-                <option key={a.slug} value={a.slug}>
-                  {a.nome}
-                </option>
-              ))}
-            </select>
-          )}
-
           {/* O colaborador só vê as demandas dele: filtrar por responsável não
               recortaria nada. */}
           {campoLigado(config, 'responsavel') && role !== 'colaborador' && (

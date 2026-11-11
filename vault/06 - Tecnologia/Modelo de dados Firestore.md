@@ -22,6 +22,7 @@ Firestore é o banco central. Leituras no cliente respeitam regras; dados sensí
 | `atividades/{id}`                          | Demandas do quadro: etapa, datas, dependências, subtarefas, checklist.  | Quem tem `atividades` lê e altera.          |
 | `diagnosticos/{slug}/questionarios/{tipo}` | Respostas Projeto/Artista.                                              | Staff ou artista vinculado.                 |
 | `links-questionario/{token}`               | Token de formulário externo.                                            | A API valida; o público não lê diretamente. |
+| `alertas-vistos/{uid}`                     | Alertas que cada pessoa marcou como vistos: `vistos` (chave → quando).   | Só o dono, sendo da equipe ativa, lê e grava. |
 
 ## Subcoleções que existem para separar acesso
 
@@ -41,6 +42,12 @@ Regra do Firestore é **por documento** e não esconde campo. Quando parte de um
 
 `configuracoes/atividades` guarda o quadro configurável: etapas, tipos, áreas, etiquetas, campos ligados, visões e modelos de projeto. Um documento só, cacheado — nada de uma coleção com um documento por coluna.
 
+## Campos acrescentados em 11/2026
+
+`artistas/{slug}` ganhou `dataNascimento` (texto `AAAA-MM-DD`, nunca Timestamp: aniversário é dia do calendário, e um instante à meia-noite UTC cairia no dia anterior em Brasília), `dataNascimentoOrigem` (`equipe` ou `questionario`) e `dataNascimentoAtualizadoEm`. Só o servidor grava.
+
+`alertas-vistos/{uid}` é documento próprio, e não campo do perfil, de propósito: o perfil é lido pela equipe inteira e só aceita auto-edição de `favoritos` — a trava que fecha a escalada de papel. O mapa é regravado inteiro numa transação a cada marca (sem merge, para a poda conseguir apagar chaves) e tem teto de 500 chaves nas regras.
+
 ## Métricas sociais
 
 `metricas-sociais/{slug}` guarda o snapshot atual e subcoleções diárias: Instagram, TikTok, YouTube, Health Score e streaming. `streaming-detalhe/atual` mantém o top 150 de faixas e top 25 de países do último recorte.
@@ -51,5 +58,6 @@ Regra do Firestore é **por documento** e não esconde campo. Quando parte de um
 - Tokens de TikTok e YouTube nunca podem ser lidos pelo cliente.
 - Coleções não declaradas nas regras caem em bloqueio total.
 - Upserts usam merge; o detalhe atual do streaming é sobrescrito por completo a cada sync.
+- Mudança em `firestore.rules` não sai com o push: a Vercel só roda o build. Publicar com `firebase deploy --only firestore:rules` (ou `node scripts/deploy-firestore-rules.mjs`) **antes** de subir o código que depende dela — a publicação troca o arquivo inteiro, então conferir antes se o que está no ar é o mesmo do repositório.
 
 Veja [[02 - Acesso e equipe/Perfis e permissões]] e [[06 - Tecnologia/Arquitetura técnica]].

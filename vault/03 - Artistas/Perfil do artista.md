@@ -37,6 +37,10 @@ O card mostra quantas faixas o artista tem assim que o perfil abre — o número
 
 Não há prévia das primeiras faixas porque a ordenação por lançamento acontece depois da busca; pedir "as 8 primeiras" ao banco devolveria 8 faixas quaisquer. Entre uma prévia inconsistente e um botão honesto, ficou o botão.
 
+## Selo de aniversário
+
+Ao lado do nome, quando há data de nascimento: "15/11 · 35 anos". No dia, o selo fica verde e diz "Aniversário hoje". Aparece também no portal, para o próprio artista — é dado dele.
+
 ## Ações
 
 - **Exportar**: reúne os dados do artista para colar numa IA ou abrir no Excel. Ver [[03 - Artistas/Exportar dados do artista]].

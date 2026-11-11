@@ -42,6 +42,10 @@ O padrão é a janela curta porque cada período custa cinco leituras por dia de
 
 A opção de incluir receita vem **desmarcada** e só aparece para quem tem a permissão. O documento pode ir para uma IA de terceiro, e faturamento não deveria viajar junto sem alguém decidir. Quando entra, sai **separada por moeda e com a instrução explícita de não somar moedas diferentes** — o painel nunca soma, e a IA precisa herdar a regra.
 
+## Data de nascimento fica de fora
+
+A resposta de data de nascimento do questionário não entra no documento. Ele existe para ir a um assistente de terceiros, a data é dado pessoal e não ajuda análise nenhuma.
+
 ## Coluna vazia some
 
 Quando uma rede não tem série no período escolhido, a coluna sai da tabela e o documento diz quais faltaram. Uma coluna inteira de "não medido" ocupa espaço sem informar, e ainda arrisca ser lida como estagnação.

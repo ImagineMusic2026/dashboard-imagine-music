@@ -44,6 +44,12 @@ O que ainda pesa, e é legítimo: as cinco séries diárias de 90 dias somam cer
 
 **Invalidar depois de escrever.** Quem grava precisa derrubar o cache, senão a tela mostra o número de antes e parece que o botão não funcionou.
 
+## Alertas na Home e alertas vistos (11/2026)
+
+A lista de alertas mora no casco do painel e é carregada uma vez ao abrir a aba; sino, badge, Home e página de Alertas leem dela. Visitar a Home não custa leitura de alerta nenhuma — e ela deixou de reler os quatro documentos de status das integrações a cada visita. Gravar algo pelo painel só marca a lista como desatualizada; ela é relida quando alguém abre a Home ou a página de Alertas. Reler na hora custava caro: salvar o dossiê invalida o cache uma vez por bloco, até cinco seguidas, e cada releitura da lista inteira passa de 300 leituras. A página de Alertas também relê se a lista tiver mais de 5 minutos, e uma aba esquecida por mais de uma hora relê ao voltar. Cada releitura inclui a consulta de todos os questionários, que é a parte cara — por isso a Home, que é a tela mais visitada, nunca relê só por idade.
+
+Os vistos custam uma leitura por pessoa por carregamento de página, e cada marca é uma transação (uma leitura e uma escrita). A data de nascimento mora no cadastro, que o roster já lê: o alerta de aniversário não custa leitura nenhuma.
+
 ## Antes de acrescentar um card
 
 Existe um medidor no repositório que replica o que cada card pede e devolve o custo por aba. Rode **uma vez**, num artista grande, e leve o número para a discussão. É mais rápido que discutir por intuição, e mais barato que descobrir depois.

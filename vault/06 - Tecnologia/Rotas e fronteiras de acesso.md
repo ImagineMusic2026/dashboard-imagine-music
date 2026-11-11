@@ -33,6 +33,12 @@ Como ele não lê a coleção `artistas`, o seletor de artista do quadro vem de 
 | --- | --- | --- |
 | `POST /api/artistas/dossie` | Os cinco blocos do dossiê | `editarArtistas`, exceto `patrimonio`, que exige `contratos` |
 | `POST /api/artistas/mercado-ao-vivo` | Nível declarado, com score da tabela oficial | `editarArtistas` |
+| `POST /api/artistas/criar` e `/atualizar` | Cadastro, inclusive a data de nascimento | `editarArtistas` |
+| `POST /api/diagnostico/data-nascimento` | Data de nascimento do questionário Artista enviado, para o cadastro | Artista no próprio cadastro (o endereço vem da sessão); equipe com `editarArtistas` |
+
+O link público (`/api/questionario-link`) é a única rota sem login que grava fora do questionário: no envio do questionário Artista, leva a data de nascimento ao cadastro, sem sobrescrever a da equipe.
+
+A data de nascimento passa pelo servidor também porque o artista não tem permissão nenhuma no próprio cadastro — e a rota relê o questionário gravado em vez de aceitar a data no corpo do pedido.
 
 Dois motivos para não abrir essas escritas ao cliente: a **nota** do mercado ao vivo tem que vir da tabela oficial e não do navegador, e os **carimbos** de quem conferiu e quando sustentam o status derivado das evidências — se viessem no corpo do pedido, deixariam de significar algo.
 

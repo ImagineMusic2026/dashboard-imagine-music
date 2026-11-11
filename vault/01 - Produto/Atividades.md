@@ -21,6 +21,8 @@ Todas leem a **mesma** coleção e o mesmo recorte de filtros. Trocar de visão 
 | Calendário | O que vence no mês, pela data de entrega. O dia mostra até 6 demandas; o "+N" abre o resto ali mesmo. |
 | Carga do time | Quanto cada pessoa está segurando, em pontos de esforço, mais o tempo médio por etapa. |
 
+O filtro de **artista** fica na barra principal, ao lado da busca, e acende quando há um escolhido (pedido da cliente em 11/2026): é o recorte que a equipe mais faz. Responsável, área, tipo, prioridade, etiqueta, concluídas e atrasadas continuam em **Filtros**.
+
 ## Demanda
 
 | Campo | Uso |

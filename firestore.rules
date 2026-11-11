@@ -167,6 +167,36 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Alertas que CADA pessoa da equipe marcou como vistos: um mapa
+    // `vistos[chaveDoAlerta] = vistoEmMs`. O alerta em si não mora no banco (é
+    // derivado das métricas a cada carga); aqui fica só a marca pessoal.
+    //
+    // Documento próprio, e NÃO um campo em `users/{uid}`: o perfil é lido pela
+    // equipe inteira (`get`/`list` acima) e só aceita auto-edição de `favoritos` —
+    // abrir mais um campo ali é mexer na trava que fecha a escalada de papel.
+    // Nenhuma regra lê este doc, então o que estiver nele não decide acesso a nada.
+    //
+    // Só o dono lê e grava, e só enquanto for da equipe ativa: alerta é tela da
+    // equipe (artista e colaborador não têm o sino), e quem é desativado perde
+    // junto. Nem o admin lê o dos outros. O `get` não olha `resource`, então a
+    // primeira leitura (doc ainda inexistente) não falha.
+    //
+    // Regra não percorre mapa: não dá para conferir cada chave nem cada valor. O
+    // que se trava é o formato (só os dois campos, `vistos` é mapa), o TAMANHO (o
+    // cliente poda antes de gravar; acima do teto, a gravação é negada) e a data,
+    // que é a do servidor — toda gravação manda `serverTimestamp()`.
+    match /alertas-vistos/{uid} {
+      allow get: if isStaff() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if isStaff()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['vistos', 'atualizadoEm'])
+        && request.resource.data.vistos is map
+        && request.resource.data.vistos.size() <= 500
+        && request.resource.data.atualizadoEm == request.time;
+      allow delete: if isStaff() && request.auth.uid == uid;
+    }
+
     // Convites
     match /convites/{token} {
       // Leitura de UM convite por token (link secreto, UUID) é liberada;

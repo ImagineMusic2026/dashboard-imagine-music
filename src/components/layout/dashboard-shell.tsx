@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { AlertasProvider } from '@/components/alertas/alertas-provider'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 
@@ -33,6 +34,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    // A lista de alertas e os vistos moram aqui, em volta do sino, da sidebar e das
+    // páginas: todos contam o mesmo array, e marcar em qualquer lugar vale em todos.
+    <AlertasProvider>
     <div className="flex min-h-screen bg-bg-950">
       <Sidebar colapsada={colapsada} drawer={drawer} onFechar={() => setDrawer(false)} />
 
@@ -50,5 +54,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
     </div>
+    </AlertasProvider>
   )
 }

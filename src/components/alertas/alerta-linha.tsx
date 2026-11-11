@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell, ClipboardList, CloudOff, Flame, MoonStar, PlayCircle, PlugZap, Star, TrendingDown, TrendingUp, Trophy, UserPlus } from 'lucide-react'
+import { Bell, Cake, Check, ClipboardList, CloudOff, Flame, MoonStar, PlayCircle, PlugZap, Star, TrendingDown, TrendingUp, Trophy, Undo2, UserPlus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { irParaCard } from '@/lib/artistas/abrir-card'
@@ -28,6 +28,7 @@ export const ICONE_ALERTA: Record<string, LucideIcon> = {
   queda_streaming: TrendingDown,
   perfil_incompleto: UserPlus,
   diagnostico_enviado: ClipboardList,
+  aniversario: Cake,
   sync_falhou: PlugZap,
   sync_parado: CloudOff,
 }
@@ -46,8 +47,22 @@ export function tempoRelativo(ms: number): string {
   return `há ${Math.floor(d / 30)}m`
 }
 
-/** Uma linha de alerta derivado — compartilhada entre /alertas e a home. */
-export function AlertaLinha({ a }: { a: AlertaDerivado }) {
+/**
+ * Uma linha de alerta derivado — compartilhada entre /alertas e a home.
+ *
+ * Com `onVisto`, ganha o botão de marcar como visto; com `visto`, o mesmo botão
+ * devolve o alerta à lista. O botão é irmão do link de ação, nunca filho: a linha
+ * em si não é clicável, cada ação tem o seu foco e o seu rótulo.
+ */
+export function AlertaLinha({
+  a,
+  onVisto,
+  visto = false,
+}: {
+  a: AlertaDerivado
+  onVisto?: () => void
+  visto?: boolean
+}) {
   const sev = SEV[a.severidade]
   const Icone = ICONE_ALERTA[a.categoria] ?? Bell
   const interno = a.url?.startsWith('/') ?? false
@@ -88,18 +103,41 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
     )
   ) : null
 
+  const botaoVisto = onVisto ? (
+    <button
+      type="button"
+      onClick={onVisto}
+      title={visto ? 'Devolver à lista de abertos' : 'Marcar como visto — some do sino e da lista'}
+      // O nome acessível COMEÇA pelo texto que aparece no botão: quem usa comando de
+      // voz diz "clicar Visto" e precisa achar o botão por ele.
+      aria-label={
+        visto
+          ? `Desmarcar: ${a.artistaNome} — ${a.descricao}`
+          : `Visto: ${a.artistaNome} — ${a.descricao}`
+      }
+      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-ink-400 hover:text-ink-100 hover:bg-bg-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+    >
+      {visto ? <Undo2 className="w-3.5 h-3.5" aria-hidden /> : <Check className="w-3.5 h-3.5" aria-hidden />}
+      {visto ? 'Desmarcar' : 'Visto'}
+    </button>
+  ) : null
+
   return (
     <div className="relative flex items-start gap-3 p-4 hover:bg-bg-800/30 transition-colors">
       <div className={cn('absolute left-0 top-0 bottom-0 w-1', sev.borderL)} />
-      {a.severidade === 'operacional' ? (
-        <div className="w-7 h-7 rounded-lg bg-blue-500/15 grid place-items-center shrink-0">
-          <Icone className="w-4 h-4 text-blue-400" />
-        </div>
-      ) : (
-        <AvatarFallback iniciais={iniciaisDe(a.artistaNome)} gradient={corAvatarDe(a.artistaSlug)} size="sm" />
-      )}
+      {/* Na lista de vistos esmaece só o conteúdo: esmaecer a linha inteira levava
+          junto o "Desmarcar" e o link de ação, que caíam abaixo do contraste legível. */}
+      <div className={cn('shrink-0', visto && 'opacity-60')}>
+        {a.severidade === 'operacional' ? (
+          <div className="w-7 h-7 rounded-lg bg-blue-500/15 grid place-items-center">
+            <Icone className="w-4 h-4 text-blue-400" />
+          </div>
+        ) : (
+          <AvatarFallback iniciais={iniciaisDe(a.artistaNome)} gradient={corAvatarDe(a.artistaSlug)} size="sm" />
+        )}
+      </div>
       <div className="flex-1 min-w-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="min-w-0">
+        <div className={cn('min-w-0', visto && 'opacity-60')}>
           <div className="flex items-center gap-2 mb-1">
             <span className={cn('text-[10px] font-bold tracking-wider px-2 py-0.5 rounded', sev.badgeBg, sev.badgeText)}>
               {sev.label}
@@ -114,7 +152,12 @@ export function AlertaLinha({ a }: { a: AlertaDerivado }) {
             <span className="min-w-0">{a.descricao}</span>
           </div>
         </div>
-        {acao}
+        {(acao || botaoVisto) && (
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+            {acao}
+            {botaoVisto}
+          </div>
+        )}
       </div>
     </div>
   )

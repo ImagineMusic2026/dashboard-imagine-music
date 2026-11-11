@@ -6,6 +6,7 @@ import {
   Activity,
   AlertCircle,
   AlertTriangle,
+  Cake,
   HeartPulse,
   Loader2,
   PlayCircle,
@@ -16,9 +17,12 @@ import {
 import { corAvatarDe, iniciaisDe, listarArtistas, type ArtistaDoc } from '@/lib/artistas/client'
 import { listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
-import { derivarAlertas, derivarAlertasOperacionais, ordenarAlertas, type StatusIntegracoes } from '@/lib/alertas/derivar'
-import { getStatusIntegracoes } from '@/lib/alertas/client'
 import { filtrarPorPrefs } from '@/lib/alertas/preferencias'
+import { chaveVisto, semVistos } from '@/lib/alertas/vistos'
+import { aniversariosProximos } from '@/lib/artistas/aniversario'
+import { ehStaff } from '@/lib/permissions'
+import { useAlertas } from '@/components/alertas/alertas-provider'
+import { useAuth } from '@/components/auth/auth-provider'
 import { derivarHealthScores, resumirSaude, type ArtistaSaude } from '@/lib/health/score'
 import { KPICard } from '@/components/shared/kpi-card'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
@@ -42,21 +46,34 @@ export default function HomePage() {
   const [estado, setEstado] = useState<Estado>('load')
   const [arts, setArts] = useState<ArtistaDoc[]>([])
   const [mapa, setMapa] = useState<Map<string, MetricasSociaisDoc>>(new Map())
-  const [integ, setInteg] = useState<StatusIntegracoes>({})
+  // Os alertas vêm do casco: a MESMA lista que o sino conta, já carregada. A Home
+  // montava a própria (só sociais e operacionais) e o número dela não batia com o
+  // do sino desde que entraram cadastro e questionário. De quebra, visitar a Home
+  // não custa leitura de alerta nenhuma — e deixou de reler as quatro integrações.
+  const { carregados, falhou: alertasFalharam, carregando: alertasCarregando, vistos, marcar, renovar } = useAlertas()
+  // Quantas vezes a pessoa pediu "Tentar de novo" — entra no aviso para ele mudar a
+  // cada tentativa e ser anunciado de novo.
+  const [tentativas, setTentativas] = useState(0)
+  const equipe = ehStaff(useAuth().role)
+  // Sem a lista não há como dizer "nenhum alerta": zero aqui seria mentira.
+  const alertasIndisponiveis = equipe && alertasFalharam && carregados === null
+
+  // Só relê se a lista estiver suja (alguém gravou no painel) ou tiver falhado —
+  // nunca por idade: a Home é a tela mais visitada, e cada releitura custa caro.
+  useEffect(() => {
+    renovar()
+  }, [renovar])
+  const [falhaVisto, setFalhaVisto] = useState(false)
+  const [avisoVisto, setAvisoVisto] = useState('')
 
   useEffect(() => {
     let vivo = true
     ;(async () => {
       try {
-        const [m, a, status] = await Promise.all([
-          listarMetricasSociais(),
-          listarArtistas(),
-          getStatusIntegracoes(),
-        ])
+        const [m, a] = await Promise.all([listarMetricasSociais(), listarArtistas()])
         if (!vivo) return
         setMapa(m)
         setArts(a)
-        setInteg(status)
         setEstado('ok')
       } catch {
         if (vivo) setEstado('erro')
@@ -69,9 +86,7 @@ export default function HomePage() {
 
   const dados = useMemo(() => {
     const nome = new Map(arts.map((a) => [a.slug, a.nome]))
-    const alertas = filtrarPorPrefs(
-      ordenarAlertas([...derivarAlertas(mapa, nome), ...derivarAlertasOperacionais(integ)]),
-    )
+    const alertas = semVistos(filtrarPorPrefs(carregados?.alertas ?? []), vistos ?? {})
     const saudes = derivarHealthScores(mapa, nome)
     const resumo = resumirSaude(saudes)
 
@@ -110,6 +125,7 @@ export default function HomePage() {
 
     return {
       alertas,
+      aniversarios: aniversariosProximos(arts),
       counts,
       topSaude: saudes.slice(0, 5),
       risco,
@@ -124,9 +140,13 @@ export default function HomePage() {
       fotoPorSlug: new Map(arts.map((a) => [a.slug, a.fotoUrl ?? null])),
       atualizadoEm: ultimaColeta(mapa),
     }
-  }, [arts, mapa, integ])
+  }, [arts, mapa, carregados, vistos])
 
-  if (estado === 'load') {
+  // Espera os alertas e os vistos junto: sem eles a contagem abriria com os alertas
+  // já vistos e cairia um instante depois. Se os alertas falharem, o resto da Home
+  // aparece mesmo assim, sem eles.
+  const esperandoAlertas = equipe && !alertasFalharam && (carregados === null || vistos === null)
+  if (estado === 'load' || (estado === 'ok' && esperandoAlertas)) {
     return (
       <div className="flex items-center gap-2 text-ink-400 text-sm py-16 justify-center">
         <Loader2 className="w-4 h-4 animate-spin" />
@@ -148,6 +168,7 @@ export default function HomePage() {
 
   const {
     alertas,
+    aniversarios,
     counts,
     topSaude,
     risco,
@@ -179,7 +200,9 @@ export default function HomePage() {
         />
         <p className="text-sm sm:text-base text-ink-400 mt-1">
           Aqui está como o portfólio está hoje.{' '}
-          {alertas.length > 0 ? (
+          {alertasIndisponiveis ? (
+            <span className="text-ink-400">Não foi possível carregar os alertas agora.</span>
+          ) : alertas.length > 0 ? (
             <>
               <span className="text-amber-400 font-semibold num">
                 {alertas.length} {alertas.length === 1 ? 'alerta' : 'alertas'}
@@ -190,6 +213,41 @@ export default function HomePage() {
             <span className="text-emerald-400 font-semibold">Nenhum alerta aberto.</span>
           )}
         </p>
+        {/* Aniversários da semana: aparecem aqui mesmo que o alerta já tenha sido
+            marcado como visto, ou que haja críticos na frente dele na lista —
+            a cliente pediu o aviso também na página inicial. Some sozinho quando
+            ninguém faz aniversário nos próximos 7 dias. */}
+        {aniversarios.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
+            <span className="flex items-center gap-1.5 text-emerald-300 font-semibold">
+              <Cake className="w-4 h-4" aria-hidden />
+              Aniversários
+            </span>
+            {aniversarios.map((n) => (
+              <Link
+                key={n.slug}
+                href={`/artistas/${n.slug}`}
+                className={cn(
+                  'px-2 py-0.5 rounded-full border transition-colors',
+                  n.dias === 0
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/25'
+                    : 'bg-bg-900 border-bg-700/50 text-ink-300 hover:text-ink-100',
+                )}
+              >
+                <span className="font-semibold">{n.nome}</span>{' '}
+                <span className="text-ink-400">
+                  {n.dias === 0
+                    ? 'hoje'
+                    : n.dias === 1
+                      ? 'amanhã'
+                      : n.data.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                  {' · '}
+                  <span className="num">{n.idade} anos</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -226,9 +284,11 @@ export default function HomePage() {
         />
         <KPICard
           label="Alertas abertos"
-          value={String(alertas.length)}
+          value={alertasIndisponiveis ? '—' : String(alertas.length)}
           subtitle={
-            nCriticos > 0 ? (
+            alertasIndisponiveis ? (
+              <span className="text-ink-500">indisponível</span>
+            ) : nCriticos > 0 ? (
               <span>
                 <span className="num text-red-400">{counts.critico} críticos</span>
                 <span className="text-ink-500"> · </span>
@@ -342,7 +402,37 @@ export default function HomePage() {
               Ver todos →
             </Link>
           </div>
-          {alertas.length === 0 ? (
+          <p className="sr-only" aria-live="polite">
+            {avisoVisto}
+          </p>
+          {falhaVisto && (
+            <p role="alert" className="mx-5 mt-4 text-[13px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+              Não foi possível marcar como visto agora. Tente de novo em instantes.
+            </p>
+          )}
+          {alertasIndisponiveis ? (
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm text-ink-300 font-medium">Não foi possível carregar os alertas</p>
+              <button
+                type="button"
+                disabled={alertasCarregando}
+                onClick={() => {
+                  setTentativas((n) => n + 1)
+                  renovar()
+                }}
+                className="mt-2 text-[13px] font-semibold text-violet-400 hover:text-violet-300 disabled:text-ink-500 transition-colors"
+              >
+                {alertasCarregando ? 'Tentando…' : 'Tentar de novo'}
+              </button>
+              <p className="sr-only" aria-live="polite">
+                {alertasCarregando
+                  ? 'Tentando carregar os alertas.'
+                  : tentativas > 0
+                    ? `Ainda não foi possível carregar os alertas (tentativa ${tentativas}).`
+                    : ''}
+              </p>
+            </div>
+          ) : alertas.length === 0 ? (
             <div className="px-5 py-10 text-center">
               <p className="text-sm text-ink-300 font-medium">Nenhum alerta aberto</p>
               <p className="text-[13px] text-ink-500 mt-1 max-w-sm mx-auto">
@@ -352,7 +442,22 @@ export default function HomePage() {
           ) : (
             <div className="divide-y divide-bg-700/30">
               {alertas.slice(0, 5).map((a) => (
-                <AlertaLinha key={a.id} a={a} />
+                <AlertaLinha
+                  key={a.id}
+                  a={a}
+                  onVisto={async () => {
+                    setFalhaVisto(false)
+                    // Muda a cada marcação (nome e quantos restam): a mesma frase de novo
+                    // não seria anunciada pelo leitor de tela.
+                    setAvisoVisto(
+                      `Alerta de ${a.artistaNome} marcado como visto. ${alertas.length - 1} ${alertas.length - 1 === 1 ? 'aberto' : 'abertos'}.`,
+                    )
+                    if (!(await marcar([chaveVisto(a)]))) {
+                      setFalhaVisto(true)
+                      setAvisoVisto('')
+                    }
+                  }}
+                />
               ))}
             </div>
           )}

@@ -40,6 +40,22 @@ export function registrarInvalidacao(invalidar: () => void): void {
   invalidadores.add(invalidar)
 }
 
+/**
+ * Para quem precisa REAGIR à invalidação, e não só esquecer um cache: o casco do
+ * painel guarda a lista de alertas do sino durante a sessão inteira, e sem isto
+ * ela seguiria velha depois de alguém editar um artista. Devolve a função que
+ * cancela — componente que se inscreve tem de sair ao desmontar.
+ *
+ * Os caches registrados no import do módulo vêm antes no Set, então quando este
+ * aviso chega eles já foram zerados e a releitura vem do Firestore.
+ */
+export function aoInvalidar(reagir: () => void): () => void {
+  invalidadores.add(reagir)
+  return () => {
+    invalidadores.delete(reagir)
+  }
+}
+
 /** Envolve uma leitura sem argumentos num cache curto. */
 export function memoCurta<T>(
   carregar: () => Promise<T>,

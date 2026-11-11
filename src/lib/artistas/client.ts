@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { invalidarCachesDeLeitura, memoCurta, memoCurtaPorChave } from '@/lib/cache-leitura'
+import type { OrigemDataNascimento } from '@/lib/artistas/aniversario'
 import type { OneRpmAggregate } from '@/lib/onerpm/types'
 import type { SoundchartsSnapshot } from '@/lib/soundcharts/tipos'
 import type {
@@ -81,6 +82,15 @@ export interface ArtistaDoc {
    * artista entrou no acompanhamento é a Imagine.
    */
   entradaIaos?: string | null
+  /**
+   * Data de nascimento ('YYYY-MM-DD'). Vem do cadastro ou do questionário de
+   * estruturação (tipo Artista), e alimenta o alerta de aniversário — ver
+   * `@/lib/artistas/aniversario`. Fato público sobre o artista, por isso mora
+   * aqui e não no dossiê da equipe.
+   */
+  dataNascimento?: string | null
+  /** Quem gravou a data — ver `OrigemDataNascimento`. Ausente com data presente = equipe. */
+  dataNascimentoOrigem?: OrigemDataNascimento | null
 }
 
 /**

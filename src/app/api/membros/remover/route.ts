@@ -59,6 +59,8 @@ export async function POST(req: Request) {
       if ((e as { code?: string })?.code !== 'auth/user-not-found') throw e
     }
     await adminDb.doc(`users/${uid}`).delete()
+    // As marcas de "alerta visto" são da pessoa; sem ela, não servem pra nada.
+    await adminDb.doc(`alertas-vistos/${uid}`).delete()
   } catch (e) {
     console.error('[api/membros/remover]', e)
     return NextResponse.json({ error: 'Não foi possível remover o membro.' }, { status: 500 })

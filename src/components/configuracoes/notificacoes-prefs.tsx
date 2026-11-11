@@ -53,6 +53,11 @@ const META: Record<CategoriaAlerta, { label: string; descricao: string; sev: Sev
     descricao: 'Queda relevante de streams na última semana.',
     sev: 'atencao',
   },
+  aniversario: {
+    label: 'Aniversário do artista',
+    descricao: 'Na semana que antecede e no dia, pela data de nascimento do cadastro.',
+    sev: 'oportunidade',
+  },
 }
 
 /** Aba "Notificações" das Configurações. Controla quais tipos de alerta notificam. */

@@ -18,6 +18,7 @@ export const CATEGORIAS_ALERTA = [
   'queda_seguidores',
   'viralizacao_streaming',
   'queda_streaming',
+  'aniversario',
 ] as const
 
 export type CategoriaAlerta = (typeof CATEGORIAS_ALERTA)[number]

@@ -7,6 +7,7 @@ import type {
   StatusIntegracao,
   StreamingSnapshot,
 } from '@/lib/metricas-sociais/types'
+import { aniversariosProximos, JANELA_ANIVERSARIO_DIAS } from '@/lib/artistas/aniversario'
 import { formatNumber } from '@/lib/utils'
 
 /**
@@ -308,7 +309,12 @@ export function derivarAlertasOperacionais(integ: StatusIntegracoes): AlertaDeri
     // Integrações já sinaliza isso. Não polui o feed de alertas.
     if (!f.status || f.status === 'nao_configurado') continue
 
-    const ts = f.ultimaSincronizacao ? Date.parse(f.ultimaSincronizacao) : agora
+    // A data do último sync que DEU CERTO: o caminho de erro de cada sync não mexe
+    // nela, então fica parada durante a falha e muda quando a fonte volta. É o que
+    // separa um episódio de falha do seguinte (e a chave do "visto" usa isso). Sem
+    // nenhum sync bom, 0 — e não "agora", que mudaria a cada carregamento e diria
+    // que a falha acabou de acontecer.
+    const ts = f.ultimaSincronizacao ? Date.parse(f.ultimaSincronizacao) : 0
 
     if (f.status === 'erro') {
       const motivo = f.erro?.trim()
@@ -423,6 +429,48 @@ export function derivarAlertasDiagnostico(
         d.enviadoEmMs as number,
       ),
     )
+}
+
+export interface ArtistaAniversario {
+  slug: string
+  nome: string
+  /** `YYYY-MM-DD`, como gravado no cadastro. */
+  dataNascimento?: string | null
+}
+
+/**
+ * Aniversário do artista: um aviso na semana que antecede e outro no dia.
+ *
+ * São dois alertas com ids diferentes de propósito — a cliente pediu os dois
+ * momentos ("quando estiver próximo e na data"), e quem marca o "faltam 4 dias"
+ * como visto tem de continuar recebendo o "é hoje". O ano entra no id pelo mesmo
+ * motivo: o aniversário do ano que vem não pode nascer já marcado como visto.
+ *
+ * Severidade de oportunidade: é relacionamento com o artista, não problema. A
+ * recência do aviso antecipado é a abertura da janela (7 dias antes), que é
+ * quando ele de fato apareceu — e não muda de um dia pro outro.
+ */
+export function derivarAlertasAniversario(
+  artistas: ArtistaAniversario[],
+  agora = Date.now(),
+): AlertaDerivado[] {
+  const out: AlertaDerivado[] = []
+  for (const { slug, nome, data, dias, idade } of aniversariosProximos(artistas, new Date(agora))) {
+    const ano = data.getFullYear()
+    const url = `/artistas/${slug}`
+    if (dias === 0) {
+      out.push(
+        mk(`aniversario-hoje-${slug}-${ano}`, slug, nome, 'oportunidade', 'aniversario', `Aniversário hoje — ${idade} anos`, 'Ver artista', url, data.getTime()),
+      )
+    } else {
+      const quando = dias === 1 ? 'amanhã' : `em ${dias} dias`
+      const dia = data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+      out.push(
+        mk(`aniversario-${slug}-${ano}`, slug, nome, 'oportunidade', 'aniversario', `Aniversário ${quando} — ${dia} (${idade} anos)`, 'Ver artista', url, data.getTime() - JANELA_ANIVERSARIO_DIAS * DIA),
+      )
+    }
+  }
+  return out
 }
 
 /** Alerta de SISTEMA (sem artista): a fonte vira o "nome" e o slug é estável. */

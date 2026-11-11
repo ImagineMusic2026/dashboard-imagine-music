@@ -12,6 +12,8 @@
  * Módulo puro (sem React, sem Firebase): serve o form do portal e a leitura da equipe.
  */
 
+import { dataNascimentoPorExtenso, lerDataNascimento, PERGUNTA_DATA_NASCIMENTO } from '@/lib/artistas/aniversario'
+
 export type TipoDiagnostico = 'projeto' | 'artista'
 
 export const TIPOS: TipoDiagnostico[] = ['projeto', 'artista']
@@ -27,6 +29,16 @@ export interface Pergunta {
   ajuda?: string
   /** Altura inicial do campo. Perguntas de resposta curta pedem menos. */
   linhas?: number
+  /**
+   * Como se responde. Ausente = texto livre, que é o caso de todas as que vieram do
+   * Pipefy.
+   *
+   * `data` vira um <input type="date"> e grava 'YYYY-MM-DD', o formato que o input
+   * devolve. Só fica gravado o que `lerDataNascimento` aceita (dia real, de 1900 até
+   * um ano atrás), porque a única pergunta de data hoje é o nascimento. Uma data que
+   * possa cair no futuro precisaria de outro validador.
+   */
+  tipo?: 'texto' | 'data'
 }
 
 export interface Secao {
@@ -165,6 +177,16 @@ const ARTISTA: Questionario = {
   secoes: [
     {
       perguntas: [
+        // A resposta desta vai para o CADASTRO (`artistas/{slug}.dataNascimento`) quando
+        // o questionário é enviado, e de lá para o alerta de aniversário. O id vem de
+        // `aniversario.ts` porque é ele que as rotas do servidor procuram em `respostas`.
+        // Fica no topo, junto dos links: é dado de identificação, não diagnóstico.
+        {
+          id: PERGUNTA_DATA_NASCIMENTO,
+          rotulo: 'Data de nascimento',
+          tipo: 'data',
+          ajuda: 'Vai para o seu cadastro e lembra a equipe do seu aniversário.',
+        },
         {
           id: 'links',
           rotulo: 'Sites, redes sociais e plataformas',
@@ -283,9 +305,21 @@ export interface Progresso {
   pct: number
 }
 
+/**
+ * Conta como respondida o que FICA GRAVADO. Para texto é qualquer coisa escrita; para
+ * data, só a que `limparRespostas` mantém. Uma data recusada no campo (antes de
+ * 1900, ou de menos de um ano atrás) não pode somar no "X de Y" e depois sumir no
+ * salvamento.
+ */
+function respondida(p: Pergunta, valor: string | undefined): boolean {
+  const v = (valor ?? '').trim()
+  if (!v) return false
+  return p.tipo === 'data' ? lerDataNascimento(v) !== null : true
+}
+
 export function progressoDe(tipo: TipoDiagnostico, respostas: Record<string, string> | undefined): Progresso {
   const perguntas = perguntasDe(tipo)
-  const respondidas = perguntas.filter((p) => (respostas?.[p.id] ?? '').trim().length > 0).length
+  const respondidas = perguntas.filter((p) => respondida(p, respostas?.[p.id])).length
   return {
     respondidas,
     total: perguntas.length,
@@ -300,14 +334,34 @@ export const MAX_RESPOSTA = 5000
  * Descarta o que não é pergunta conhecida e corta o que passa do teto. Higiene
  * compartilhada entre o client (antes do setDoc) e a API do link público (antes do
  * merge via Admin SDK, onde é a ÚNICA validação — regra nenhuma roda lá).
+ *
+ * Pergunta de data só guarda data válida, já aparada; o resto vira ''. É a mesma
+ * régua do cadastro e do alerta (`lerDataNascimento`): o que passasse aqui e fosse
+ * recusado lá ficaria no questionário como resposta sem nunca chegar ao cadastro.
  */
 export function limparRespostas(tipo: TipoDiagnostico, respostas: Record<string, string>): Record<string, string> {
-  const validos = idsValidos(tipo)
+  const porId = new Map(perguntasDe(tipo).map((p) => [p.id, p]))
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(respostas)) {
-    if (!validos.has(k)) continue
-    const s = typeof v === 'string' ? v.slice(0, MAX_RESPOSTA) : ''
-    out[k] = s
+    const p = porId.get(k)
+    if (!p) continue
+    if (p.tipo === 'data') {
+      out[k] = typeof v === 'string' && lerDataNascimento(v) ? v.trim() : ''
+      continue
+    }
+    out[k] = typeof v === 'string' ? v.slice(0, MAX_RESPOSTA) : ''
   }
   return out
+}
+
+/**
+ * A resposta como se LÊ (modal da equipe, PDF). Data vira 'dd/mm/aaaa': o gravado é
+ * o formato do input ('YYYY-MM-DD'), não o de quem lê. O que não for uma data
+ * legível volta cru — mostrar estranho é melhor que esconder o que foi respondido.
+ */
+export function respostaLegivel(p: Pergunta, valor: string | undefined): string {
+  const r = typeof valor === 'string' ? valor.trim() : ''
+  if (p.tipo !== 'data' || !r) return r
+  const n = lerDataNascimento(r)
+  return n ? dataNascimentoPorExtenso(n) : r
 }

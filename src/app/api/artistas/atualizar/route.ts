@@ -20,6 +20,8 @@ export async function POST(req: Request) {
     nome?: string
     genero?: string
     fotoUrl?: string
+    /** 'YYYY-MM-DD'. `unknown` porque o tipo é conferido abaixo, antes de repassar. */
+    dataNascimento?: unknown
     spotifyUrl?: string
     youtubeUrl?: string
     instagramUrl?: string
@@ -46,6 +48,10 @@ export async function POST(req: Request) {
         nome: body.nome ?? '',
         genero: body.genero,
         fotoUrl: body.fotoUrl,
+        // Só texto ou null ('' e null apagam). Qualquer outro tipo vira `undefined`,
+        // que PRESERVA a data gravada: um envio torto não pode apagar nada.
+        dataNascimento:
+          typeof body.dataNascimento === 'string' || body.dataNascimento === null ? body.dataNascimento : undefined,
         spotifyUrl: body.spotifyUrl,
         youtubeUrl: body.youtubeUrl,
         instagramUrl: body.instagramUrl,

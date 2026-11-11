@@ -1,6 +1,6 @@
 import logoImagineMusic from '@/components/images/LOGO_ImagineMusic.png'
 import type { DiagnosticoDoc } from './client'
-import { NOME_CURTO, progressoDe, questionario, type TipoDiagnostico } from './perguntas'
+import { NOME_CURTO, progressoDe, questionario, respostaLegivel, type TipoDiagnostico } from './perguntas'
 
 /**
  * O questionário respondido virando um documento — pra mandar pro artista, levar pra
@@ -82,7 +82,8 @@ function montarHtml(tipo: TipoDiagnostico, artistaNome: string, doc: Diagnostico
     .map((secao) => {
       const perguntas = secao.perguntas
         .map((p) => {
-          const r = (doc?.respostas?.[p.id] ?? '').trim()
+          // Data sai como 'dd/mm/aaaa', como no modal — não no formato gravado.
+          const r = respostaLegivel(p, doc?.respostas?.[p.id])
           // `pre-wrap` na resposta: as quebras de linha são do artista.
           const resposta = r
             ? `<p class="resposta">${esc(r)}</p>`

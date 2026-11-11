@@ -21,6 +21,7 @@
  *
  * O cabeçalho "como ler" existe pelo mesmo motivo: é barato e melhora a resposta.
  */
+import { PERGUNTA_DATA_NASCIMENTO } from './aniversario'
 import type { ArtistaDoc, ProjetoDoc } from './client'
 import type { MetricasSociaisDoc, StreamingDetalheDoc } from '@/lib/metricas-sociais/types'
 import type { ResultadoIge } from '@/lib/iaos/ige'
@@ -372,14 +373,23 @@ export function montarExportacao(d: DadosExportacao, geradoEm = new Date()): str
   }
 
   /* ── questionários ──────────────────────────────────────────────────────── */
-  const respondidos = d.diagnosticos.filter((q) => q.doc?.respostas)
+  // A data de nascimento fica de fora. Este texto é feito para colar em assistente
+  // de IA de terceiro, e data de nascimento é dado pessoal que não acrescenta nada
+  // à análise de carreira — viajaria junto sem ninguém ter decidido isso.
+  //
+  // O filtro vem antes do título da seção: um questionário em que só a data foi
+  // respondida deixaria "Respostas dos questionários" vazio no documento.
+  const respondidos = d.diagnosticos
+    .map((q) => ({
+      q,
+      respostas: Object.entries(q.doc?.respostas ?? {}).filter(
+        ([k, v]) => k !== PERGUNTA_DATA_NASCIMENTO && typeof v === 'string' && v.trim(),
+      ),
+    }))
+    .filter((x) => x.respostas.length)
   if (respondidos.length) {
     partes.push('\n## Respostas dos questionários')
-    for (const q of respondidos) {
-      const respostas = Object.entries(q.doc?.respostas ?? {}).filter(
-        ([, v]) => typeof v === 'string' && v.trim(),
-      )
-      if (!respostas.length) continue
+    for (const { q, respostas } of respondidos) {
       partes.push(
         linhas([
           '',

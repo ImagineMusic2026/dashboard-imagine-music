@@ -1,5 +1,6 @@
 import { collectionGroup, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
+import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import { ehTipoValido, limparRespostas, MAX_RESPOSTA, type TipoDiagnostico } from './perguntas'
 
 // Higiene das respostas mora em `perguntas.ts` (módulo puro — a API do link público
@@ -149,4 +150,30 @@ export async function salvarDiagnostico(
     }
   }
   await setDoc(ref(slug, tipo), dados, { merge: true })
+}
+
+/**
+ * Leva a data de nascimento do questionário Artista JÁ ENVIADO para o cadastro
+ * (`artistas/{slug}`), de onde sai o alerta de aniversário. O formulário chama logo
+ * depois de um envio que gravou, no portal e no painel.
+ *
+ * Passa por rota porque `artistas/{slug}` nega escrita pelo navegador. E a rota não
+ * recebe a data: relê o questionário gravado e aplica a política do servidor (nunca
+ * apaga, e não passa por cima da data que a equipe digitou no cadastro). O `slug` só
+ * vale para a equipe; para o artista a rota usa o da sessão.
+ *
+ * Os caches só caem quando o cadastro MUDOU: zerar tudo custa reler o roster
+ * inteiro, e "mantida"/"ignorada" não mudam nada que alguma tela mostre.
+ */
+export async function copiarDataNascimentoParaCadastro(slug: string): Promise<void> {
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+  const res = await fetch('/api/diagnostico/data-nascimento', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  })
+  const data = (await res.json().catch(() => null)) as { error?: string; resultado?: string } | null
+  if (!res.ok) throw new Error(data?.error ?? 'Não foi possível levar a data de nascimento ao cadastro.')
+  if (data?.resultado === 'gravada') invalidarCachesDeLeitura()
 }

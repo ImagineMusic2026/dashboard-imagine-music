@@ -8,8 +8,9 @@ export const dynamic = 'force-dynamic'
 /**
  * Cadastro manual de 1 artista. Exige a permissão `editarArtistas` (admin e
  * marketing por padrão) — a mesma de editar; só excluir segue admin-only. Recebe
- * nome + URLs das redes (todas opcionais menos o nome) e faz UPSERT em
- * `artistas/{slug}` preservando o que já existir (receita, redes não informadas).
+ * nome + URLs das redes + data de nascimento (tudo opcional menos o nome) e faz
+ * UPSERT em `artistas/{slug}` preservando o que já existir (receita, redes e data
+ * não informadas).
  */
 export async function POST(req: Request) {
   const auth = await exigirPermissao(req, 'editarArtistas')
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
   let body: {
     nome?: string
     genero?: string
+    /** 'YYYY-MM-DD'. `unknown` porque o tipo é conferido abaixo, antes de repassar. */
+    dataNascimento?: unknown
     spotifyUrl?: string
     youtubeUrl?: string
     instagramUrl?: string
@@ -38,6 +41,10 @@ export async function POST(req: Request) {
       {
         nome: body.nome ?? '',
         genero: body.genero,
+        // Só texto ou null: qualquer outra coisa (número, objeto) vira "não informou",
+        // e quem valida a data em si é `salvarArtistaManual`.
+        dataNascimento:
+          typeof body.dataNascimento === 'string' || body.dataNascimento === null ? body.dataNascimento : undefined,
         spotifyUrl: body.spotifyUrl,
         youtubeUrl: body.youtubeUrl,
         instagramUrl: body.instagramUrl,

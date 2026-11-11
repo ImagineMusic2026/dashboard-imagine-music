@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Check, ChevronDown, Plus } from 'lucide-react'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
+import { idadeEm, isoLocal, lerDataNascimento, NASCIMENTO_MIN } from '@/lib/artistas/aniversario'
 import { cn } from '@/lib/utils'
 
 /**
@@ -154,6 +155,74 @@ export function CamposProjeto({
           className={TEXTAREA}
         />
       </div>
+    </div>
+  )
+}
+
+/**
+ * Data de nascimento do artista, que alimenta o alerta de aniversário. Mesmo
+ * campo em criar e editar; `idPrefixo` evita colisão de id, como em `CamposProjeto`.
+ *
+ * O `max` é HOJE, e não o limite da regra (um ano atrás), de propósito: o seletor do
+ * celular abre no `max`, e um "Definir" sem mexer precisa cair numa data que a
+ * regra recusa — se abrisse no limite, gravaria o artista com 1 ano. Quem valida é
+ * `lerDataNascimento`, no envio e no servidor. A idade aparece na dica assim que a
+ * data é válida: é o que denuncia o ano esquecido antes de salvar.
+ */
+export function CampoDataNascimento({
+  valor,
+  onChange,
+  idPrefixo,
+  nota,
+  questionarioPreenche = true,
+}: {
+  /** 'YYYY-MM-DD' ou '' — o formato que o <input type="date"> devolve e o que se grava. */
+  valor: string
+  onChange: (v: string) => void
+  idPrefixo: string
+  /** Linha sobre o valor ATUAL (ex.: de onde ele veio). Entra também no aria-describedby. */
+  nota?: string | null
+  /**
+   * Se o questionário do artista ainda pode preencher este campo. Falso quando a
+   * equipe já digitou ou apagou a data — o questionário não mexe mais nela, e a
+   * dica não pode prometer o contrário.
+   */
+  questionarioPreenche?: boolean
+}) {
+  const id = `${idPrefixo}-nascimento`
+  const idDica = `${id}-dica`
+  const idNota = `${id}-nota`
+  const n = lerDataNascimento(valor)
+  const idade = n ? idadeEm(n) : null
+
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-300 mb-1.5">
+        Data de nascimento <span className="text-ink-500 font-normal text-xs">· opcional</span>
+      </label>
+      <input
+        id={id}
+        type="date"
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        min={NASCIMENTO_MIN}
+        max={isoLocal(new Date())}
+        aria-describedby={nota ? `${idNota} ${idDica}` : idDica}
+        className={cn(INPUT, '[color-scheme:dark]')}
+      />
+      {nota && (
+        <p id={idNota} className="text-[11px] text-violet-300/90 mt-1">
+          {nota}
+        </p>
+      )}
+      <p id={idDica} className="text-[11px] text-ink-500 mt-1">
+        {idade !== null && (
+          <span className="text-ink-300">
+            {idade} {idade === 1 ? 'ano' : 'anos'}.{' '}
+          </span>
+        )}
+        Usada no alerta de aniversário.{questionarioPreenche && ' Se ficar vazia, o questionário do artista pode preencher.'}
+      </p>
     </div>
   )
 }

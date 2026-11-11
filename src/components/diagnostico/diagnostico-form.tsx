@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Check, CloudOff, Loader2, Paperclip, Send, UserCog } from 'lucide-react'
+import { idadeEm, isoLocal, lerDataNascimento, NASCIMENTO_MIN } from '@/lib/artistas/aniversario'
 import {
+  copiarDataNascimentoParaCadastro,
   getDiagnostico,
   salvarDiagnostico,
   MAX_RESPOSTA,
@@ -34,10 +36,13 @@ type Salvamento = { estado: 'ocioso' | 'salvando' | 'salvo' | 'erro'; em?: numbe
  * cópia por quem digitou. O que muda é a `origem` gravada a cada save, e a cópia da
  * tela: no portal/link se fala COM a pessoa, no painel se fala SOBRE o artista.
  *
- * São ~20 perguntas de texto longo: ninguém responde de uma sentada. Por isso
- * autosave por pausa de digitação + retomada — fecha e volta depois, e o rascunho
- * está lá. Concluir não tranca nada: só sinaliza que acabou (e editar depois volta
- * pra rascunho, pra o que se vê ser o estado real).
+ * São ~20 perguntas, quase todas de texto longo: ninguém responde de uma sentada.
+ * Por isso autosave por pausa de digitação + retomada — fecha e volta depois, e o
+ * rascunho está lá. Concluir não tranca nada: só sinaliza que acabou (e editar
+ * depois volta pra rascunho, pra o que se vê ser o estado real).
+ *
+ * Enviar o questionário Artista também leva a data de nascimento ao cadastro do
+ * artista — ver `enviar`.
  */
 export function DiagnosticoForm({
   tipo,
@@ -111,9 +116,11 @@ export function DiagnosticoForm({
     }
   }, [slug, tipo, viaLink, token])
 
+  // Devolve se gravou. O autosave ignora (o erro já aparece no indicador do topo);
+  // o `enviar` precisa saber, porque só um envio que gravou leva a data ao cadastro.
   const salvar = useCallback(
-    async (enviar = false) => {
-      if (viaLink ? !token : !slug) return
+    async (enviar = false): Promise<boolean> => {
+      if (viaLink ? !token : !slug) return false
       // Guardar o link do arquivo não é responder: não reescreve autoria nem status.
       // No doc que ainda não existe a autoria PRECISA ir junto (a regra exige).
       const soAnexo =
@@ -138,8 +145,10 @@ export function DiagnosticoForm({
           setOrigemSalva(viaLink ? 'artista' : modo)
           setEnviado(enviar)
         }
+        return true
       } catch {
         setSalvamento({ estado: 'erro' })
+        return false
       }
     },
     [slug, tipo, modo, viaLink, token]
@@ -172,7 +181,23 @@ export function DiagnosticoForm({
     if (enviando) return
     setEnviando(true)
     if (timer.current) clearTimeout(timer.current)
-    await salvar(true)
+    const gravou = await salvar(true)
+    // A data de nascimento vai para o cadastro (e de lá para o alerta de aniversário)
+    // só depois de um envio que GRAVOU, e só no questionário Artista — o único que a
+    // pergunta. A rota relê o questionário gravado e copia de lá, então é chamada
+    // mesmo sem data neste formulário: ela pode estar gravada por outra aba ou pela
+    // equipe. No modo link quem leva é a própria API do link, no servidor.
+    //
+    // Melhor esforço: as respostas já estão salvas, e a cópia falhar não pode virar
+    // erro na tela de quem respondeu. Esperar por ela segura o botão um instante a
+    // mais, mas garante que o perfil aberto em seguida já mostre a data.
+    if (gravou && !viaLink && slug && tipo === 'artista') {
+      try {
+        await copiarDataNascimentoParaCadastro(slug)
+      } catch (e) {
+        console.warn('[questionário] a data de nascimento não foi para o cadastro', e)
+      }
+    }
     setEnviando(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -428,6 +453,23 @@ function Campo({
 }) {
   const id = `d-${pergunta.id}`
   const ajudaId = pergunta.ajuda ? `${id}-ajuda` : undefined
+  // Só depois que a pessoa sai do campo: o ano é digitado dígito a dígito ("0001",
+  // "0019", "0199"…), e avisar a cada tecla acusaria erro no meio da digitação.
+  const [saiu, setSaiu] = useState(false)
+  // O campo mostra uma data que não existe (31/02) ou incompleta, mas devolve '':
+  // sem olhar o `badInput`, ela pareceria só "vazia" e passaria sem aviso.
+  const [ilegivel, setIlegivel] = useState(false)
+  const ehData = pergunta.tipo === 'data'
+  // Data recusada (antes de 1900, ou de menos de um ano atrás) não é gravada —
+  // `limparRespostas` a troca por vazio. Sem o aviso, a pessoa veria a data no campo
+  // e acharia que respondeu.
+  const nascimento = ehData ? lerDataNascimento(valor) : null
+  const dataRecusada = ehData && saiu && (ilegivel || (valor.trim() !== '' && !nascimento))
+  const erroId = dataRecusada ? `${id}-erro` : undefined
+  // A idade ao lado denuncia o ano esquecido: o calendário do celular abre num ano
+  // recente, e "1 ano" salta aos olhos antes do envio.
+  const idadeId = nascimento ? `${id}-idade` : undefined
+  const descritaPor = [ajudaId, idadeId, erroId].filter(Boolean).join(' ') || undefined
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-ink-200 mb-1">
@@ -438,20 +480,77 @@ function Campo({
           {pergunta.ajuda}
         </p>
       )}
-      <textarea
-        id={id}
-        aria-describedby={ajudaId}
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        rows={pergunta.linhas ?? 3}
-        maxLength={MAX_RESPOSTA}
-        className={cn(
-          'w-full bg-bg-950 border border-bg-700/50 rounded-lg px-4 py-2.5 text-sm text-ink-100',
-          'placeholder:text-ink-600 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20',
-          'resize-y leading-relaxed transition-colors'
-        )}
-        placeholder="Escreva aqui…"
-      />
+      {ehData ? (
+        <>
+          {/* Largura de data, não de parágrafo: esticado como os textareas, o campo
+              ficaria quase todo vazio. `min`/`max` só evitam que o calendário ofereça o
+              que vai ser recusado — quem valida é `lerDataNascimento`, no save. */}
+          <input
+            id={id}
+            type="date"
+            aria-describedby={descritaPor}
+            aria-invalid={dataRecusada || undefined}
+            value={valor}
+            // Editar apaga o aviso até sair do campo de novo: corrigir o ano passa por
+            // "0001", "0019"… e o aviso não pode piscar a cada dígito. Só FOCAR não
+            // apaga — quem volta ao campo com o leitor de tela ainda ouve que ele está
+            // inválido, e por quê.
+            onChange={(e) => {
+              setSaiu(false)
+              setIlegivel(e.currentTarget.validity.badInput)
+              onChange(e.target.value)
+            }}
+            // De vazio para uma data inexistente o navegador não dispara change — só
+            // o blur fica sabendo.
+            onBlur={(e) => {
+              setIlegivel(e.currentTarget.validity.badInput)
+              setSaiu(true)
+            }}
+            min={NASCIMENTO_MIN}
+            // HOJE, e não o limite da regra: o seletor do celular abre no max, e o
+            // "Definir" sem mexer precisa cair numa data recusada (com aviso), e não
+            // numa aceita de 1 ano.
+            max={isoLocal(new Date())}
+            className={cn(
+              'w-full sm:w-56 bg-bg-950 border border-bg-700/50 rounded-lg px-4 py-2.5 text-sm text-ink-100',
+              'focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20',
+              'transition-colors [color-scheme:dark]',
+              dataRecusada && 'border-red-500/60'
+            )}
+          />
+          {nascimento && (
+            <p id={idadeId} className="text-[12px] text-ink-400 leading-relaxed mt-1.5">
+              {idadeEm(nascimento)} {idadeEm(nascimento) === 1 ? 'ano' : 'anos'}
+            </p>
+          )}
+          {/* Sempre montada, para o aviso ser ANUNCIADO quando aparece no blur — a
+              essa altura o foco já está na pergunta seguinte. */}
+          <div aria-live="polite">
+            {dataRecusada && (
+              <p id={erroId} className="text-[12px] text-red-400 leading-relaxed mt-1.5">
+                {ilegivel
+                  ? 'Essa data não existe ou está incompleta — confira dia, mês e ano. Do jeito que está, não é salva.'
+                  : 'Confira a data: ela precisa ser de 1900 até um ano atrás. Do jeito que está, não é salva.'}
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        <textarea
+          id={id}
+          aria-describedby={ajudaId}
+          value={valor}
+          onChange={(e) => onChange(e.target.value)}
+          rows={pergunta.linhas ?? 3}
+          maxLength={MAX_RESPOSTA}
+          className={cn(
+            'w-full bg-bg-950 border border-bg-700/50 rounded-lg px-4 py-2.5 text-sm text-ink-100',
+            'placeholder:text-ink-600 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20',
+            'resize-y leading-relaxed transition-colors'
+          )}
+          placeholder="Escreva aqui…"
+        />
+      )}
     </div>
   )
 }

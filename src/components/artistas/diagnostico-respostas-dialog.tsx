@@ -4,7 +4,13 @@ import { useEffect } from 'react'
 import { Check, ClipboardList, FileDown, Paperclip, X } from 'lucide-react'
 import type { DiagnosticoDoc } from '@/lib/diagnostico/client'
 import { exportarDiagnosticoPdf } from '@/lib/diagnostico/exportar'
-import { NOME_CURTO, progressoDe, questionario, type TipoDiagnostico } from '@/lib/diagnostico/perguntas'
+import {
+  NOME_CURTO,
+  progressoDe,
+  questionario,
+  respostaLegivel,
+  type TipoDiagnostico,
+} from '@/lib/diagnostico/perguntas'
 import { cn } from '@/lib/utils'
 
 function dataCurta(ms: number | null): string {
@@ -15,9 +21,9 @@ function dataCurta(ms: number | null): string {
 /**
  * As respostas do artista num modal, e não expandidas no perfil.
  *
- * São 16–22 perguntas de texto livre: abertas na página, empurravam todo o resto do
- * perfil pra baixo, e o tamanho ainda dependia do quanto o artista escreveu. Aqui a
- * leitura fica contida e a rolagem é do modal.
+ * São 16–23 perguntas, quase todas de texto livre: abertas na página, empurravam
+ * todo o resto do perfil pra baixo, e o tamanho ainda dependia do quanto o artista
+ * escreveu. Aqui a leitura fica contida e a rolagem é do modal.
  *
  * Mantém a ordem e as seções do questionário — é assim que o diagnóstico se lê. As
  * não respondidas ficam, discretas: saber o que ficou em branco também é informação.
@@ -138,7 +144,8 @@ export function DiagnosticoRespostasDialog({
                 <h3 className="text-[11px] tracking-[0.18em] font-bold text-violet-400 uppercase">{secao.titulo}</h3>
               )}
               {secao.perguntas.map((p) => {
-                const r = (doc?.respostas?.[p.id] ?? '').trim()
+                // Data sai como 'dd/mm/aaaa', não no formato gravado.
+                const r = respostaLegivel(p, doc?.respostas?.[p.id])
                 return (
                   <div key={p.id}>
                     <div className="text-[12px] font-semibold text-ink-400 mb-1">{p.rotulo}</div>

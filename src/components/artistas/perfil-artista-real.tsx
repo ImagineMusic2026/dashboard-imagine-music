@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, Loader2, Pencil, Sparkles, Star } from 'lucide-react'
+import { ArrowLeft, Cake, ExternalLink, Loader2, Pencil, Sparkles, Star } from 'lucide-react'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { HealthScoreArtistaCard } from '@/components/artistas/health-score-card'
@@ -29,6 +29,7 @@ import { FonogramasArtistaCard } from '@/components/artistas/fonogramas-artista-
 import { DiagnosticoArtistaCard } from '@/components/artistas/diagnostico-artista-card'
 import { AcessoIntegracoesCard } from '@/components/artistas/acesso-integracoes-card'
 import { useAuth } from '@/components/auth/auth-provider'
+import { diaEMes, diasAte, idadeEm, JANELA_ANIVERSARIO_DIAS, lerDataNascimento, proximoAniversario } from '@/lib/artistas/aniversario'
 import {
   corAvatarDe,
   getArtista,
@@ -71,6 +72,61 @@ const LINKS: { tipo: PlataformaTipo; nome: string; cor: string; get: (a: Artista
   { tipo: 'instagram', nome: 'Instagram', cor: 'text-fuchsia-400', get: (a) => a.redes?.instagram },
   { tipo: 'tiktok', nome: 'TikTok', cor: 'text-cyan-400', get: (a) => a.redes?.tiktok },
 ]
+
+/**
+ * Aniversário ao lado do nome: "15/11 · 35 anos", ou destacado no próprio dia.
+ *
+ * Texto puro de propósito — os chips logo abaixo são links, e isto não pode
+ * parecer um. Vale também no portal: o artista vê o próprio aniversário, que é
+ * dado dele. Data ausente ou inválida não mostra nada (a mesma régua do alerta).
+ *
+ * O leitor de tela ouve outra frase ("Aniversário: 15/11, 35 anos"): a versão
+ * visível só se entende pelo ícone, e o "·" seria lido como símbolo.
+ */
+function SeloAniversario({ dataNascimento }: { dataNascimento: ArtistaDoc['dataNascimento'] }) {
+  const hoje = new Date()
+  const n = lerDataNascimento(dataNascimento, hoje)
+  if (!n) return null
+
+  const proximo = proximoAniversario(n, hoje)
+  const dias = diasAte(proximo, hoje)
+  const ehHoje = dias === 0
+  const anos = (k: number) => `${k} ${k === 1 ? 'ano' : 'anos'}`
+  // Duas idades possíveis, e o texto diz qual é qual. Na semana do aniversário, a
+  // Home e o alerta falam da idade que ele VAI FAZER ("36 anos"); aqui, "14/11 · 35
+  // anos" faria a equipe achar que um dos dois errou. Então: na janela do alerta,
+  // "faz 36 em 14/11"; fora dela, a idade de hoje com a data ao lado, rotulada.
+  // A idade que faz é `ano - nasc.ano`, a mesma conta do alerta — é o que dá a
+  // idade certa a quem nasceu em 29/02 e comemora em 28/02.
+  const faz = proximo.getFullYear() - n.ano
+  const quando = dias === 1 ? 'amanhã' : `em ${diaEMes({ ano: proximo.getFullYear(), mes: proximo.getMonth() + 1, dia: proximo.getDate() })}`
+  const visivel = ehHoje
+    ? `Aniversário hoje · ${anos(faz)}`
+    : dias <= JANELA_ANIVERSARIO_DIAS
+      ? `Faz ${anos(faz)} ${quando}`
+      : `${anos(idadeEm(n, hoje))} · aniversário ${diaEMes(n)}`
+  const falado = ehHoje
+    ? `Aniversário hoje, ${anos(faz)}`
+    : dias <= JANELA_ANIVERSARIO_DIAS
+      ? `Faz ${anos(faz)} ${quando}`
+      : `${anos(idadeEm(n, hoje))}, aniversário em ${diaEMes(n)}`
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 text-[12px]',
+        // No dia ganha a cor de oportunidade, a mesma do alerta de aniversário.
+        ehHoje
+          ? 'px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-semibold'
+          : 'text-ink-400',
+      )}
+    >
+      <Cake aria-hidden className={cn('w-3.5 h-3.5 shrink-0', ehHoje ? 'text-emerald-300' : 'text-ink-500')} />
+      <span aria-hidden>{visivel}</span>
+      <span className="sr-only">{falado}</span>
+    </span>
+  )
+}
 
 export function PerfilArtistaReal({
   slug,
@@ -165,7 +221,11 @@ export function PerfilArtistaReal({
             <span className="text-ink-600">·</span>
             <span className="text-cyan-400">CADASTRO REAL</span>
           </div>
-          <h1 className="text-3xl font-bold text-ink-100">{a.nome}</h1>
+          {/* Nome e aniversário na mesma linha; nome longo empurra o selo pra baixo. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-3xl font-bold text-ink-100">{a.nome}</h1>
+            <SeloAniversario dataNascimento={a.dataNascimento} />
+          </div>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {links.length ? (
               links.map((l) => (

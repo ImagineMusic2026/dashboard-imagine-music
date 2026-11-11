@@ -8,10 +8,12 @@ import {
   INPUT,
   RedeLabel,
   GeneroCombobox,
+  CampoDataNascimento,
   CamposProjeto,
   PROJETO_VAZIO,
   type DadosProjeto,
 } from '@/components/artistas/artista-form-fields'
+import { lerDataNascimento } from '@/lib/artistas/aniversario'
 import { cn } from '@/lib/utils'
 import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 
@@ -29,6 +31,7 @@ type Resultado = {
 export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [nome, setNome] = useState('')
   const [genero, setGenero] = useState('')
+  const [dataNascimento, setDataNascimento] = useState('')
   const [spotifyUrl, setSpotifyUrl] = useState('')
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [instagramUrl, setInstagramUrl] = useState('')
@@ -46,6 +49,11 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
       setErro('Informe o nome do artista.')
       return
     }
+    // Mesma função que o servidor usa — avisa antes da viagem, com a mesma mensagem.
+    if (dataNascimento && !lerDataNascimento(dataNascimento)) {
+      setErro('Confira a data de nascimento: ela precisa ser de 1900 até um ano atrás.')
+      return
+    }
     setEnviando(true)
     try {
       const token = await auth.currentUser?.getIdToken()
@@ -53,7 +61,18 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
       const res = await fetch('/api/artistas/criar', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, genero, spotifyUrl, youtubeUrl, instagramUrl, tiktokUrl, ...projeto }),
+        body: JSON.stringify({
+          nome,
+          genero,
+          // Só quando preenchida: na criação, vazio é "não informou" e nunca apaga a
+          // data de um slug que já existia (ver `salvarArtistaManual`).
+          ...(dataNascimento ? { dataNascimento } : {}),
+          spotifyUrl,
+          youtubeUrl,
+          instagramUrl,
+          tiktokUrl,
+          ...projeto,
+        }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error ?? 'Não foi possível salvar o artista.')
@@ -71,6 +90,7 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
   function adicionarOutro() {
     setNome('')
     setGenero('')
+    setDataNascimento('')
     setSpotifyUrl('')
     setYoutubeUrl('')
     setInstagramUrl('')
@@ -123,6 +143,13 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
               </label>
               <GeneroCombobox value={genero} onChange={setGenero} />
             </div>
+
+            <CampoDataNascimento
+              valor={dataNascimento}
+              onChange={setDataNascimento}
+              idPrefixo="art"
+              questionarioPreenche={!dataNascimento}
+            />
 
             <div>
               <RedeLabel tipo="spotify" cor="text-emerald-400" htmlFor="art-spotify" />

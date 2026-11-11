@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import admin from 'firebase-admin'
 import { adminDb } from '@/lib/firebase-admin'
+import { PERGUNTA_DATA_NASCIMENTO } from '@/lib/artistas/aniversario'
+import { copiarDataNascimentoDoQuestionario } from '@/lib/artistas/data-nascimento-servidor'
 import { ehTipoValido, limparRespostas, type TipoDiagnostico } from '@/lib/diagnostico/perguntas'
 
 export const runtime = 'nodejs'
@@ -20,6 +22,12 @@ export const dynamic = 'force-dynamic'
  * estreita de propósito: só as chaves conhecidas do questionário (`limparRespostas`
  * descarta o resto), só `origem: 'artista'` (pro card e pro alerta é a pessoa
  * respondendo, não a equipe), e nunca toca `arquivoUrl` (anexo interno da equipe).
+ *
+ * Fora do questionário ela escreve UMA coisa: no envio do questionário Artista, a
+ * data de nascimento vai para o cadastro (`artistas/{slug}`), sempre pela política de
+ * `copiarDataNascimentoDoQuestionario` — nunca apaga e não passa por cima da data
+ * que a equipe digitou. A resposta do POST é a mesma de qualquer jeito: quem tem o
+ * link não fica sabendo o que o cadastro já dizia.
  */
 
 type LinkDoc = { slug: string; tipo: TipoDiagnostico }
@@ -87,6 +95,7 @@ export async function POST(req: Request) {
         : {}
     const enviar = body.enviar === true
     const agora = admin.firestore.FieldValue.serverTimestamp()
+    const respostas = limparRespostas(link.tipo, brutas)
 
     // Mesmo shape do save do portal (ver `salvarDiagnostico`): merge porque o
     // autosave manda o form inteiro a cada pausa, e `enviadoEm` não pode sumir num
@@ -96,14 +105,31 @@ export async function POST(req: Request) {
     const dados: Record<string, unknown> = {
       slug: link.slug,
       tipo: link.tipo,
-      respostas: limparRespostas(link.tipo, brutas),
+      respostas,
       origem: 'artista',
       status: enviar ? 'enviado' : 'rascunho',
       atualizadoEm: agora,
     }
     if (enviar) dados.enviadoEm = agora
 
-    await adminDb.doc(`diagnosticos/${link.slug}/questionarios/${link.tipo}`).set(dados, { merge: true })
+    const ref = adminDb.doc(`diagnosticos/${link.slug}/questionarios/${link.tipo}`)
+    await ref.set(dados, { merge: true })
+
+    // A data de nascimento vai para o cadastro só no ENVIO (rascunho é resposta que
+    // ainda pode mudar) e depois de as respostas estarem gravadas. Copia do que ficou
+    // GRAVADO, e não do corpo deste pedido: o merge preserva a data que já estava no
+    // questionário quando o formulário desta aba não a trazia (aberto antes de ela ser
+    // respondida em outro lugar) — o mesmo que a rota do portal e do painel faz.
+    // Melhor esforço: as respostas já estão salvas, e falhar aqui não pode virar erro
+    // pra quem respondeu.
+    if (enviar && link.tipo === 'artista') {
+      try {
+        const gravado = (await ref.get()).data()?.respostas as Record<string, unknown> | undefined
+        await copiarDataNascimentoDoQuestionario(link.slug, gravado?.[PERGUNTA_DATA_NASCIMENTO])
+      } catch (e) {
+        console.error('[api/questionario-link POST] data de nascimento → cadastro', e)
+      }
+    }
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error('[api/questionario-link POST]', e)

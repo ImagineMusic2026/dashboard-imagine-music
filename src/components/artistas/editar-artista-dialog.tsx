@@ -7,11 +7,13 @@ import {
   INPUT,
   RedeLabel,
   GeneroCombobox,
+  CampoDataNascimento,
   CamposProjeto,
   PROJETO_VAZIO,
   projetoDeDoc,
   type DadosProjeto,
 } from '@/components/artistas/artista-form-fields'
+import { lerDataNascimento } from '@/lib/artistas/aniversario'
 import { corAvatarDe, getProjeto, iniciaisDe, type ArtistaDoc, type RedeSocialDoc } from '@/lib/artistas/client'
 import { invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import { AvatarFallback } from '@/components/artistas/avatar-fallback'
@@ -57,6 +59,16 @@ export function EditarArtistaDialog({
 }) {
   const [nome, setNome] = useState(artista.nome ?? '')
   const [genero, setGenero] = useState(artista.genero ?? '')
+  // A data só vai no envio se a pessoa MEXEU nela. O diálogo nasce do artista em
+  // cache (até 5 min): reenviar sempre o valor inicial apagaria — ou voltaria pra
+  // antiga — uma data que o questionário do artista gravou nesse meio-tempo.
+  // O inicial fica congelado no estado: compara-se com o que o campo MOSTROU ao
+  // abrir, mesmo que o `artista` recebido mude depois.
+  const [nascimentoInicial] = useState(() =>
+    typeof artista.dataNascimento === 'string' ? artista.dataNascimento : ''
+  )
+  const [dataNascimento, setDataNascimento] = useState(nascimentoInicial)
+  const nascimentoMudou = dataNascimento !== nascimentoInicial
   const [fotoUrl, setFotoUrl] = useState(artista.fotoUrl ?? '')
   const [spotifyUrl, setSpotifyUrl] = useState(urlInicial(artista.redes?.spotify, 'spotify'))
   const [youtubeUrl, setYoutubeUrl] = useState(urlInicial(artista.redes?.youtube, 'youtube'))
@@ -99,6 +111,11 @@ export function EditarArtistaDialog({
       setErro('Informe o nome do artista.')
       return
     }
+    // Mesma função que o servidor usa — avisa antes da viagem, com a mesma mensagem.
+    if (nascimentoMudou && dataNascimento && !lerDataNascimento(dataNascimento)) {
+      setErro('Confira a data de nascimento: ela precisa ser de 1900 até um ano atrás.')
+      return
+    }
     setEnviando(true)
     try {
       const token = await auth.currentUser?.getIdToken()
@@ -110,6 +127,8 @@ export function EditarArtistaDialog({
           slug: artista.slug,
           nome,
           genero,
+          // `undefined` some do JSON e o servidor preserva; '' (campo limpo) apaga.
+          dataNascimento: nascimentoMudou ? dataNascimento : undefined,
           fotoUrl,
           spotifyUrl,
           youtubeUrl,
@@ -201,6 +220,25 @@ export function EditarArtistaDialog({
             </label>
             <GeneroCombobox value={genero} onChange={setGenero} />
           </div>
+
+          <CampoDataNascimento
+            valor={dataNascimento}
+            onChange={setDataNascimento}
+            idPrefixo="edit"
+            // Diz de onde veio a data que está ali — e some assim que a equipe a
+            // altera, porque ao salvar ela passa a ser da equipe.
+            // O questionário só preenche cadastro sem data e sem decisão da equipe.
+            questionarioPreenche={!nascimentoInicial && !artista.dataNascimentoOrigem && !dataNascimento}
+            nota={
+              nascimentoMudou
+                ? null
+                : nascimentoInicial && artista.dataNascimentoOrigem === 'questionario'
+                  ? 'Preenchida pelo questionário do artista.'
+                  : !nascimentoInicial && artista.dataNascimentoOrigem === 'equipe'
+                    ? 'Apagada pela equipe — o questionário não preenche de novo.'
+                    : null
+            }
+          />
 
           <div>
             <label htmlFor="edit-foto" className="block text-sm font-medium text-ink-300 mb-1.5">

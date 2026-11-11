@@ -1,5 +1,6 @@
 import admin from 'firebase-admin'
 import { adminDb } from '@/lib/firebase-admin'
+import { lerDataNascimento, type OrigemDataNascimento } from '@/lib/artistas/aniversario'
 import { slugify } from '../onerpm/aggregate'
 import { extrairInstagram, extrairSpotify, extrairTiktok, extrairYoutube } from './extrair'
 import type {
@@ -216,6 +217,8 @@ export interface DadosProjetoInput {
 export interface NovoArtistaInput extends DadosProjetoInput {
   nome: string
   genero?: string | null
+  /** 'YYYY-MM-DD'. Na criação, vazio é só "não informou" — nunca apaga a data de um slug que já existe. */
+  dataNascimento?: string | null
   spotifyUrl?: string | null
   youtubeUrl?: string | null
   instagramUrl?: string | null
@@ -301,6 +304,25 @@ async function salvarProjetoArtista(
 }
 
 /**
+ * Data digitada no cadastro é da EQUIPE. É essa origem que impede um questionário
+ * enviado depois de sobrescrevê-la — ele só atualiza o que ele mesmo gravou.
+ */
+const ORIGEM_CADASTRO: OrigemDataNascimento = 'equipe'
+
+/**
+ * Data de nascimento do envio, aparada; '' quando veio vazia.
+ *
+ * Valida com `lerDataNascimento`, a MESMA função do formulário e do alerta, e não
+ * com um teste de formato: 31/02 passa num regex — e uma data aceita aqui mas
+ * recusada pelo alerta ficaria gravada sem nunca virar aviso de aniversário.
+ */
+function dataNascimentoDoInput(v: string | null | undefined): string {
+  const s = (v ?? '').trim()
+  if (s && !lerDataNascimento(s)) throw new ArtistaInputError('Data de nascimento inválida.')
+  return s
+}
+
+/**
  * Cadastro MANUAL de um artista (UPSERT em `artistas/{slug}`). Mesmo modelo do
  * roster, porém um por vez e a partir das URLs digitadas. Só inclui no merge as
  * redes informadas — assim NÃO apaga redes/receita já existentes caso o slug
@@ -315,6 +337,8 @@ export async function salvarArtistaManual(
   const slug = slugify(nome)
   if (!slug) throw new ArtistaInputError('O nome precisa ter ao menos uma letra ou número.')
   const genero = (input.genero ?? '').trim() || null
+  // Valida antes de ler ou gravar qualquer coisa: data inválida recusa o envio inteiro.
+  const dataNascimento = dataNascimentoDoInput(input.dataNascimento)
 
   const spotify = input.spotifyUrl ? extrairSpotify(input.spotifyUrl) : null
   const youtube = input.youtubeUrl ? extrairYoutube(input.youtubeUrl) : null
@@ -345,6 +369,13 @@ export async function salvarArtistaManual(
     cadastroPorEmail: meta.email,
   }
   if (genero) data.genero = genero
+  // Vazio NUNCA apaga aqui: o "criar" também é upsert, e recadastrar um slug que já
+  // existe não pode limpar a data que a equipe ou o questionário gravou antes.
+  if (dataNascimento) {
+    data.dataNascimento = dataNascimento
+    data.dataNascimentoOrigem = ORIGEM_CADASTRO
+    data.dataNascimentoAtualizadoEm = admin.firestore.FieldValue.serverTimestamp()
+  }
   if (Object.keys(redesParaSalvar).length) data.redes = redesParaSalvar
   if (!jaExistia) {
     data.fonteCadastro = 'manual'
@@ -373,6 +404,8 @@ export interface AtualizarArtistaInput extends DadosProjetoInput {
   genero?: string | null
   /** Foto do artista (URL http(s)). Vazio remove; `undefined` preserva. */
   fotoUrl?: string | null
+  /** 'YYYY-MM-DD'. Mesmo tri-estado da foto: vazio remove (data e origem); `undefined` preserva. */
+  dataNascimento?: string | null
   spotifyUrl?: string | null
   youtubeUrl?: string | null
   instagramUrl?: string | null
@@ -458,6 +491,28 @@ export async function atualizarArtistaManual(
     if (!foto) updates.fotoUrl = admin.firestore.FieldValue.delete()
     else if (/^https?:\/\//i.test(foto)) updates.fotoUrl = foto
     else throw new ArtistaInputError('A foto precisa ser uma URL http(s) válida.')
+  }
+
+  // Data de nascimento: o mesmo tri-estado da foto. `undefined` preserva — e é o
+  // que o diálogo manda quando ninguém mexeu no campo, porque ele nasce do artista
+  // em cache e reenviar a data antiga desfaria uma que o questionário acabou de
+  // gravar. Vazio apaga a data E a origem: a origem não pode sobrar descrevendo
+  // uma data que não existe mais.
+  if (input.dataNascimento !== undefined) {
+    const dataNascimento = dataNascimentoDoInput(input.dataNascimento)
+    if (dataNascimento) {
+      updates.dataNascimento = dataNascimento
+      updates.dataNascimentoOrigem = ORIGEM_CADASTRO
+      updates.dataNascimentoAtualizadoEm = admin.firestore.FieldValue.serverTimestamp()
+    } else {
+      // Sai a data, mas a ORIGEM fica: 'equipe' sem data é o registro de que a equipe
+      // apagou de propósito (data errada, pedido de exclusão do dado). Sem ele, o
+      // próximo envio do questionário — ou o artista chamando a cópia de novo —
+      // regravaria em silêncio a data que acabou de ser tirada.
+      updates.dataNascimento = admin.firestore.FieldValue.delete()
+      updates.dataNascimentoOrigem = ORIGEM_CADASTRO
+      updates.dataNascimentoAtualizadoEm = admin.firestore.FieldValue.serverTimestamp()
+    }
   }
 
   const avisos: string[] = []

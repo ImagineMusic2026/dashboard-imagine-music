@@ -45,12 +45,13 @@ export function ListaView({
   agrupamento: Agrupamento
   onAbrir: (a: Atividade) => void
 }) {
-  const { config, visiveis, todas, progresso, atrasada, concluida, mover, filtrando } = useQuadro()
+  const { config, visiveis, todas, progresso, atrasada, concluida, mover, filtrando, tituloDe, nomeArtistaDe } =
+    useQuadro()
   const [ordem, setOrdem] = useState<Ordem>('quadro')
   const [recolhidos, setRecolhidos] = useState<Set<string>>(new Set())
 
   const linhas = useMemo(() => {
-    if (ordem === 'quadro') return montarLinhas(visiveis, config, { agrupamento, recolhidos })
+    if (ordem === 'quadro') return montarLinhas(visiveis, config, { agrupamento, recolhidos, nomeArtistaDe })
 
     const peso = (a: Atividade) => prioridadeMeta[a.prioridade]?.peso ?? 0
     const ordenadas = [...visiveis].sort((a, b) => {
@@ -66,7 +67,8 @@ export function ListaView({
         case 'responsavel':
           return (a.responsavelNome ?? 'zzz').localeCompare(b.responsavelNome ?? 'zzz', 'pt-BR')
         default:
-          return a.titulo.localeCompare(b.titulo, 'pt-BR')
+          // Pelo título como aparece: com o padrão, isso já agrupa por artista.
+          return tituloDe(a).localeCompare(tituloDe(b), 'pt-BR')
       }
     })
     return ordenadas.map((a) => ({
@@ -76,7 +78,7 @@ export function ListaView({
       nivel: 0,
       temFilhos: false,
     }))
-  }, [visiveis, config, agrupamento, recolhidos, ordem, progresso])
+  }, [visiveis, config, agrupamento, recolhidos, ordem, progresso, tituloDe, nomeArtistaDe])
 
   function alternar(chave: string) {
     setRecolhidos((atual) => {
@@ -200,8 +202,8 @@ export function ListaView({
                           aria-expanded={!recolhidos.has(a.id)}
                           aria-label={
                             recolhidos.has(a.id)
-                              ? `Mostrar subtarefas de "${a.titulo}"`
-                              : `Ocultar subtarefas de "${a.titulo}"`
+                              ? `Mostrar subtarefas de "${tituloDe(a)}"`
+                              : `Ocultar subtarefas de "${tituloDe(a)}"`
                           }
                           className="p-0.5 rounded text-ink-400 hover:text-violet-300 transition-colors shrink-0"
                         >
@@ -224,12 +226,9 @@ export function ListaView({
                             concluida(a) && 'text-ink-500 line-through decoration-ink-600',
                           )}
                         >
-                          {a.titulo}
+                          {tituloDe(a)}
                         </button>
                         <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                          {campoLigado(config, 'artista') && a.artistaNome && (
-                            <span className="text-[10px] text-ink-500 truncate">{a.artistaNome}</span>
-                          )}
                           {tipo && (
                             <span className={cn('text-[9px] px-1 py-px rounded border', cor(tipo.cor).chip)}>
                               {tipo.label}
@@ -266,7 +265,7 @@ export function ListaView({
                     <select
                       value={a.etapa}
                       onChange={(e) => mover(a.id, e.target.value, null)}
-                      aria-label={`Etapa de "${a.titulo}"`}
+                      aria-label={`Etapa de "${tituloDe(a)}"`}
                       className={cn(
                         'bg-bg-900 border border-bg-700/50 rounded-md px-2 py-1 text-[11px] focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20',
                         cor(etapa?.cor).text,

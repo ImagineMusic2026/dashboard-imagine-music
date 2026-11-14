@@ -31,7 +31,8 @@ import {
   type Atividade,
   type ItemChecklist,
 } from '@/lib/atividades/client'
-import { CONFIG_PADRAO, type ConfigQuadro, type Prioridade } from '@/lib/atividades/tipos'
+import { campoLigado, CONFIG_PADRAO, type ConfigQuadro, type Prioridade } from '@/lib/atividades/tipos'
+import { tituloComArtista } from '@/lib/atividades/titulo'
 import { ehColaborador } from '@/lib/permissions'
 import type { AppUser } from '@/lib/users'
 
@@ -107,6 +108,18 @@ interface QuadroCtx {
   limparFiltros: () => void
   /** Etiquetas em uso no quadro + as sugeridas na configuração. */
   etiquetasConhecidas: string[]
+  /**
+   * O título como aparece em TODA tela: `Artista - título` (ver
+   * `@/lib/atividades/titulo`). Use isto, e não `a.titulo`, onde a demanda é
+   * identificada pelo nome — o que fica gravado é só o que a pessoa escreveu.
+   */
+  tituloDe: (a: Atividade) => string
+  /**
+   * O nome do artista da demanda como aparece: o do cadastro, e o gravado só para
+   * artista que saiu do roster. É o mesmo que vai na frente do `tituloDe` — raias,
+   * grupos e o detalhe usam este, para não mostrarem um nome antigo ao lado do novo.
+   */
+  nomeArtistaDe: (a: Atividade) => string
   progresso: (a: Atividade) => number
   atrasada: (a: Atividade) => boolean
   concluida: (a: Atividade) => boolean
@@ -200,6 +213,35 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
 
   const lista = useMemo(() => todas ?? [], [todas])
 
+  // O nome do artista vem do cadastro (a lista de opções), não do que ficou
+  // gravado na demanda: renomear o artista muda o título de todas as demandas dele.
+  // O gravado só vale para artista que saiu do roster.
+  const nomePorSlug = useMemo(() => new Map(artistas.map((a) => [a.slug, a.nome])), [artistas])
+  const nomeArtistaDe = useCallback(
+    (a: Atividade) => (a.artistaSlug && nomePorSlug.get(a.artistaSlug)) || a.artistaNome || '',
+    [nomePorSlug],
+  )
+  const artistaLigado = campoLigado(configAtiva, 'artista')
+  // Memorizado: a lista ordena pelo título exibido, e cada comparação montaria as
+  // expressões do nome de novo. A chave é o título + os dois nomes; o cache
+  // recomeça quando os nomes do cadastro mudam.
+  const tituloDe = useMemo(() => {
+    const cache = new Map<string, string>()
+    return (a: Atividade) => {
+      if (!artistaLigado) return a.titulo
+      const nome = nomeArtistaDe(a)
+      const chave = `${nome}\u0000${a.artistaNome ?? ''}\u0000${a.titulo}`
+      let t = cache.get(chave)
+      if (t === undefined) {
+        // Limpa também com o nome GRAVADO: num artista renomeado, o título antigo
+        // foi escrito com o nome de antes ("LANÇAMENTO - GLAUCO" num "Glauco Lima").
+        t = tituloComArtista(a.titulo, nome, a.artistaNome)
+        cache.set(chave, t)
+      }
+      return t
+    }
+  }, [artistaLigado, nomeArtistaDe])
+
   /**
    * O recorte, em duas camadas.
    *
@@ -228,14 +270,15 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
       if (filtros.etiqueta && !(a.etiquetas ?? []).includes(filtros.etiqueta)) return false
       if (!termo) return true
       return (
-        a.titulo.toLowerCase().includes(termo) ||
+        // O título COMO APARECE: quem digita "Glauco - card" na busca acha a demanda.
+        tituloDe(a).toLowerCase().includes(termo) ||
         (a.descricao ?? '').toLowerCase().includes(termo) ||
         (a.artistaNome ?? '').toLowerCase().includes(termo) ||
         (a.responsavelNome ?? '').toLowerCase().includes(termo) ||
         (a.etiquetas ?? []).some((e) => e.toLowerCase().includes(termo))
       )
     },
-    [filtros],
+    [filtros, tituloDe],
   )
 
   const noEscopoLista = useMemo(() => lista.filter(noEscopo), [lista, noEscopo])
@@ -372,6 +415,8 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
     filtrando,
     limparFiltros: () => setFiltros(FILTROS_VAZIOS),
     etiquetasConhecidas,
+    tituloDe,
+    nomeArtistaDe,
     progresso: (a) => progressoDe(a, lista, configAtiva),
     atrasada: (a) => estaAtrasada(a, configAtiva),
     concluida: (a) => concluida(a, configAtiva),

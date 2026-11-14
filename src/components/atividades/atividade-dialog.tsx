@@ -31,6 +31,7 @@ import {
   type Prioridade,
   type TemplateDemanda,
 } from '@/lib/atividades/tipos'
+import { SEPARADOR, semArtistaNoTitulo, tituloSugeridoDoModelo } from '@/lib/atividades/titulo'
 import { ehColaborador } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
@@ -62,7 +63,7 @@ export function AtividadeDialog({
   onSalvo: (id: string) => void | Promise<void>
 }) {
   const { appUser } = useAuth()
-  const { config, todas, artistas, equipe, etiquetasConhecidas, aplicarLocal, recarregar } =
+  const { config, todas, artistas, equipe, etiquetasConhecidas, aplicarLocal, recarregar, nomeArtistaDe } =
     useQuadro()
   const editando = !!atividade
   // O colaborador só mexe nas demandas em que é o responsável — então ele é
@@ -71,13 +72,21 @@ export function AtividadeDialog({
   const colaborador = ehColaborador(appUser?.role ?? null)
 
   const [modelo, setModelo] = useState<TemplateDemanda | null>(null)
-  /** Título cru do modelo, com `{artista}` ainda por resolver. */
-  const [tituloDoModelo, setTituloDoModelo] = useState<string | null>(null)
   const tocouNoTitulo = useRef(false)
   const [modelosAbertos, setModelosAbertos] = useState(false)
   const painel = useRef<HTMLDivElement>(null)
   const primeiroCampo = useRef<HTMLInputElement>(null)
-  const [titulo, setTitulo] = useState(atividade?.titulo ?? '')
+  // Editando uma demanda antiga, o campo já abre sem o nome que alguém escreveu à
+  // mão ("LANÇAMENTO MUSICAL - GLAUCO" vira "LANÇAMENTO MUSICAL"): o nome entra
+  // sozinho na frente, e salvar grava o título limpo. A pessoa vê a troca antes.
+  // Os nomes são os mesmos do `tituloDe` (cadastro e gravado), então o campo abre
+  // com o que o quadro mostra depois do nome.
+  const [tituloAberto] = useState(() =>
+    atividade && campoLigado(config, 'artista')
+      ? semArtistaNoTitulo(atividade.titulo, [nomeArtistaDe(atividade), atividade.artistaNome])
+      : (atividade?.titulo ?? ''),
+  )
+  const [titulo, setTitulo] = useState(tituloAberto)
   const [descricao, setDescricao] = useState(atividade?.descricao ?? '')
   const [etapa, setEtapa] = useState(atividade?.etapa ?? etapaInicial)
   const [prioridade, setPrioridade] = useState<Prioridade>(atividade?.prioridade ?? 'media')
@@ -101,6 +110,18 @@ export function AtividadeDialog({
     [artistas, artistaSlug],
   )
 
+  // O nome que vai na frente do título — o do cadastro; o gravado na demanda só
+  // vale para artista que saiu do roster. Mesma regra do `tituloDe` do quadro.
+  const mesmoArtista = !!artistaSlug && artistaSlug === atividade?.artistaSlug
+  const prefixo = campoLigado(config, 'artista')
+    ? artistaEscolhido?.nome ?? (mesmoArtista ? (atividade?.artistaNome ?? null) : null)
+    : null
+  // Limpar o que já abriu limpo não muda nada (`semArtistaNoTitulo` vai até onde
+  // não sai mais nada): salvar sem mexer no título grava o que o quadro mostrava.
+  const tituloFinal = prefixo
+    ? semArtistaNoTitulo(titulo, [prefixo, mesmoArtista ? atividade?.artistaNome : null])
+    : titulo.trim()
+
   /**
    * Aplica um modelo aos campos — o projeto em si só é montado ao salvar.
    *
@@ -112,9 +133,9 @@ export function AtividadeDialog({
    */
   function escolherModelo(m: TemplateDemanda | null) {
     setModelo(m)
-    setTituloDoModelo(m?.titulo ?? null)
-
-    setTitulo('')
+    // O título do modelo entra enquanto a pessoa não digita um próprio — sem o
+    // `{artista}`, que o padrão "Artista - título" já põe na frente.
+    setTitulo(m && !tocouNoTitulo.current ? tituloSugeridoDoModelo(m) : '')
     setDescricao('')
     setTipo('')
     setArea('')
@@ -137,18 +158,6 @@ export function AtividadeDialog({
     setInicio(hoje)
     if (typeof m.prazoEmDias === 'number') setPrazo(somarDias(hoje, m.prazoEmDias))
   }
-
-  /**
-   * `{artista}` é resolvido enquanto a pessoa não digita um título próprio.
-   *
-   * Antes era resolvido no clique do modelo, então escolher o artista DEPOIS
-   * deixava o título com o literal "o artista" — e quase todo mundo escolhe o
-   * modelo primeiro.
-   */
-  useEffect(() => {
-    if (!tituloDoModelo || tocouNoTitulo.current) return
-    setTitulo(tituloDoModelo.replace('{artista}', artistaEscolhido?.nome ?? 'o artista'))
-  }, [tituloDoModelo, artistaEscolhido])
 
   /**
    * Foco e teclado do diálogo.
@@ -203,7 +212,7 @@ export function AtividadeDialog({
     e.preventDefault()
     if (salvando || !appUser) return
     setErro(null)
-    if (!titulo.trim()) {
+    if (!tituloFinal) {
       setErro('Dê um título à demanda.')
       return
     }
@@ -228,7 +237,9 @@ export function AtividadeDialog({
           ? (atividade?.responsavelNome ?? null)
           : null
       const dados = {
-        titulo: titulo.trim(),
+        // Gravado SEM o nome do artista, mesmo que a pessoa o tenha digitado: o
+        // nome entra na exibição (`tituloDe`), e gravado ele apareceria duas vezes.
+        titulo: tituloFinal,
         descricao,
         etapa,
         prioridade,
@@ -437,19 +448,43 @@ export function AtividadeDialog({
             <label htmlFor="at-titulo" className={rotulo}>
               O que precisa ser feito
             </label>
-            <input
-              id="at-titulo"
-              ref={primeiroCampo}
-              type="text"
-              required
-              value={titulo}
-              onChange={(e) => {
-                tocouNoTitulo.current = true
-                setTitulo(e.target.value)
-              }}
-              placeholder="Ex.: Roteiro do clipe de “Madrugada”"
-              className={campo}
-            />
+            {/* O nome do artista fica preso na frente do campo, fora do que se
+                digita: o título segue o padrão "Artista - título" sem ninguém
+                precisar lembrar dele (pedido da cliente, 11/2026). */}
+            <div className="flex">
+              {prefixo && (
+                <span
+                  aria-hidden
+                  className="flex items-center shrink-0 max-w-[45%] px-3 rounded-l-lg border border-r-0 border-bg-700/50 bg-bg-800 text-sm text-ink-300"
+                >
+                  <span className="truncate">{prefixo}</span>
+                  {/* Margem, e não o espaço do separador: espaço no começo de um item
+                      flex é descartado, e o hífen grudava no nome ("Glauco!-"). */}
+                  <span className="ml-1 text-ink-500">{SEPARADOR.trim()}</span>
+                </span>
+              )}
+              <input
+                id="at-titulo"
+                ref={primeiroCampo}
+                type="text"
+                required
+                value={titulo}
+                onChange={(e) => {
+                  tocouNoTitulo.current = true
+                  setTitulo(e.target.value)
+                }}
+                aria-describedby="at-titulo-dica"
+                placeholder={prefixo ? 'Ex.: Lançamento, card, presskit' : 'Ex.: Roteiro do clipe de “Madrugada”'}
+                className={cn(campo, prefixo && 'rounded-l-none')}
+              />
+            </div>
+            <p id="at-titulo-dica" className="text-[11px] text-ink-500 mt-1">
+              {prefixo
+                ? `Aparece como: ${prefixo}${SEPARADOR}${tituloFinal || '…'}`
+                : campoLigado(config, 'artista')
+                  ? 'Escolhendo o artista, o nome dele entra sozinho no começo do título.'
+                  : 'O título aparece como você escrever.'}
+            </p>
           </div>
 
           {/* Com modelo de projeto, a etapa inicial é decidida pelo próprio
@@ -510,7 +545,15 @@ export function AtividadeDialog({
                 <select
                   id="at-artista"
                   value={artistaSlug}
-                  onChange={(e) => setArtistaSlug(e.target.value)}
+                  onChange={(e) => {
+                    const slug = e.target.value
+                    setArtistaSlug(slug)
+                    // Editando sem ter mexido no título: tirar o artista ("Interna")
+                    // devolve o título como estava gravado — o nome que o campo tirou
+                    // ao abrir identificava a demanda, ninguém o apagou. Com outro
+                    // artista o campo segue limpo: o nome antigo apontaria o errado.
+                    if (atividade && !tocouNoTitulo.current) setTitulo(slug ? tituloAberto : atividade.titulo)
+                  }}
                   className={campo}
                 >
                   <option value="">— Interna —</option>
@@ -519,6 +562,14 @@ export function AtividadeDialog({
                       {a.nome}
                     </option>
                   ))}
+                  {/* Artista que saiu do cadastro (ou lista que não carregou): sem a
+                      opção, o seletor mostrava "Interna" enquanto o nome dele seguia
+                      na frente do título — e escolher "Interna" nem disparava. */}
+                  {atividade?.artistaSlug && !artistas.some((a) => a.slug === atividade.artistaSlug) && (
+                    <option value={atividade.artistaSlug}>
+                      {atividade.artistaNome ?? atividade.artistaSlug}
+                    </option>
+                  )}
                 </select>
               </div>
             )}

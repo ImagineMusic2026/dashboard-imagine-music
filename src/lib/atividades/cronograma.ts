@@ -309,8 +309,13 @@ export function conflitosDe(
    * que só lê as demandas dele). Aí uma antecessora fora dele é da equipe, não
    * excluída — e acusar "não existe mais" seria mentira.
    */
-  opcoes: { universoParcial?: boolean } = {},
+  opcoes: {
+    universoParcial?: boolean
+    /** O título como a tela mostra (`tituloDe` do quadro); sem ele, o gravado. */
+    nomeDe?: (a: Atividade) => string
+  } = {},
 ): Map<string, Conflito[]> {
+  const nomeDe = opcoes.nomeDe ?? ((x: Atividade) => x.titulo)
   const porId = new Map(universo.map((a) => [a.id, a]))
   const emCiclo = idsEmCiclo(universo)
   const saida = new Map<string, Conflito[]>()
@@ -331,7 +336,7 @@ export function conflitosDe(
         problemas.push({
           tipo: 'ciclo',
           outraId: depId,
-          mensagem: `Dependência circular com "${dep.titulo}".`,
+          mensagem: `Dependência circular com "${nomeDe(dep)}".`,
         })
         continue
       }
@@ -342,7 +347,7 @@ export function conflitosDe(
         problemas.push({
           tipo: 'ordem',
           outraId: depId,
-          mensagem: `"${dep.titulo}" só termina ${atraso} dia${atraso === 1 ? '' : 's'} depois desta começar.`,
+          mensagem: `"${nomeDe(dep)}" só termina ${atraso} dia${atraso === 1 ? '' : 's'} depois desta começar.`,
         })
       }
     }
@@ -524,12 +529,13 @@ export function agruparPor(
   lista: Atividade[],
   por: Agrupamento,
   config: ConfigQuadro,
+  opcoes: { nomeArtistaDe?: (a: Atividade) => string } = {},
 ): Grupo[] {
   if (por === 'nenhum') return [{ id: '__todos__', rotulo: '', itens: lista }]
 
   const grupos = new Map<string, Grupo>()
   for (const a of lista) {
-    const { id, rotulo } = chaveDoGrupo(a, por, config)
+    const { id, rotulo } = chaveDoGrupo(a, por, config, opcoes.nomeArtistaDe)
     const g = grupos.get(id) ?? { id, rotulo, itens: [] }
     g.itens.push(a)
     grupos.set(id, g)
@@ -542,10 +548,22 @@ export function agruparPor(
   })
 }
 
-function chaveDoGrupo(a: Atividade, por: Agrupamento, config: ConfigQuadro): { id: string; rotulo: string } {
+/**
+ * `nomeArtistaDe` dá o nome do cadastro (o mesmo da frente do título): sem ele, a
+ * raia de um artista renomeado ficava com o nome antigo e os cards com o novo.
+ */
+function chaveDoGrupo(
+  a: Atividade,
+  por: Agrupamento,
+  config: ConfigQuadro,
+  nomeArtistaDe?: (a: Atividade) => string,
+): { id: string; rotulo: string } {
   switch (por) {
     case 'artista':
-      return { id: a.artistaSlug ?? '__sem__', rotulo: a.artistaNome ?? 'Sem artista' }
+      return {
+        id: a.artistaSlug ?? '__sem__',
+        rotulo: nomeArtistaDe?.(a) || a.artistaNome || 'Sem artista',
+      }
     case 'responsavel':
       return { id: a.responsavelUid ?? '__sem__', rotulo: a.responsavelNome ?? 'Sem responsável' }
     case 'area':
@@ -576,9 +594,13 @@ function chaveDoGrupo(a: Atividade, por: Agrupamento, config: ConfigQuadro): { i
 export function montarLinhas(
   lista: Atividade[],
   config: ConfigQuadro,
-  opcoes: { agrupamento: Agrupamento; recolhidos: Set<string> },
+  opcoes: {
+    agrupamento: Agrupamento
+    recolhidos: Set<string>
+    nomeArtistaDe?: (a: Atividade) => string
+  },
 ): Linha[] {
-  const { agrupamento, recolhidos } = opcoes
+  const { agrupamento, recolhidos, nomeArtistaDe } = opcoes
   const ids = new Set(lista.map((a) => a.id))
   const filhosPor = new Map<string, Atividade[]>()
   const topo: Atividade[] = []
@@ -610,7 +632,7 @@ export function montarLinhas(
 
   const grupos = new Map<string, { rotulo: string; itens: Atividade[] }>()
   for (const a of topo) {
-    const { id, rotulo } = chaveDoGrupo(a, agrupamento, config)
+    const { id, rotulo } = chaveDoGrupo(a, agrupamento, config, nomeArtistaDe)
     const g = grupos.get(id) ?? { rotulo, itens: [] }
     g.itens.push(a)
     grupos.set(id, g)

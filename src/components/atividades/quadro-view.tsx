@@ -46,12 +46,12 @@ export function QuadroView({
   onAbrir: (a: Atividade) => void
   onNovo: (etapa: string) => void
 }) {
-  const { config, visiveis, filtrando, mover } = useQuadro()
+  const { config, visiveis, filtrando, mover, nomeArtistaDe } = useQuadro()
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [alvo, setAlvo] = useState<string | null>(null)
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
 
-  const grupos = agruparPor(visiveis, agrupamento, config)
+  const grupos = agruparPor(visiveis, agrupamento, config, { nomeArtistaDe })
   const comRaias = agrupamento !== 'nenhum'
 
   function alternarRaia(id: string) {

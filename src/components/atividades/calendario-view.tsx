@@ -42,7 +42,7 @@ const POR_DIA = 6
  * quem quer a janela inteira tem o cronograma ao lado.
  */
 export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void }) {
-  const { config, visiveis, atrasada, concluida, filtrando } = useQuadro()
+  const { config, visiveis, atrasada, concluida, filtrando, tituloDe } = useQuadro()
   const hoje = hojeISO()
   const [mesBase, setMesBase] = useState(() => hoje.slice(0, 7))
   // Dias abertos pelo "+N": a chave é a data ISO, então o que sobra de outro mês
@@ -183,11 +183,11 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
                         key={a.id}
                         type="button"
                         onClick={() => onAbrir(a)}
-                        title={a.titulo}
+                        title={tituloDe(a)}
                         // A data só existia visualmente, na célula em volta: para
                         // quem navega por leitor de tela, os botões do mês eram
                         // uma lista de títulos sem quando.
-                        aria-label={`${a.titulo} — ${a.marco ? 'marco' : 'entrega'} em ${dataLonga(iso)}`}
+                        aria-label={`${tituloDe(a)} — ${a.marco ? 'marco' : 'entrega'} em ${dataLonga(iso)}`}
                         className={cn(
                           'w-full text-left text-[10px] px-1.5 py-1 rounded border truncate flex items-center gap-1 transition-colors hover:brightness-125',
                           concluida(a)
@@ -198,7 +198,7 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
                         )}
                       >
                         {a.marco && <CircleDot className="w-2.5 h-2.5 shrink-0 rotate-45" aria-hidden />}
-                        <span className="truncate">{a.titulo}</span>
+                        <span className="truncate">{tituloDe(a)}</span>
                       </button>
                     )
                   })}

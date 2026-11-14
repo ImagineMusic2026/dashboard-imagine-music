@@ -1,21 +1,20 @@
 'use client'
 
-import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Loader2, Trash2 } from 'lucide-react'
-import { AvatarFallback } from '@/components/artistas/avatar-fallback'
-import { useAuth } from '@/components/auth/auth-provider'
 import { useQuadro } from '@/components/atividades/quadro-contexto'
-import { corAvatarDe, iniciaisDe } from '@/lib/artistas/client'
+import { iniciaisDe } from '@/lib/artistas/client'
 import { type Atividade } from '@/lib/atividades/client'
 import { campoLigado, cor, etapaDe } from '@/lib/atividades/tipos'
-import { ehStaff } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 /**
- * Um card do quadro — deliberadamente ENXUTO: título, artista e responsável.
+ * Um card do quadro — deliberadamente ENXUTO: o título no padrão "Artista -
+ * título" (ver `tituloDe`) e o responsável.
  *
  * O quadro responde "em que etapa está cada demanda", e pra isso bastam essas
- * três linhas. Chips de tipo, área e prioridade, descrição, barra de progresso,
+ * duas linhas. O artista tinha uma linha própria, com avatar; desde que o título
+ * passou a trazer o nome (11/2026), ela só repetia o que estava logo acima — e o
+ * link para o perfil continua no detalhe. Chips de tipo, área e prioridade, descrição, barra de progresso,
  * etiquetas, prazo, esforço e os selos de subtarefa/comentário/link/dependência
  * saíram do card em 03/11/2026: com tudo isso dentro, cada card passava de 200px
  * e meia dúzia de demandas já empurravam a rolagem horizontal pra fora da tela.
@@ -26,9 +25,8 @@ import { cn } from '@/lib/utils'
  * "Atrasada", que impede o atraso de ser sinalizado só por cor.
  *
  * O container NÃO é clicável de propósito (regra de a11y do repo: nada de
- * pressável dentro de pressável). Quem abre a demanda é o título; as setas, o
- * link do artista e o excluir são irmãos dele — cada um com o seu foco e o seu
- * rótulo. As setas também são o caminho de quem não arrasta: teclado e celular.
+ * pressável dentro de pressável). Quem abre a demanda é o título; as setas e o
+ * excluir são irmãos dele — cada um com o seu foco e o seu rótulo. As setas também são o caminho de quem não arrasta: teclado e celular.
  */
 export function AtividadeCard({
   atividade,
@@ -45,11 +43,9 @@ export function AtividadeCard({
   onArrastarFim: () => void
   onSoltarAntes: () => void
 }) {
-  const { config, mover, remover, excluindo, atrasada } = useQuadro()
-  // Só a equipe abre o perfil do artista; para o colaborador o nome é texto.
-  const { role } = useAuth()
-  const equipe = ehStaff(role)
+  const { config, mover, remover, excluindo, atrasada, tituloDe } = useQuadro()
   const a = atividade
+  const titulo = tituloDe(a)
 
   const i = config.etapas.findIndex((e) => e.key === a.etapa)
   const anterior = i > 0 ? config.etapas[i - 1] : null
@@ -94,28 +90,8 @@ export function AtividadeCard({
           onClick={onAbrir}
           className="text-left text-sm font-semibold text-ink-100 hover:text-violet-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 rounded"
         >
-          {a.titulo}
+          {titulo}
         </button>
-
-        {campoLigado(config, 'artista') && a.artistaNome && (
-          <div className="flex items-center gap-1.5 mt-2">
-            <AvatarFallback
-              iniciais={iniciaisDe(a.artistaNome)}
-              gradient={corAvatarDe(a.artistaSlug ?? a.artistaNome)}
-              size="sm"
-            />
-            {equipe && a.artistaSlug ? (
-              <Link
-                href={`/artistas/${a.artistaSlug}`}
-                className="text-[12px] text-violet-400 hover:text-violet-300 truncate"
-              >
-                {a.artistaNome}
-              </Link>
-            ) : (
-              <span className="text-[12px] text-ink-400 truncate">{a.artistaNome}</span>
-            )}
-          </div>
-        )}
 
         {/* Rodapé: responsável à esquerda; à direita o atraso e, no hover ou no
             foco, as ações. Dividir a linha com elas é o que evita reservar mais
@@ -149,8 +125,8 @@ export function AtividadeCard({
               onClick={() => anterior && mover(a.id, anterior.key, null)}
               aria-label={
                 anterior
-                  ? `Mover "${a.titulo}" para ${anterior.label}`
-                  : `"${a.titulo}" já está na primeira etapa`
+                  ? `Mover "${titulo}" para ${anterior.label}`
+                  : `"${titulo}" já está na primeira etapa`
               }
               className="p-1 rounded hover:bg-bg-800 text-ink-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
             >
@@ -162,8 +138,8 @@ export function AtividadeCard({
               onClick={() => proxima && mover(a.id, proxima.key, null)}
               aria-label={
                 proxima
-                  ? `Mover "${a.titulo}" para ${proxima.label}`
-                  : `"${a.titulo}" já está na última etapa`
+                  ? `Mover "${titulo}" para ${proxima.label}`
+                  : `"${titulo}" já está na última etapa`
               }
               className="p-1 rounded hover:bg-bg-800 text-ink-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
             >
@@ -172,7 +148,7 @@ export function AtividadeCard({
             <button
               type="button"
               onClick={() => remover(a)}
-              aria-label={`Excluir "${a.titulo}"`}
+              aria-label={`Excluir "${titulo}"`}
               className="p-1 rounded hover:bg-red-500/10 text-ink-500 hover:text-red-400 transition-colors"
             >
               {excluindoEste ? (

@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
  * dos carimbos que cada movimentação de card deixa.
  */
 export function CargaView({ onAbrir }: { onAbrir: (a: Atividade) => void }) {
-  const { config, visiveis, equipe, atrasada } = useQuadro()
+  const { config, visiveis, equipe, atrasada, tituloDe } = useQuadro()
 
   const carga = useMemo(
     () =>
@@ -126,7 +126,7 @@ export function CargaView({ onAbrir }: { onAbrir: (a: Atividade) => void }) {
                         onClick={() => onAbrir(a)}
                         className="text-[12px] text-ink-300 hover:text-violet-300 transition-colors truncate text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 rounded"
                       >
-                        {a.titulo}
+                        {tituloDe(a)}
                       </button>
                       {a.esforco && (
                         <span className="text-[9px] font-bold text-ink-600 num shrink-0">

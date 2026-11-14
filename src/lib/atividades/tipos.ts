@@ -276,7 +276,12 @@ export interface TemplateDemanda {
   key: string
   nome: string
   descricaoModelo?: string | null
-  /** Título sugerido. `{artista}` é trocado pelo nome do artista escolhido. */
+  /**
+   * Título sugerido, SEM o nome do artista: ele entra sozinho na frente, pelo
+   * padrão "Artista - título" (`@/lib/atividades/titulo`). Um `{artista}` deixado
+   * aqui por configuração antiga é retirado junto com o separador colado nele, e
+   * se sobrar o mesmo título de uma etapa, a mãe leva o `nome` do modelo.
+   */
   titulo?: string | null
   descricao?: string | null
   tipo?: string | null
@@ -437,7 +442,7 @@ export const CONFIG_PADRAO: ConfigQuadro = {
       key: 'lancamento-single',
       nome: 'Lançamento de single',
       descricaoModelo: 'Projeto completo de 6 semanas, do fechamento da faixa à primeira semana de métricas.',
-      titulo: 'Lançamento — {artista}',
+      titulo: 'Lançamento',
       tipo: 'lancamento',
       area: 'marketing',
       prioridade: 'alta',
@@ -451,7 +456,9 @@ export const CONFIG_PADRAO: ConfigQuadro = {
         { titulo: 'Roteiro e gravação do clipe', inicioEmDias: 12, duracaoEmDias: 14, area: 'conteudo', esforco: 'g', dependeDoIndice: 0 },
         { titulo: 'Conteúdo de pré-lançamento', inicioEmDias: 26, duracaoEmDias: 10, area: 'conteudo', esforco: 'm', dependeDoIndice: 3 },
         { titulo: 'Imprensa e pitch de playlists', inicioEmDias: 28, duracaoEmDias: 8, area: 'marketing', esforco: 'm', dependeDoIndice: 2 },
-        { titulo: 'Lançamento', inicioEmDias: 36, duracaoEmDias: 0, area: 'marketing', dependeDoIndice: 5 },
+        // "Dia do", como o "Dia do show": a mãe já se chama "Lançamento", e com o
+        // nome do artista na frente as duas apareceriam iguais ("Glauco - Lançamento").
+        { titulo: 'Dia do lançamento', inicioEmDias: 36, duracaoEmDias: 0, area: 'marketing', dependeDoIndice: 5 },
         { titulo: 'Leitura da primeira semana', inicioEmDias: 36, duracaoEmDias: 7, area: 'marketing', esforco: 'p', dependeDoIndice: 6 },
       ],
     },
@@ -459,7 +466,7 @@ export const CONFIG_PADRAO: ConfigQuadro = {
       key: 'campanha-conteudo',
       nome: 'Campanha de conteúdo',
       descricaoModelo: 'Duas semanas de produção de cortes, do conceito à publicação.',
-      titulo: 'Campanha de conteúdo — {artista}',
+      titulo: 'Campanha de conteúdo',
       tipo: 'conteudo',
       area: 'conteudo',
       prioridade: 'media',
@@ -479,7 +486,7 @@ export const CONFIG_PADRAO: ConfigQuadro = {
       key: 'show',
       nome: 'Show / apresentação',
       descricaoModelo: 'Três semanas entre fechar o contrato e o registro do show.',
-      titulo: 'Show — {artista}',
+      titulo: 'Show',
       tipo: 'show',
       area: 'comercial',
       prioridade: 'alta',

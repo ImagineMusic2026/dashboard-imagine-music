@@ -49,6 +49,7 @@ import {
   prioridadeMeta,
   tipoDe,
 } from '@/lib/atividades/tipos'
+import { semArtistaNoTitulo } from '@/lib/atividades/titulo'
 import { ehStaff } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
@@ -100,6 +101,8 @@ export function AtividadeDetalhe({
     aplicarLocal,
     recarregar,
     setErro,
+    tituloDe,
+    nomeArtistaDe,
   } = useQuadro()
 
   // A demanda vem do estado do quadro: assim marcar um item aqui reflete no
@@ -127,8 +130,8 @@ export function AtividadeDetalhe({
   // Para o colaborador `todas` são só as demandas dele: antecessora que não
   // está ali é da equipe, não excluída.
   const problemas = useMemo(
-    () => conflitosDe(todas, config, todas, { universoParcial: !equipe }).get(a.id) ?? [],
-    [todas, config, a.id, equipe],
+    () => conflitosDe(todas, config, todas, { universoParcial: !equipe, nomeDe: tituloDe }).get(a.id) ?? [],
+    [todas, config, a.id, equipe, tituloDe],
   )
   const mae = a.paiId ? todas.find((x) => x.id === a.paiId) : null
 
@@ -233,7 +236,12 @@ export function AtividadeDetalhe({
     setNovaSub('')
     await comGuarda(async () => {
       const dados = {
-          titulo,
+          // Herda o artista da mãe — e com ele o nome na frente do título. Quem
+          // digitar o nome mesmo assim (o do cadastro, que é o que a tela mostra,
+          // ou o gravado na mãe) não o vê duas vezes.
+          titulo: campoLigado(config, 'artista')
+            ? semArtistaNoTitulo(titulo, [nomeArtistaDe(a), a.artistaNome])
+            : titulo,
           etapa: config.etapas[0]?.key ?? a.etapa,
           prioridade: a.prioridade,
           // A subtarefa herda o contexto da mãe — artista, área e responsável
@@ -242,7 +250,7 @@ export function AtividadeDetalhe({
           tipo: a.tipo ?? null,
           area: a.area ?? null,
           artistaSlug: a.artistaSlug ?? null,
-          artistaNome: a.artistaNome ?? null,
+          artistaNome: nomeArtistaDe(a) || null,
           responsavelUid: a.responsavelUid ?? null,
           responsavelNome: a.responsavelNome ?? null,
           paiId: a.id,
@@ -350,7 +358,7 @@ export function AtividadeDetalhe({
         ref={painel}
         role="dialog"
         aria-modal="true"
-        aria-label={a.titulo}
+        aria-label={tituloDe(a)}
         tabIndex={-1}
         onKeyDown={aoTabular}
         className="relative w-full max-w-lg bg-bg-900 border-l border-bg-700/50 shadow-2xl overflow-y-auto animate-fade-in focus:outline-none"
@@ -360,13 +368,13 @@ export function AtividadeDetalhe({
             <div className="flex-1 min-w-0">
               {mae && (
                 <p className="text-[11px] text-ink-500 mb-1 truncate">
-                  Subtarefa de <span className="text-ink-300">{mae.titulo}</span>
+                  Subtarefa de <span className="text-ink-300">{tituloDe(mae)}</span>
                 </p>
               )}
               {!mae && a.paiId && !equipe && (
                 <p className="text-[11px] text-ink-500 mb-1 truncate">Subtarefa de um projeto da equipe</p>
               )}
-              <h2 className="text-lg font-bold text-ink-100 leading-snug">{a.titulo}</h2>
+              <h2 className="text-lg font-bold text-ink-100 leading-snug">{tituloDe(a)}</h2>
             </div>
             <button
               type="button"
@@ -469,15 +477,16 @@ export function AtividadeDetalhe({
               <div>
                 <dt className="text-ink-500 mb-0.5">Artista</dt>
                 <dd className="text-ink-200 truncate">
-                  {equipe && a.artistaSlug && a.artistaNome ? (
+                  {/* O nome do cadastro, como na frente do título logo acima. */}
+                  {equipe && a.artistaSlug && nomeArtistaDe(a) ? (
                     <Link
                       href={`/artistas/${a.artistaSlug}`}
                       className="text-violet-400 hover:text-violet-300"
                     >
-                      {a.artistaNome}
+                      {nomeArtistaDe(a)}
                     </Link>
                   ) : (
-                    (a.artistaNome ?? <span className="text-ink-600 italic">Interna</span>)
+                    nomeArtistaDe(a) || <span className="text-ink-600 italic">Interna</span>
                   )}
                 </dd>
               </div>
@@ -625,7 +634,7 @@ export function AtividadeDetalhe({
                         concluida(f) ? 'text-ink-500 line-through' : 'text-ink-200',
                       )}
                     >
-                      {f.titulo}
+                      {tituloDe(f)}
                     </span>
                     <span className="text-[10px] text-ink-600 num shrink-0">{progresso(f)}%</span>
                   </li>
@@ -664,7 +673,7 @@ export function AtividadeDetalhe({
                   return (
                     <li key={depId} className="flex items-center gap-2">
                       <span className="text-[13px] flex-1 truncate text-ink-200">
-                        {dep?.titulo ??
+                        {(dep && tituloDe(dep)) ??
                           (daEquipe ? (
                             <span className="text-ink-500 italic">demanda da equipe</span>
                           ) : (
@@ -675,7 +684,7 @@ export function AtividadeDetalhe({
                         <button
                           type="button"
                           onClick={() => alternarDependencia(depId)}
-                          aria-label={`Remover dependência de "${dep?.titulo ?? depId}"`}
+                          aria-label={`Remover dependência de "${dep ? tituloDe(dep) : depId}"`}
                           className="p-0.5 rounded text-ink-600 hover:text-red-400 transition-colors shrink-0"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -699,7 +708,7 @@ export function AtividadeDetalhe({
                   .filter((x) => !(a.dependeDe ?? []).includes(x.id))
                   .map((x) => (
                     <option key={x.id} value={x.id}>
-                      {x.titulo}
+                      {tituloDe(x)}
                     </option>
                   ))}
               </select>

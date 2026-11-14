@@ -90,6 +90,8 @@ export function CronogramaView({
     concluida,
     setErro,
     filtrando,
+    tituloDe,
+    nomeArtistaDe,
   } = useQuadro()
 
   const [escala, setEscala] = useState<Escala>('semana')
@@ -116,8 +118,8 @@ export function CronogramaView({
   const arrastou = useRef<string | null>(null)
 
   const linhas = useMemo(
-    () => montarLinhas(visiveis, config, { agrupamento, recolhidos }),
-    [visiveis, config, agrupamento, recolhidos],
+    () => montarLinhas(visiveis, config, { agrupamento, recolhidos, nomeArtistaDe }),
+    [visiveis, config, agrupamento, recolhidos, nomeArtistaDe],
   )
 
   const janela = useMemo(() => janelaDe(visiveis), [visiveis])
@@ -134,8 +136,8 @@ export function CronogramaView({
   const { role } = useAuth()
   const universoParcial = ehColaborador(role)
   const conflitos = useMemo(
-    () => conflitosDe(visiveis, config, todas, { universoParcial }),
-    [visiveis, config, todas, universoParcial],
+    () => conflitosDe(visiveis, config, todas, { universoParcial, nomeDe: tituloDe }),
+    [visiveis, config, todas, universoParcial, tituloDe],
   )
   const critico = useMemo(
     () => (mostrarCritico ? caminhoCritico(visiveis) : new Set<string>()),
@@ -220,7 +222,7 @@ export function CronogramaView({
       if (alvo && deslocamento !== 0) {
         const afetadas = empurrarSucessoras(todas, a.id, deslocamento)
         if (afetadas.length) {
-          setCascata({ id: a.id, titulo: alvo.titulo, dias: deslocamento, afetadas: afetadas.length })
+          setCascata({ id: a.id, titulo: tituloDe(alvo), dias: deslocamento, afetadas: afetadas.length })
         }
       }
     }
@@ -236,7 +238,7 @@ export function CronogramaView({
       window.removeEventListener('pointerup', soltar)
       window.removeEventListener('pointercancel', soltar)
     }
-  }, [arrasto, eixo.larguraDia, reagendar, todas, visiveis])
+  }, [arrasto, eixo.larguraDia, reagendar, todas, visiveis, tituloDe])
 
   async function aplicarCascata() {
     if (!cascata) return
@@ -476,8 +478,8 @@ export function CronogramaView({
                         aria-expanded={!recolhidos.has(a.id)}
                         aria-label={
                           recolhidos.has(a.id)
-                            ? `Mostrar subtarefas de "${a.titulo}"`
-                            : `Ocultar subtarefas de "${a.titulo}"`
+                            ? `Mostrar subtarefas de "${tituloDe(a)}"`
+                            : `Ocultar subtarefas de "${tituloDe(a)}"`
                         }
                         className="p-0.5 rounded text-ink-400 hover:text-violet-300 transition-colors shrink-0"
                       >
@@ -499,9 +501,9 @@ export function CronogramaView({
                         linha.temFilhos ? 'font-bold text-ink-100' : 'text-ink-200',
                         concluida(a) && 'text-ink-500 line-through decoration-ink-600',
                       )}
-                      title={a.titulo}
+                      title={tituloDe(a)}
                     >
-                      {a.titulo}
+                      {tituloDe(a)}
                     </button>
 
                     {!!problemas.length && (
@@ -541,8 +543,8 @@ export function CronogramaView({
                             fim: vigente.fim,
                           })
                         }}
-                        title={`${a.titulo} — marco em ${dataCurta(vigente.inicio)}`}
-                        aria-label={`Marco "${a.titulo}" em ${dataCurta(vigente.inicio)}`}
+                        title={`${tituloDe(a)} — marco em ${dataCurta(vigente.inicio)}`}
+                        aria-label={`Marco "${tituloDe(a)}" em ${dataCurta(vigente.inicio)}`}
                         className="absolute top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing"
                         style={{ left: barra.left + eixo.larguraDia / 2 - 7 }}
                       >
@@ -592,8 +594,8 @@ export function CronogramaView({
                               fim: vigente.fim,
                             })
                           }}
-                          title={`${a.titulo}\n${dataCurta(vigente.inicio)} → ${dataCurta(vigente.fim)} · ${duracaoEmDias({ ...a, inicio: vigente.inicio, prazo: vigente.fim })} dias\n${situacao.texto}`}
-                          aria-label={`${a.titulo}, de ${dataCurta(vigente.inicio)} a ${dataCurta(vigente.fim)}. ${situacao.texto}. Abrir demanda.`}
+                          title={`${tituloDe(a)}\n${dataCurta(vigente.inicio)} → ${dataCurta(vigente.fim)} · ${duracaoEmDias({ ...a, inicio: vigente.inicio, prazo: vigente.fim })} dias\n${situacao.texto}`}
+                          aria-label={`${tituloDe(a)}, de ${dataCurta(vigente.inicio)} a ${dataCurta(vigente.fim)}. ${situacao.texto}. Abrir demanda.`}
                           className="absolute inset-0 w-full cursor-grab active:cursor-grabbing px-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                         >
                           <span className="text-[10px] font-semibold text-ink-100 truncate block leading-5">

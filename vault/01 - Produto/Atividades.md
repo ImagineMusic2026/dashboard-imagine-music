@@ -15,7 +15,7 @@ Todas leem a **mesma** coleção e o mesmo recorte de filtros. Trocar de visão 
 
 | Visão | Responde |
 | --- | --- |
-| Quadro | Em que etapa cada demanda está. Kanban, arrastar entre colunas, raias por artista/responsável/área, limite de WIP por coluna. O card é enxuto de propósito: título, artista e responsável. |
+| Quadro | Em que etapa cada demanda está. Kanban, arrastar entre colunas, raias por artista/responsável/área, limite de WIP por coluna. O card é enxuto de propósito: título (já com o artista na frente) e responsável. |
 | Cronograma | Quando cada coisa acontece. Barras de início a prazo, dependências entre demandas, marcos, caminho crítico, arrastar para reprogramar. |
 | Lista | Muita demanda de uma vez, ordenável por prazo, prioridade, progresso ou responsável. |
 | Calendário | O que vence no mês, pela data de entrega. O dia mostra até 6 demandas; o "+N" abre o resto ali mesmo. |
@@ -27,7 +27,7 @@ O filtro de **artista** fica na barra principal, ao lado da busca, e acende quan
 
 | Campo | Uso |
 | --- | --- |
-| Título | O que precisa ser feito. |
+| Título | O que precisa ser feito ("Lançamento", "Card", "Presskit"). Aparece como **Artista - título** — ver abaixo. |
 | Etapa | Coluna do fluxo. As colunas são configuráveis; a marcada como **entrega** carimba a conclusão. |
 | Prioridade | Baixa, Média, Alta, Urgente. |
 | Tipo | Natureza do pedido (lançamento, conteúdo, show…). Configurável. |
@@ -44,15 +44,25 @@ O filtro de **artista** fica na barra principal, ao lado da busca, e acende quan
 | Links | Referências externas (Drive, YouTube). Sem upload: o projeto não tem Storage. |
 | Comentários | Fio de conversa dentro da demanda. |
 
+## Padrão do título
+
+Pedido da cliente em 11/2026, para saber de imediato de que artista é cada demanda: em toda tela o título aparece como `Nome do artista - título`. O nome vem do **cadastro**, não é digitado — renomear o artista muda todas as demandas dele, e as raias, os grupos e o detalhe usam o mesmo nome. Demanda interna (sem artista) mostra o título como está: as "(IMAGINE MUSIC) …" sem artista escolhido seguem assim até alguém escolher o artista Imagine Music nelas.
+
+- No formulário o nome fica fixo antes do campo, com a prévia de como vai aparecer. O que se grava é só o que a pessoa escreve; se ela digitar o nome mesmo assim, ele é tirado ao salvar. Editando, trocar para **Interna** sem mexer no título devolve o título como estava gravado — o nome que o campo tirou ao abrir identificava a demanda.
+- Títulos antigos, com o nome escrito à mão nas pontas — "(OS CLONES) PROGRAMAR…", "LANÇAMENTO MUSICAL - GLAUCO", "LINK BIO [GLAUCO]", "REVISAR LANÇAMENTO DE (SILFARLEY)", "Youtube - Os Clones" — aparecem limpos, sem migração. Ao editar, o campo já abre sem o nome. Vale o nome abreviado pelas primeiras palavras: entre parênteses basta uma ("(IVANA)" para "Ivana Barreto"); depois de um traço, duas ("Os Clones"), porque "Turnê - Bahia" numa demanda da Bahia Hits é o lugar. Também vale o nome antigo de um artista renomeado.
+- Na dúvida, o nome **fica** — repetido é feio, cortado errado some texto, e salvar o formulário grava o corte. Por isso não sai: no meio do título ("Revisar redes de Nenho (YouTube)"); dentro de parêntese ou aspas com mais coisa ("Show (Nenho & Glauco)", 'Divulgar “Arraiá do Nenho”'); depois de artigo, conector ou vírgula ("Ajustar a luz", "Nenho feat. Glauco", "Show do Nenho e do Glauco", "CARD FELIZ ANIVERSÁRIO, GLAUCO!"); em traço colado dos dois lados ("Beira-Mar", "instagram.com/nenho"); depois de barra ("JUNINHO/NENHO" é dupla). Num título que mistura maiúsculas e minúsculas, nome escrito em minúscula é palavra comum ("Mapa de luz" para uma artista Luz).
+- Com o nome no título, a linha do artista saiu do card do quadro e o nome pequeno saiu da lista: só repetiam. O link para o perfil do artista continua no detalhe da demanda.
+- A busca e a ordenação por título da lista usam o título como aparece — ordenar por título já agrupa por artista.
+
 ## Modelos de projeto
 
-Um modelo com etapas cria a demanda mãe **e** todas as subtarefas de uma vez, já datadas e encadeadas. É o que evita remontar o mesmo lançamento do zero toda vez. Os modelos são editáveis na configuração; ao criar, os valores são copiados — mudar o modelo depois não mexe no que já existe.
+O título sugerido pelo modelo não leva o nome do artista — ele entra sozinho pelo padrão do título. Por isso o marco do lançamento de single virou **Dia do lançamento**, como o "Dia do show": com o nome na frente, a mãe "Lançamento" e o marco "Lançamento" apareceriam iguais. Configuração salva antes disso ainda tem o marco "Lançamento"; nela a mãe nasce com o nome do modelo ("Lançamento de single"). Um modelo com etapas cria a demanda mãe **e** todas as subtarefas de uma vez, já datadas e encadeadas. É o que evita remontar o mesmo lançamento do zero toda vez. Os modelos são editáveis na configuração; ao criar, os valores são copiados — mudar o modelo depois não mexe no que já existe.
 
 De fábrica vêm: lançamento de single, campanha de conteúdo, show e demanda avulsa.
 
 ## O card do quadro
 
-O card mostra **título, artista e responsável** — nada mais. Tipo, área, prioridade, descrição, progresso, etiquetas, prazo, esforço e os selos de subtarefa, comentário, link e dependência vivem no detalhe, que abre ao clicar no título. A decisão é de 03/11/2026: o card cheio passava de 200px e meia dúzia de demandas já jogavam a rolagem do quadro pra fora da tela.
+O card mostra **título e responsável** — nada mais. O artista vem na frente do título, pelo padrão do título; a linha própria dele, com avatar, saiu em 11/2026 porque só repetia o nome. Tipo, área, prioridade, descrição, progresso, etiquetas, prazo, esforço e os selos de subtarefa, comentário, link e dependência vivem no detalhe, que abre ao clicar no título. A decisão é de 03/11/2026: o card cheio passava de 200px e meia dúzia de demandas já jogavam a rolagem do quadro pra fora da tela.
 
 Duas exceções ficaram, porque não custam altura e custam caro de perder: a barra colorida da esquerda (cor da etapa, vermelha quando atrasou) e o selo **Atrasada**, que impede o atraso de ser sinalizado só por cor.
 
@@ -83,7 +93,7 @@ Links da demanda só viram link clicável quando são endereço da web, e-mail (
 - Excluir uma demanda solta as subtarefas dela (viram demandas de topo) e remove as setas que apontavam pra ela.
 - Se a conferência de uso não carregar, a remoção de coluna também fica bloqueada — "não sei quantas demandas há aqui" é tratado como "não deixa", que é o lado seguro.
 - No calendário o dia mostra até **6** demandas (eram 3) e a célula cresce com o conteúdo a partir de um piso de 140px — um mês tranquilo continua compacto, e a semana que tem um dia cheio é a única que estica. O **+N demandas** é um botão: abre as escondidas na própria célula e vira "mostrar menos".
-- Desligar um campo na configuração continua valendo para o formulário, o detalhe e as outras visões; no card do quadro só **artista** e **responsável** têm efeito, porque os demais já não aparecem lá.
+- Desligar um campo na configuração continua valendo para o formulário, o detalhe e as outras visões; no card do quadro só **artista** e **responsável** têm efeito, porque os demais já não aparecem lá. Com **artista** desligado, os títulos aparecem como foram escritos, sem o nome na frente, em todas as visões.
 - O **caminho crítico** é a corrente de dependências mais longa pela duração planejada, não o cálculo de folga total do MS Project. Para um cronograma de lançamento aponta o mesmo gargalo, mas a diferença está registrada para não ser cobrada como defeito.
 
 Veja [[02 - Acesso e equipe/Perfis e permissões]] e [[06 - Tecnologia/Modelo de dados Firestore]].

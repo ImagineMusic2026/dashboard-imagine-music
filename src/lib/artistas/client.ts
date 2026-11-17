@@ -331,6 +331,41 @@ export function getProjeto(slug: string): Promise<ProjetoDoc | null> {
   return cacheProjeto(slug)
 }
 
+async function lerProjetos(): Promise<Record<string, string[]>> {
+  const snap = await getDocs(collection(db, 'projetos'))
+  const porSlug: Record<string, string[]> = {}
+  snap.docs.forEach((d) => {
+    const s = (d.data() as { servicosPrevistos?: unknown })?.servicosPrevistos
+    porSlug[d.id] = Array.isArray(s) ? s.filter((x): x is string => typeof x === 'string') : []
+  })
+  return porSlug
+}
+
+/**
+ * Os serviços previstos de TODO o roster, por slug — o que a coluna "Serviços"
+ * da lista de artistas precisa.
+ *
+ * ## Por que uma varredura, e o que ela custa
+ *
+ * É a mesma forma de `listarArtistas` e `listarMetricasSociais`: uma varredura
+ * da coleção inteira, cacheada. A lista já paga duas; esta é a terceira, e leva
+ * o custo de abrir a tela de ~232 para ~348 leituras por janela de cache. Num
+ * orçamento de 50 mil por dia (ver a nota de custo de leitura no vault), é um
+ * preço real e consciente.
+ *
+ * A alternativa barata seria um resumo desnormalizado — um documento só com
+ * `{slug: serviços}`, escrito pelas rotas que gravam `projetos`. Custaria UMA
+ * leitura em vez de 116. Não foi o caminho por dois motivos: exigiria um
+ * backfill dos 116 artistas já cadastrados antes de a coluna dizer a verdade, e
+ * um resumo dessincronizado mostraria serviço errado em silêncio — que é pior
+ * do que caro. Se o custo apertar, é aqui que se troca, e só aqui.
+ *
+ * Só STAFF lê `projetos` (regras). Pro resto isto lança `permission-denied`, e
+ * quem chama trata como "não sei os serviços" — escondendo a coluna, não
+ * quebrando a lista.
+ */
+export const listarProjetosServicos = memoCurta(lerProjetos).ler
+
 /**
  * Declara (ou desfaz) o nível de mercado ao vivo do artista. Passa por rota —
  * `projetos` nega escrita pelo client, e o score tem que vir da tabela oficial,

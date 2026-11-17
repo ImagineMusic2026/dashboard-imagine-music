@@ -19,14 +19,13 @@ export const TEXTAREA = cn(INPUT, 'resize-y min-h-[72px] leading-relaxed')
 
 const GENEROS = ['Sertanejo', 'Piseiro', 'Forró', 'Pagode', 'Funk', 'Gospel', 'MPB', 'Pop', 'Rock', 'Rap', 'Arrocha', 'Brega', 'Axé', 'Eletrônica']
 
-/** Serviços que o selo presta — espelha o card de estruturação do Pipefy. */
-export const SERVICOS_PREVISTOS = [
-  'Estruturação estratégica',
-  'Assessoria de Marketing',
-  'Tráfego Pago',
-  'Selo digital',
-  'Produção de Vídeo',
-]
+// A lista mora em `@/lib/artistas/servicos` desde que a tabela de artistas
+// passou a mostrar e filtrar por serviço. Importada E reexportada: o `export
+// from` sozinho não traz o nome pro escopo deste arquivo, que usa a lista nos
+// checkboxes logo abaixo.
+import { SERVICOS_PREVISTOS } from '@/lib/artistas/servicos'
+
+export { SERVICOS_PREVISTOS }
 
 /** Lado COMERCIAL do cadastro: a relação do selo com o artista, não a presença dele nas plataformas. */
 export interface DadosProjeto {

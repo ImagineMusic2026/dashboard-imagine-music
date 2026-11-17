@@ -11,10 +11,13 @@ import {
   corAvatarDe,
   iniciaisDe,
   listarArtistas,
+  listarProjetosServicos,
   listarReceitas,
   type ArtistaDoc,
   type ReceitaResumo,
 } from '@/lib/artistas/client'
+import { SERVICOS_PREVISTOS, servicoCurto } from '@/lib/artistas/servicos'
+import { ehStaff } from '@/lib/permissions'
 import { getHistoricoHealth, listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
 import { derivarHealthScores } from '@/lib/health/score'
@@ -61,6 +64,46 @@ function AcessoCelula({ nivel }: { nivel: NivelAcesso }) {
       <span className="text-[10px] num text-ink-500 shrink-0">
         {nivel.totalIntegravel ? `${nivel.conectados}/${nivel.totalIntegravel}` : '—'}
       </span>
+    </div>
+  )
+}
+
+/**
+ * Os serviços previstos do artista, em posições FIXAS.
+ *
+ * Mesma linguagem da coluna Acesso ao lado: marcadores + contagem. A posição de
+ * cada serviço é a ordem de `SERVICOS_PREVISTOS` e não muda de linha pra linha
+ * — é isso que deixa varrer a coluna de cima a baixo e ver quem tem Tráfego
+ * Pago sem ler rótulo nenhum.
+ *
+ * Os quadradinhos são decoração (`aria-hidden`): quem usa leitor de tela recebe
+ * a lista escrita, não cinco "preenchido, vazio, preenchido".
+ */
+function ServicosCelula({ servicos }: { servicos: string[] }) {
+  const ativos = SERVICOS_PREVISTOS.filter((s) => servicos.includes(s))
+  // Serviço gravado que não está mais na lista oficial (renomeado, descontinuado):
+  // não tem quadradinho, mas continua dito por extenso — sumir seria mentir.
+  const fora = servicos.filter((s) => !SERVICOS_PREVISTOS.includes(s))
+  const nomes = [...ativos, ...fora].map(servicoCurto)
+  const rotulo = nomes.length ? nomes.join(', ') : 'nenhum serviço previsto'
+  return (
+    <div className="flex items-center gap-2" title={rotulo}>
+      <div className="flex gap-1 shrink-0" aria-hidden>
+        {SERVICOS_PREVISTOS.map((s) => (
+          <span
+            key={s}
+            className={cn(
+              'w-2 h-2 rounded-[3px]',
+              servicos.includes(s) ? 'bg-violet-400' : 'bg-bg-700/60',
+            )}
+          />
+        ))}
+      </div>
+      <span className="text-[10px] num text-ink-500 shrink-0">
+        {ativos.length ? `${ativos.length}/${SERVICOS_PREVISTOS.length}` : '—'}
+        {fora.length ? ` +${fora.length}` : ''}
+      </span>
+      <span className="sr-only">Serviços: {rotulo}</span>
     </div>
   )
 }
@@ -282,6 +325,13 @@ export function ArtistasLista() {
   const [carregando, setCarregando] = useState(true)
   const [busca, setBusca] = useState('')
   const [soFavoritos, setSoFavoritos] = useState(false)
+  /**
+   * Serviços previstos por slug. `null` = NÃO SEI — ou a pessoa não é staff (as
+   * regras negam `projetos`), ou a leitura falhou. Nos dois casos a coluna e o
+   * filtro somem, em vez de a tabela inteira dizer que ninguém tem serviço.
+   */
+  const [servicos, setServicos] = useState<Record<string, string[]> | null>(null)
+  const [servicoFiltro, setServicoFiltro] = useState('')
   // Padrão: maior audiência primeiro (a cliente pediu o roster ordenado por alcance).
   const [sort, setSort] = useState<EstadoSort>({ coluna: 'audiencia', dir: 'desc' })
   const [pagina, setPagina] = useState(1)
@@ -310,10 +360,14 @@ export function ArtistasLista() {
    */
   const recarregar = useCallback(async () => {
     setCarregando(true)
-    const [oRoster, oMetricas, oReceitas] = await Promise.allSettled([
+    const [oRoster, oMetricas, oReceitas, oServicos] = await Promise.allSettled([
       listarArtistas(),
       listarMetricasSociais(),
       ehAdmin ? listarReceitas() : Promise.resolve(new Map<string, ReceitaResumo>()),
+      // Terceira varredura de coleção da tela (ver `listarProjetosServicos`).
+      // Só staff lê `projetos`; pro resto nem se pede, pra não gastar uma
+      // chamada que as regras vão negar.
+      ehStaff(role) ? listarProjetosServicos() : Promise.resolve(null),
     ])
 
     if (oRoster.status === 'fulfilled') {
@@ -324,9 +378,10 @@ export function ArtistasLista() {
     }
     if (oMetricas.status === 'fulfilled') setMetricas(oMetricas.value)
     if (oReceitas.status === 'fulfilled') setReceitas(oReceitas.value)
+    setServicos(oServicos.status === 'fulfilled' ? oServicos.value : null)
 
     setCarregando(false)
-  }, [ehAdmin])
+  }, [ehAdmin, role])
 
   useEffect(() => {
     if (loading || !role) return
@@ -338,8 +393,13 @@ export function ArtistasLista() {
     const q = busca.trim().toLowerCase()
     let arr = q ? artistas.filter((a) => a.nome.toLowerCase().includes(q)) : artistas
     if (soFavoritos) arr = arr.filter((a) => favoritos.has(a.slug))
+    // Sem `servicos` o filtro nem aparece na tela; a guarda aqui é pra um
+    // filtro escolhido antes não esvaziar a lista se a leitura cair depois.
+    if (servicoFiltro && servicos) {
+      arr = arr.filter((a) => (servicos[a.slug] ?? []).includes(servicoFiltro))
+    }
     return arr
-  }, [artistas, busca, soFavoritos, favoritos])
+  }, [artistas, busca, soFavoritos, favoritos, servicoFiltro, servicos])
 
   // Health Score + alertas por artista — derivados das métricas (mesma lib da home).
   const { saudePorSlug, alertasPorSlug } = useMemo(() => {
@@ -510,6 +570,32 @@ export function ArtistasLista() {
               className="w-full pl-9 pr-3 py-2 bg-bg-800/50 border border-bg-700/40 rounded-lg text-sm text-ink-200 placeholder:text-ink-500 focus:outline-none focus:border-violet-500/40"
             />
           </div>
+          {servicos && (
+            <select
+              value={servicoFiltro}
+              onChange={(e) => {
+                setServicoFiltro(e.target.value)
+                setPagina(1)
+              }}
+              aria-label="Filtrar por serviço previsto"
+              // Acende quando há escolha, como o filtro de artista das
+              // Atividades: um filtro ligado que parece desligado faz a pessoa
+              // achar que o roster encolheu.
+              className={cn(
+                'py-2 px-3 bg-bg-800/50 border rounded-lg text-sm focus:outline-none focus:border-violet-500/40',
+                servicoFiltro
+                  ? 'border-violet-500/40 text-violet-300'
+                  : 'border-bg-700/40 text-ink-300',
+              )}
+            >
+              <option value="">Todos os serviços</option>
+              {SERVICOS_PREVISTOS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -536,6 +622,7 @@ export function ArtistasLista() {
                   <th className={cn(TH, 'text-left')}>Tendência</th>
                   <ThOrdenavel coluna="audiencia" label="Audiência" align="right" sort={sort} onOrdenar={aoOrdenar} />
                   <th className={cn(TH, 'text-left')}>Acesso</th>
+                  {servicos && <th className={cn(TH, 'text-left')}>Serviços</th>}
                   <ReceitaGate>
                     <ThOrdenavel coluna="receita" label="Receita" align="right" sort={sort} onOrdenar={aoOrdenar} />
                   </ReceitaGate>
@@ -600,6 +687,12 @@ export function ArtistasLista() {
                       <td className="px-4 py-3">
                         <AcessoCelula nivel={nivelAcesso(a.redes, metricas.get(a.slug))} />
                       </td>
+
+                      {servicos && (
+                        <td className="px-4 py-3">
+                          <ServicosCelula servicos={servicos[a.slug] ?? []} />
+                        </td>
+                      )}
 
                       <ReceitaGate>
                         <td className="px-4 py-3 text-right">
@@ -741,6 +834,14 @@ export function ArtistasLista() {
                       <AcessoCelula nivel={nivelAcesso(a.redes, metricas.get(a.slug))} />
                     </span>
                   </div>
+                  {/* Linha própria, e só quando há serviço: espremer mais um
+                      bloco na linha do acesso quebraria o card em tela de
+                      celular, e quem não tem serviço não ganha linha vazia. */}
+                  {!!servicos?.[a.slug]?.length && (
+                    <div className="mt-2">
+                      <ServicosCelula servicos={servicos[a.slug]} />
+                    </div>
+                  )}
                   {ehAdmin &&
                     (() => {
                       const rec = dadosReceita(r)

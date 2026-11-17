@@ -1,10 +1,18 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CircleDot } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CircleDot, X } from 'lucide-react'
 import { useQuadro } from '@/components/atividades/quadro-contexto'
-import { deISO, hojeISO, paraISO, type Atividade } from '@/lib/atividades/client'
-import { dataLonga } from '@/lib/atividades/cronograma'
+import {
+  deISO,
+  diasEntre,
+  hojeISO,
+  paraISO,
+  reprogramar,
+  somarDias,
+  type Atividade,
+} from '@/lib/atividades/client'
+import { dataLonga, empurrarSucessoras } from '@/lib/atividades/cronograma'
 import { cor, etapaDe } from '@/lib/atividades/tipos'
 import { cn } from '@/lib/utils'
 
@@ -34,20 +42,60 @@ const MESES = [
 const POR_DIA = 6
 
 /**
+ * O dia em que a demanda aparece no calendário: o PRAZO, e o início só quando é
+ * marco (que não tem duração).
+ *
+ * É também o ponto de referência do arrasto: a distância entre este dia e o dia
+ * em que o card foi solto é o quanto a janela inteira anda.
+ */
+function diaDe(a: Atividade): string | null {
+  return a.prazo ?? (a.marco ? a.inicio : null) ?? null
+}
+
+/** O empurrão oferecido depois de mover uma demanda que tem sucessoras. */
+interface Cascata {
+  id: string
+  titulo: string
+  dias: number
+  afetadas: number
+}
+
+/**
  * O calendário: as entregas do mês.
  *
  * Aqui a demanda aparece pela data de ENTREGA, não pela janela inteira. É a
  * pergunta "o que vence nesta semana?", e espalhar cada demanda por todos os
  * dias entre início e prazo transformaria um mês normal num bloco sólido —
  * quem quer a janela inteira tem o cronograma ao lado.
+ *
+ * Arrastar o card pra outro dia reprograma a demanda (pedido da cliente em
+ * 11/2026): a janela inteira anda a mesma distância, numa escrita só, como o
+ * arrasto do quadro e o da barra do cronograma.
  */
 export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void }) {
-  const { config, visiveis, atrasada, concluida, filtrando, tituloDe } = useQuadro()
+  const {
+    config,
+    visiveis,
+    todas,
+    reagendar,
+    aplicarLocal,
+    atrasada,
+    concluida,
+    filtrando,
+    tituloDe,
+    setErro,
+  } = useQuadro()
   const hoje = hojeISO()
   const [mesBase, setMesBase] = useState(() => hoje.slice(0, 7))
   // Dias abertos pelo "+N": a chave é a data ISO, então o que sobra de outro mês
   // não atrapalha — aquele dia só volta a existir quando o mês dele voltar.
   const [abertos, setAbertos] = useState<Set<string>>(new Set())
+  // Arrasto: o card que está na mão e o dia sob o cursor. Os dois só marcam a
+  // tela — quem grava é `soltarNoDia`.
+  const [arrastando, setArrastando] = useState<string | null>(null)
+  const [alvo, setAlvo] = useState<string | null>(null)
+  const [cascata, setCascata] = useState<Cascata | null>(null)
+  const [empurrando, setEmpurrando] = useState(false)
 
   const [ano, mes] = mesBase.split('-').map(Number)
 
@@ -77,7 +125,7 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
   const porDia = useMemo(() => {
     const m = new Map<string, Atividade[]>()
     for (const a of visiveis) {
-      const dia = a.prazo ?? (a.marco ? a.inicio : null)
+      const dia = diaDe(a)
       if (!dia) continue
       const atual = m.get(dia) ?? []
       atual.push(a)
@@ -86,7 +134,7 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
     return m
   }, [visiveis])
 
-  const semData = visiveis.filter((a) => !a.prazo && !(a.marco && a.inicio))
+  const semData = visiveis.filter((a) => !diaDe(a))
 
   function alternarDia(iso: string) {
     setAbertos((atual) => {
@@ -100,6 +148,61 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
   function andar(passo: number) {
     const d = new Date(ano, mes - 1 + passo, 1, 12)
     setMesBase(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+
+  /**
+   * Solta o card num dia: a janela inteira anda a mesma distância.
+   *
+   * O calendário mostra a demanda pela data de ENTREGA, então é ela que vai
+   * parar no dia onde o card foi solto; o início acompanha pelo mesmo número de
+   * dias. Arrastar REPROGRAMA, não estica — quem quer mudar a duração tem as
+   * pontas da barra no cronograma. Uma escrita, sem releitura, como o quadro.
+   */
+  function soltarNoDia(iso: string, id: string) {
+    const a = todas.find((x) => x.id === id)
+    const atual = a ? diaDe(a) : null
+    if (!a || !atual) return
+    const dias = diasEntre(atual, iso)
+    if (!dias) return
+
+    void reagendar(
+      a.id,
+      a.inicio ? somarDias(a.inicio, dias) : null,
+      a.prazo ? somarDias(a.prazo, dias) : null,
+    )
+
+    // Mesma regra do cronograma: mover uma demanda NÃO empurra as dependentes
+    // sozinho — reagendar em cascata sem avisar é o tipo de coisa que ninguém
+    // desfaz. A faixa oferece o empurrão. O deslocamento é medido pelo dia do
+    // card, que é a ENTREGA: é a data em que a antecessora termina que puxa a
+    // sucessora.
+    const afetadas = empurrarSucessoras(todas, a.id, dias)
+    if (afetadas.length) {
+      setCascata({ id: a.id, titulo: tituloDe(a), dias, afetadas: afetadas.length })
+    }
+  }
+
+  async function aplicarCascata() {
+    if (!cascata) return
+    setEmpurrando(true)
+    try {
+      const mudancas = empurrarSucessoras(todas, cascata.id, cascata.dias)
+      // Uma escrita por demanda afetada, em sequência: são poucas, e assim uma
+      // falha isolada não desfaz o resto.
+      for (const m of mudancas) await reprogramar(m.id, m.inicio, m.prazo)
+      // As novas datas já estão calculadas — aplicar no estado local custa zero
+      // leitura, enquanto recarregar varreria a coleção inteira.
+      for (const m of mudancas) {
+        const demanda = todas.find((x) => x.id === m.id)
+        if (demanda) aplicarLocal({ ...demanda, inicio: m.inicio, prazo: m.prazo })
+      }
+      setCascata(null)
+      setErro(null)
+    } catch {
+      setErro('Não consegui empurrar as demandas dependentes.')
+    } finally {
+      setEmpurrando(false)
+    }
   }
 
   return (
@@ -131,8 +234,37 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
         >
           Hoje
         </button>
-        <p className="text-[11px] text-ink-600 ml-auto hidden sm:block">Pela data de entrega</p>
+        <p className="text-[11px] text-ink-600 ml-auto hidden sm:block">
+          Pela data de entrega · arraste o card pra outro dia
+        </p>
       </div>
+
+      {cascata && (
+        <div className="flex flex-wrap items-center gap-3 bg-violet-500/10 border border-violet-500/30 rounded-xl px-4 py-2.5">
+          <p className="text-sm text-violet-100/90 flex-1 min-w-[240px]">
+            <strong>{cascata.titulo}</strong> andou {Math.abs(cascata.dias)} dia
+            {Math.abs(cascata.dias) === 1 ? '' : 's'}{' '}
+            {cascata.dias > 0 ? 'para frente' : 'para trás'}. Empurrar as {cascata.afetadas} demandas
+            que dependem dela?
+          </p>
+          <button
+            type="button"
+            onClick={aplicarCascata}
+            disabled={empurrando}
+            className="px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 disabled:opacity-70 text-white text-xs font-semibold transition-colors"
+          >
+            {empurrando ? 'Empurrando…' : 'Empurrar dependentes'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCascata(null)}
+            aria-label="Manter as datas das dependentes"
+            className="p-1.5 rounded-md text-ink-400 hover:text-ink-100 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <div className="border border-bg-700/40 rounded-xl overflow-hidden">
         <div className="grid grid-cols-7 bg-bg-900 border-b border-bg-700/40">
@@ -157,10 +289,29 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
               return (
                 <div
                   key={iso}
+                  onDragOver={(e) => {
+                    // Sem o preventDefault o navegador recusa o drop. A célula
+                    // inteira é alvo, inclusive por baixo dos cards: o evento
+                    // deles sobe até aqui.
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    setAlvo(iso)
+                  }}
+                  onDragLeave={() => setAlvo((c) => (c === iso ? null : c))}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const id = e.dataTransfer.getData('text/plain')
+                    setAlvo(null)
+                    setArrastando(null)
+                    if (id) soltarNoDia(iso, id)
+                  }}
                   className={cn(
-                    'min-h-[140px] p-1.5 border-r border-bg-700/20 last:border-r-0 space-y-1',
+                    'min-h-[140px] p-1.5 border-r border-bg-700/20 last:border-r-0 space-y-1 transition-colors',
                     !doMes && 'bg-bg-950/40',
                     fds && doMes && 'bg-bg-950/20',
+                    arrastando &&
+                      alvo === iso &&
+                      'bg-violet-500/10 ring-1 ring-inset ring-violet-500/40',
                   )}
                 >
                   <div
@@ -182,6 +333,20 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
                       <button
                         key={a.id}
                         type="button"
+                        // O card é o mesmo botão que abre a demanda: arrastar e
+                        // clicar não competem (o navegador não dispara o clique
+                        // no fim de um arrasto), e quem não arrasta — teclado,
+                        // celular — muda a data pelo detalhe, que abre daqui.
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', a.id)
+                          e.dataTransfer.effectAllowed = 'move'
+                          setArrastando(a.id)
+                        }}
+                        onDragEnd={() => {
+                          setArrastando(null)
+                          setAlvo(null)
+                        }}
                         onClick={() => onAbrir(a)}
                         title={tituloDe(a)}
                         // A data só existia visualmente, na célula em volta: para
@@ -189,7 +354,8 @@ export function CalendarioView({ onAbrir }: { onAbrir: (a: Atividade) => void })
                         // uma lista de títulos sem quando.
                         aria-label={`${tituloDe(a)} — ${a.marco ? 'marco' : 'entrega'} em ${dataLonga(iso)}`}
                         className={cn(
-                          'w-full text-left text-[10px] px-1.5 py-1 rounded border truncate flex items-center gap-1 transition-colors hover:brightness-125',
+                          'w-full text-left text-[10px] px-1.5 py-1 rounded border truncate flex items-center gap-1 transition-colors hover:brightness-125 cursor-grab active:cursor-grabbing',
+                          arrastando === a.id && 'opacity-40',
                           concluida(a)
                             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
                             : atrasada(a)

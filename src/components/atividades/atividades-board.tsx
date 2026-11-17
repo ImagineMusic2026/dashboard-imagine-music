@@ -51,7 +51,17 @@ const iconeDaVisao: Record<Visao, typeof SquareKanban> = {
 /** Visões em que agrupar muda alguma coisa. */
 const ACEITAM_AGRUPAMENTO: Visao[] = ['quadro', 'cronograma', 'lista']
 
-type Dialogo = null | { modo: 'novo'; etapa: string } | { modo: 'editar'; atividade: Atividade }
+type Dialogo =
+  | null
+  | { modo: 'novo'; etapa: string }
+  | { modo: 'editar'; atividade: Atividade }
+  /**
+   * Duplicar abre o MESMO formulário de editar, preenchido com a demanda — mas
+   * salvando cria outra. Nada é gravado enquanto a pessoa não confirma: uma
+   * cópia instantânea apareceria no quadro com título e data idênticos ao
+   * original, e a primeira coisa a fazer seria procurá-la pra ajustar.
+   */
+  | { modo: 'duplicar'; atividade: Atividade }
 
 export function AtividadesBoard() {
   return (
@@ -445,19 +455,23 @@ function QuadroTela() {
           bloqueado={!!dialogo}
           onFechar={() => setDetalheId(null)}
           onEditar={() => setDialogo({ modo: 'editar', atividade: detalhe })}
+          onDuplicar={() => setDialogo({ modo: 'duplicar', atividade: detalhe })}
         />
       )}
 
       {dialogo && (
         <AtividadeDialog
-          atividade={dialogo.modo === 'editar' ? dialogo.atividade : null}
+          atividade={dialogo.modo === 'novo' ? null : dialogo.atividade}
+          duplicando={dialogo.modo === 'duplicar'}
           etapaInicial={dialogo.modo === 'novo' ? dialogo.etapa : (config.etapas[0]?.key ?? '')}
           onFechar={() => setDialogo(null)}
           onSalvo={(id) => {
             setDialogo(null)
             // Criar uma demanda já abre o detalhe dela: quase sempre o próximo
-            // passo é anexar o briefing ou destrinchar o checklist.
-            if (dialogo.modo === 'novo') setDetalheId(id)
+            // passo é anexar o briefing ou destrinchar o checklist. Vale também
+            // pra cópia — e aqui ainda mais, porque é como a pessoa vê que o
+            // que está na tela agora é a nova, não a original.
+            if (dialogo.modo !== 'editar') setDetalheId(id)
           }}
         />
       )}

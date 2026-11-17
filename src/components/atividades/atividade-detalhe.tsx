@@ -11,6 +11,7 @@ import {
   ListTree,
   Loader2,
   MessageSquare,
+  Copy,
   Pencil,
   Plus,
   History as HistoryIcon,
@@ -77,11 +78,14 @@ export function AtividadeDetalhe({
   atividade,
   onFechar,
   onEditar,
+  onDuplicar,
   bloqueado,
 }: {
   atividade: Atividade
   onFechar: () => void
   onEditar: () => void
+  /** Abre o formulário preenchido com esta demanda, pra criar outra igual. */
+  onDuplicar: () => void
   /** Há um diálogo por cima — o Esc pertence a ele, não a este painel. */
   bloqueado: boolean
 }) {
@@ -383,6 +387,15 @@ export function AtividadeDetalhe({
               className="p-1.5 rounded-md hover:bg-bg-800 text-ink-400 hover:text-ink-100 transition-colors shrink-0"
             >
               <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onDuplicar}
+              aria-label="Duplicar demanda"
+              title="Abre o formulário preenchido com esta demanda"
+              className="p-1.5 rounded-md hover:bg-bg-800 text-ink-400 hover:text-ink-100 transition-colors shrink-0"
+            >
+              <Copy className="w-4 h-4" />
             </button>
             <button
               type="button"

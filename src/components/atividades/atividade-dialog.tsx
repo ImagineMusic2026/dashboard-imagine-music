@@ -52,11 +52,17 @@ const rotulo = 'block text-sm font-medium text-ink-300 mb-1.5'
  */
 export function AtividadeDialog({
   atividade,
+  duplicando = false,
   etapaInicial,
   onFechar,
   onSalvo,
 }: {
   atividade: Atividade | null
+  /**
+   * Veio de "Duplicar": o formulário abre preenchido com `atividade`, mas
+   * salvar CRIA outra demanda em vez de gravar por cima dela.
+   */
+  duplicando?: boolean
   /** Coluna em que o "+" foi clicado — já vem selecionada ao criar. */
   etapaInicial: string
   onFechar: () => void
@@ -65,7 +71,9 @@ export function AtividadeDialog({
   const { appUser } = useAuth()
   const { config, todas, artistas, equipe, etiquetasConhecidas, aplicarLocal, recarregar, nomeArtistaDe } =
     useQuadro()
-  const editando = !!atividade
+  // Duplicando há `atividade` (é de onde os campos vêm), mas NÃO se está
+  // editando: o caminho de salvar tem que ser o de criar.
+  const editando = !!atividade && !duplicando
   // O colaborador só mexe nas demandas em que é o responsável — então ele é
   // sempre o responsável do que cria, e não repassa (a demanda sumiria da tela
   // dele e a regra do Firestore recusaria).
@@ -257,10 +265,18 @@ export function AtividadeDialog({
         responsavelUid: uidResponsavel || null,
         responsavelNome,
         paiId: atividade?.paiId ?? null,
-        dependeDe: atividade?.dependeDe ?? [],
-        checklist: atividade?.checklist ?? [],
+        // A cópia NÃO herda antecessoras: uma demanda que se liga sozinha ao
+        // caminho crítico é mais trabalho pra desfazer do que pra refazer, e o
+        // detalhe tem "Adicionar dependência" a um clique.
+        dependeDe: duplicando ? [] : (atividade?.dependeDe ?? []),
+        // O checklist vem junto, mas zerado: a cópia ainda não fez nada, e
+        // itens marcados afirmariam um trabalho que não aconteceu.
+        checklist: duplicando
+          ? (atividade?.checklist ?? []).map((i) => ({ ...i, feito: false }))
+          : (atividade?.checklist ?? []),
         links: atividade?.links ?? [],
-        progresso: atividade?.progresso ?? null,
+        // Progresso manual é medida da original; a cópia começa do zero.
+        progresso: duplicando ? null : (atividade?.progresso ?? null),
       }
 
       let id: string
@@ -342,7 +358,7 @@ export function AtividadeDialog({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-bg-700/40 sticky top-0 bg-bg-900 rounded-t-2xl z-10">
           <div id="at-dialogo-titulo" className="font-bold text-ink-100">
-            {editando ? 'Editar demanda' : 'Nova demanda'}
+            {editando ? 'Editar demanda' : duplicando ? 'Duplicar demanda' : 'Nova demanda'}
           </div>
           <button
             type="button"
@@ -355,7 +371,9 @@ export function AtividadeDialog({
         </div>
 
         <form className="p-5 space-y-4" onSubmit={aoEnviar}>
-          {!editando && !!config.templates.length && (
+          {/* Duplicando não se escolhe modelo: o "modelo" é a demanda copiada,
+              e aplicar outro por cima apagaria os campos que vieram dela. */}
+          {!editando && !duplicando && !!config.templates.length && (
             <div>
               {/* Recolhido por padrão: na maioria das vezes a escolha é "Em
                   branco", e a lista aberta empurrava o resto do formulário
@@ -811,9 +829,11 @@ export function AtividadeDialog({
               ? 'Salvando…'
               : editando
                 ? 'Salvar alterações'
-                : modelo?.etapas?.length
-                  ? 'Criar projeto'
-                  : 'Criar demanda'}
+                : duplicando
+                  ? 'Criar a cópia'
+                  : modelo?.etapas?.length
+                    ? 'Criar projeto'
+                    : 'Criar demanda'}
           </button>
           {/* Etapa atual é informação, não decisão, quando o modelo manda. */}
           {!editando && modelo?.etapas?.length ? (

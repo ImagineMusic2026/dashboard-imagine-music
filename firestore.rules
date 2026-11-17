@@ -346,6 +346,22 @@ service cloud.firestore {
       allow delete: if podeEditarArtistas();
     }
 
+    // Link PÚBLICO de assinatura de contrato — mesmo desenho do link do
+    // questionário, com duas diferenças que vêm do que ele abre: quem gerencia é
+    // quem cuida de contrato (`podeContratos`, admin por padrão, marketing
+    // fechado), e o token aponta pra UM contrato, não pro artista. O público
+    // também não toca aqui: `/c/{token}` resolve o token na API, com Admin SDK.
+    // `update` não existe — link se cria e se revoga (delete), nunca se edita.
+    match /links-contrato/{token} {
+      allow get, list: if podeContratos();
+      allow create: if podeContratos()
+        && request.resource.data.keys().hasOnly(['slug', 'contratoId', 'criadoPor', 'criadoEm'])
+        && request.resource.data.slug is string
+        && request.resource.data.contratoId is string;
+      allow update: if false;
+      allow delete: if podeContratos();
+    }
+
     // A página de Alertas varre TODOS os questionários de uma vez pra avisar quando
     // um artista responde. Query de grupo exige uma regra com prefixo curinga — a
     // do caminho específico acima não autoriza collectionGroup. Só leitura, só staff;

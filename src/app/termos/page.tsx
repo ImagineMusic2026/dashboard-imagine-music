@@ -1,13 +1,17 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { BrandLogo } from '@/components/shared/logo'
+import { EMPRESA as DADOS } from '@/lib/empresa'
 
 // ── Dados oficiais que aparecem nos termos ───────────────────────────────────
-const EMPRESA = 'Imagine Music' // nome fantasia / marca
-const RAZAO_SOCIAL = 'IMAGINE MUSIC LTDA'
-const CNPJ = '36.435.325/0001-44'
-const EMAIL = 'music@imaginegroup.com.br' // e-mail oficial de contato
-const FORO = 'Feira de Santana, BA'
+// Vêm de `@/lib/empresa`: os mesmos aparecem na política de privacidade e no
+// contrato emitido pelo painel, e três cópias divergem na primeira mudança.
+const EMPRESA = DADOS.marca
+const RAZAO_SOCIAL = DADOS.razaoSocial
+const CNPJ = DADOS.cnpj
+const EMAIL = DADOS.email
+const FORO = DADOS.foro
+// Data do TEXTO desta página — não é dado da empresa, fica aqui.
 const ATUALIZADO = '19 de junho de 2026'
 // ─────────────────────────────────────────────────────────────────────────────
 

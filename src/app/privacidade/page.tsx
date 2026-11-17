@@ -1,13 +1,17 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { BrandLogo } from '@/components/shared/logo'
+import { EMPRESA as DADOS } from '@/lib/empresa'
 
 // ── Dados oficiais que aparecem na política ──────────────────────────────────
-const EMPRESA = 'Imagine Music' // nome fantasia / marca
-const RAZAO_SOCIAL = 'IMAGINE MUSIC LTDA'
-const CNPJ = '36.435.325/0001-44'
-const ENDERECO = 'Rua Barão de Cotegipe, nº 927, Sala 102, 1º andar, Centro, Feira de Santana/BA, Brasil'
-const EMAIL = 'music@imaginegroup.com.br' // e-mail oficial de contato/privacidade
+// Vêm de `@/lib/empresa`: os mesmos aparecem nos termos e no contrato emitido
+// pelo painel, e três cópias divergem na primeira mudança.
+const EMPRESA = DADOS.marca
+const RAZAO_SOCIAL = DADOS.razaoSocial
+const CNPJ = DADOS.cnpj
+const ENDERECO = DADOS.endereco
+const EMAIL = DADOS.email
+// Prazos e datas do TEXTO desta página — não são dados da empresa.
 const RETENCAO = '30 dias' // EDITAR se quiser outro prazo de exclusão
 const ATUALIZADO = '19 de junho de 2026'
 // ─────────────────────────────────────────────────────────────────────────────

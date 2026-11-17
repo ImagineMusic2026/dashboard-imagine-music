@@ -383,7 +383,7 @@ export function PerfilArtistaReal({
           {/* Contratos — ficha da vigência + link do PDF digitalizado (o painel não
               tem Storage). Capacidade `contratos`, padrão admin; o card se autoprotege
               porque este mesmo perfil é o que o artista vê no portal. */}
-          <ContratosArtistaCard slug={a.slug} />
+          <ContratosArtistaCard slug={a.slug} nome={a.nome} />
         </>
       )}
 

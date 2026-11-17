@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { ConfigQuadroTab } from '@/components/atividades/config-quadro'
+import { ConfigContratosTab } from '@/components/configuracoes/config-contratos'
 import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
 import { MatrizPermissoes } from '@/components/configuracoes/matriz-permissoes'
@@ -11,13 +12,21 @@ import { PerfilTab } from '@/components/configuracoes/perfil-tab'
 import { ehStaff } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
-type Aba = 'time' | 'artistas' | 'permissoes' | 'quadro' | 'notificacoes' | 'perfil'
+type Aba =
+  | 'time'
+  | 'artistas'
+  | 'permissoes'
+  | 'quadro'
+  | 'contratos'
+  | 'notificacoes'
+  | 'perfil'
 
 const ABAS: { key: Aba; label: string }[] = [
   { key: 'time', label: 'Time' },
   { key: 'artistas', label: 'Artistas' },
   { key: 'permissoes', label: 'Permissões' },
   { key: 'quadro', label: 'Quadro de atividades' },
+  { key: 'contratos', label: 'Modelos de contrato' },
   { key: 'notificacoes', label: 'Notificações' },
   { key: 'perfil', label: 'Perfil' },
 ]
@@ -82,6 +91,7 @@ export function ConfiguracoesView() {
           )}
           {abaAtual === 'permissoes' && <MatrizPermissoes />}
           {abaAtual === 'quadro' && <ConfigQuadroTab />}
+          {abaAtual === 'contratos' && <ConfigContratosTab />}
           {abaAtual === 'notificacoes' && <NotificacoesPrefs />}
           {abaAtual === 'perfil' && <PerfilTab />}
         </div>

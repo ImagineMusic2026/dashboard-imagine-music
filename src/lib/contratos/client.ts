@@ -9,6 +9,15 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { memoCurtaPorChave, invalidarCachesDeLeitura } from '@/lib/cache-leitura'
+import {
+  hojeISO,
+  situacaoDe,
+  type Contrato,
+  type DadosContrato,
+  type ModeloContrato,
+  type SituacaoContrato,
+} from '@/lib/contratos/tipos'
+import { limparValores } from '@/lib/contratos/modelo'
 
 /**
  * Contratos do artista — `projetos/{slug}/contratos/{id}`.
@@ -18,7 +27,12 @@ import { memoCurtaPorChave, invalidarCachesDeLeitura } from '@/lib/cache-leitura
  * documento da relação comercial, não dado dele pra consultar. Regra do Firestore
  * é por documento — só separar resolve.
  *
- * ## Por que o PDF é um link, e não um upload
+ * Este arquivo é o IO. Os tipos e as contas (situação, estado, datas, campos do
+ * modelo) vivem em `tipos.ts`, que não importa Firebase — a página pública onde
+ * o artista assina precisa deles e não pode carregar o SDK. Tudo de lá é
+ * reexportado aqui, então quem já importava deste arquivo não muda nada.
+ *
+ * ## Por que o PDF ANEXADO é um link, e não um upload
  *
  * O projeto não tem Firebase Storage (exigiria o plano Blaze) e a rota serverless
  * da Vercel barra corpo acima de 4,5 MB — um contrato digitalizado passa disso com
@@ -28,94 +42,17 @@ import { memoCurtaPorChave, invalidarCachesDeLeitura } from '@/lib/cache-leitura
  *
  * O que isso implica na prática: quem abrir o link precisa ter acesso à pasta. Se
  * um dia entrar Storage de verdade, só o campo `arquivoUrl` muda.
+ *
+ * ## E por que o contrato GERADO não precisa de Storage
+ *
+ * O emitido pelo painel não é arquivo nenhum: o documento é o texto do modelo
+ * copiado pra dentro do doc, mais os valores preenchidos e as duas assinaturas
+ * (PNG pequena do traço, em dataURL). O PDF é REGERADO sob demanda a partir
+ * disso, pela impressão do navegador — nada fica armazenado, então a decisão de
+ * não ter Storage continua de pé.
  */
 
-export type TipoContrato =
-  | 'agenciamento'
-  | 'distribuicao'
-  | 'edicao'
-  | 'empresariamento'
-  | 'aditivo'
-  | 'outro'
-
-export const tipoContratoMeta: Record<TipoContrato, { label: string }> = {
-  agenciamento: { label: 'Agenciamento' },
-  distribuicao: { label: 'Distribuição' },
-  edicao: { label: 'Edição' },
-  empresariamento: { label: 'Empresariamento' },
-  aditivo: { label: 'Aditivo' },
-  outro: { label: 'Outro' },
-}
-
-export const TIPOS_CONTRATO = Object.keys(tipoContratoMeta) as TipoContrato[]
-
-export interface Contrato {
-  id: string
-  tipo: TipoContrato
-  /** Nome próprio quando ajuda a distinguir (ex.: "Aditivo — turnê 2026"). */
-  titulo?: string | null
-  /** Início da vigência em 'YYYY-MM-DD'. */
-  inicio: string
-  /** Fim da vigência; `null` = prazo indeterminado. */
-  fim?: string | null
-  /** Encerrado/rescindido antes do fim previsto. */
-  encerrado?: boolean
-  /** Link do PDF digitalizado (Drive da Imagine). Ver o cabeçalho deste arquivo. */
-  arquivoUrl?: string | null
-  /** Percentual do selo, quando o contrato define um. */
-  percentual?: number | null
-  observacoes?: string | null
-  criadoPor?: string
-}
-
-export interface DadosContrato {
-  tipo: TipoContrato
-  titulo?: string | null
-  inicio: string
-  fim?: string | null
-  encerrado?: boolean
-  arquivoUrl?: string | null
-  percentual?: number | null
-  observacoes?: string | null
-}
-
-/**
- * Situação derivada das datas — não é campo guardado de propósito: um status
- * gravado envelhece sozinho (o contrato vence sem ninguém tocar no doc) e vira
- * mentira na tela.
- */
-export type SituacaoContrato = 'vigente' | 'a-vencer' | 'vencido' | 'encerrado' | 'futuro'
-
-export const situacaoMeta: Record<SituacaoContrato, { label: string; chip: string }> = {
-  vigente: { label: 'Vigente', chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  'a-vencer': { label: 'A vencer', chip: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  vencido: { label: 'Vencido', chip: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  encerrado: { label: 'Encerrado', chip: 'bg-bg-700 text-ink-400 border-bg-700' },
-  futuro: { label: 'A iniciar', chip: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
-}
-
-/** Janela em que um contrato já entra como "a vencer" — tempo de renegociar. */
-export const DIAS_AVISO = 90
-
-/** Data local de hoje em 'YYYY-MM-DD' (sem conversão de fuso). */
-export function hojeISO(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-/** Dias entre duas datas 'YYYY-MM-DD' (b - a). Meio-dia evita pegadinha de fuso. */
-export function diasEntre(a: string, b: string): number {
-  const ms = new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()
-  return Math.round(ms / 86_400_000)
-}
-
-export function situacaoDe(c: Contrato, hoje = hojeISO()): SituacaoContrato {
-  if (c.encerrado) return 'encerrado'
-  if (c.inicio && c.inicio > hoje) return 'futuro'
-  if (!c.fim) return 'vigente'
-  if (c.fim < hoje) return 'vencido'
-  return diasEntre(hoje, c.fim) <= DIAS_AVISO ? 'a-vencer' : 'vigente'
-}
+export * from '@/lib/contratos/tipos'
 
 /** Ordena o que exige atenção primeiro; encerrados e vencidos afundam. */
 const PESO: Record<SituacaoContrato, number> = {
@@ -196,20 +133,42 @@ export async function excluirContrato(slug: string, id: string): Promise<void> {
   invalidarCachesDeLeitura()
 }
 
-/** Aceita só http(s) — o link vira um `href` que a equipe clica. */
-export function linkValido(url: string): boolean {
-  try {
-    const u = new URL(url.trim())
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
-const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-
-/** 'YYYY-MM-DD' → '12 set 2026' (sem conversão de fuso). */
-export function dataCurta(iso: string): string {
-  const [a, m, d] = iso.split('-')
-  return `${Number(d)} ${MESES[Number(m) - 1] ?? ''} ${a}`
+/**
+ * Emite um contrato a partir de um modelo.
+ *
+ * O modelo é COPIADO: o texto e a definição dos campos entram no documento. É a
+ * mesma regra dos modelos de projeto do quadro de atividades ("o modelo não vira
+ * vínculo — os valores são copiados"), e aqui ela é inegociável. Um contrato
+ * assinado não pode mudar uma vírgula porque alguém editou o modelo na
+ * configuração depois — e o `hash` gravado na assinatura deixaria de bater.
+ *
+ * Devolve o id, que é o que amarra o link público a este contrato.
+ */
+export async function criarContratoGerado(
+  slug: string,
+  modelo: ModeloContrato,
+  dados: DadosContrato,
+  valoresEquipe: Record<string, string>,
+  criadoPor: string,
+): Promise<string> {
+  const ref = await addDoc(caminho(slug), {
+    ...limpar(dados),
+    origem: 'gerado',
+    modeloKey: modelo.key,
+    modeloNome: modelo.nome,
+    // Congela a data do documento. Ver `emitidoEm` em `tipos.ts`.
+    emitidoEm: hojeISO(),
+    textoModelo: modelo.texto,
+    campos: modelo.campos,
+    // Só o que a EQUIPE preenche entra agora. O resto é do artista e chega pela
+    // rota pública — aqui nem é olhado, pra uma tela do painel não conseguir
+    // gravar resposta no lugar dele.
+    valores: limparValores(modelo.campos, valoresEquipe, 'equipe'),
+    assinaturaArtista: null,
+    assinaturaImagine: null,
+    criadoPor,
+    criadoEm: serverTimestamp(),
+  })
+  invalidarCachesDeLeitura()
+  return ref.id
 }

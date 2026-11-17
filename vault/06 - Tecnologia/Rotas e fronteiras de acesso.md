@@ -9,6 +9,7 @@ tipo: arquitetura
 - `/` — landing.
 - `/login` e `/aceitar-convite`.
 - `/q/{token}` — questionário externo limitado ao token.
+- `/c/{token}` — assinatura de contrato limitada ao token. Ver [[03 - Artistas/Contratos]].
 - `/privacidade`, `/termos`, callbacks de conexão TikTok e YouTube.
 
 ## Área da equipe
@@ -35,8 +36,13 @@ Como ele não lê a coleção `artistas`, o seletor de artista do quadro vem de 
 | `POST /api/artistas/mercado-ao-vivo` | Nível declarado, com score da tabela oficial | `editarArtistas` |
 | `POST /api/artistas/criar` e `/atualizar` | Cadastro, inclusive a data de nascimento | `editarArtistas` |
 | `POST /api/diagnostico/data-nascimento` | Data de nascimento do questionário Artista enviado, para o cadastro | Artista no próprio cadastro (o endereço vem da sessão); equipe com `editarArtistas` |
+| `POST /api/contratos/assinar` | A contra-assinatura da Imagine no contrato gerado | `contratos` |
 
 O link público (`/api/questionario-link`) é a única rota sem login que grava fora do questionário: no envio do questionário Artista, leva a data de nascimento ao cadastro, sem sobrescrever a da equipe.
+
+Desde 11/2026 há uma **segunda** rota sem login que grava: `/api/contrato-link`, a da assinatura de contrato. Vale o mesmo princípio e vale lembrar o mesmo risco — regra do Firestore não roda no Admin SDK, então a validação escrita na rota é a única que existe. Ela aceita só as chaves que o modelo daquele contrato declarou como do artista, confere os obrigatórios, exige o aceite, limita o tamanho da assinatura e recusa a segunda com 409. `slug` e `contratoId` vêm do documento do link, nunca do corpo: senão quem tem um link assinaria no contrato alheio.
+
+A contra-assinatura passa por rota pelo mesmo motivo dos carimbos do dossiê: data, IP e o hash do texto não podem vir do navegador.
 
 A data de nascimento passa pelo servidor também porque o artista não tem permissão nenhuma no próprio cadastro — e a rota relê o questionário gravado em vez de aceitar a data no corpo do pedido.
 

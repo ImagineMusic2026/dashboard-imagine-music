@@ -43,6 +43,9 @@ Nenhum destes avança com desenvolvimento — os três dependem de resposta da c
 - [x] Atividades: cronograma, cinco visões e quadro configurável.
 - [x] Dossiê do artista a partir do documento de cadastro-base.
 - [x] Viralização: leitura diária, por país e por faixa, do relatório da OneRPM.
+- [x] Contratos: emitir a partir de modelo, assinar por link e gerar o PDF — no ar em 17/11/2026, com o contrato de distribuição da cliente já cadastrado. Ver [[03 - Artistas/Contratos]].
+- [x] Atividades: arrastar o card do calendário pra reprogramar, e duplicar demanda.
+- [x] Artistas: serviços previstos na lista, com coluna e filtro.
 
 ## Convenção de status
 

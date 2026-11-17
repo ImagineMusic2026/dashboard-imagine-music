@@ -31,6 +31,7 @@ tipo: indice
 - [[03 - Artistas/Estágio (IGE)]]
 - [[03 - Artistas/Diagnósticos e questionários]]
 - [[03 - Artistas/Projeto comercial interno]]
+- [[03 - Artistas/Contratos]]
 - [[03 - Artistas/Dossiê do artista]]
 
 ## Dados e integrações

@@ -22,6 +22,7 @@ Firestore é o banco central. Leituras no cliente respeitam regras; dados sensí
 | `atividades/{id}`                          | Demandas do quadro: etapa, datas, dependências, subtarefas, checklist.  | Quem tem `atividades` lê e altera.          |
 | `diagnosticos/{slug}/questionarios/{tipo}` | Respostas Projeto/Artista.                                              | Staff ou artista vinculado.                 |
 | `links-questionario/{token}`               | Token de formulário externo.                                            | A API valida; o público não lê diretamente. |
+| `links-contrato/{token}`                   | Token de assinatura de contrato: `slug` e `contratoId`.                  | A API valida; o público não lê diretamente. Gerir exige `contratos`. |
 | `alertas-vistos/{uid}`                     | Alertas que cada pessoa marcou como vistos: `vistos` (chave → quando).   | Só o dono, sendo da equipe ativa, lê e grava. |
 
 ## Subcoleções que existem para separar acesso
@@ -47,6 +48,16 @@ Regra do Firestore é **por documento** e não esconde campo. Quando parte de um
 `artistas/{slug}` ganhou `dataNascimento` (texto `AAAA-MM-DD`, nunca Timestamp: aniversário é dia do calendário, e um instante à meia-noite UTC cairia no dia anterior em Brasília), `dataNascimentoOrigem` (`equipe` ou `questionario`) e `dataNascimentoAtualizadoEm`. Só o servidor grava.
 
 `alertas-vistos/{uid}` é documento próprio, e não campo do perfil, de propósito: o perfil é lido pela equipe inteira e só aceita auto-edição de `favoritos` — a trava que fecha a escalada de papel. O mapa é regravado inteiro numa transação a cada marca (sem merge, para a poda conseguir apagar chaves) e tem teto de 500 chaves nas regras.
+
+`configuracoes/contratos` guarda os modelos de contrato: nome, tipo, o texto com `{{chave}}` e a definição dos campos. Um documento só, cacheado, como o do quadro. O contrato de distribuição da cliente vive **aqui**, e não no código — o repositório é público.
+
+`projetos/{slug}/contratos/{id}` ganhou os campos do contrato **gerado**: `origem` (`anexo`, que é o que todo contrato anterior é, ou `gerado`), `modeloKey`, `modeloNome`, `emitidoEm`, `textoModelo` e `campos` (as cópias do modelo na hora de emitir), `valores` e as duas assinaturas, `assinaturaArtista` e `assinaturaImagine`. Cada assinatura guarda nome, documento, a PNG do traço em dataURL, e o que **o servidor** carimba: data, IP, user-agent e o SHA-256 do texto renderizado.
+
+Três consequências que valem estar escritas:
+
+- O texto do modelo é **copiado** pro documento, não referenciado. Editar o modelo depois não muda contrato já emitido, e é isso que impede um contrato assinado de mudar sozinho.
+- `emitidoEm` existe porque a data que sai no documento não pode ser calculada na hora de desenhar: o PDF regerado no ano que vem traria outra data e o hash da assinatura deixaria de bater.
+- A PNG da assinatura mora **dentro** do documento (uns 10–30 KB cada, longe do teto de 1 MB). Não é Storage, e por isso a decisão de não ter Storage continua de pé — ver [[03 - Artistas/Contratos]].
 
 ## Métricas sociais
 

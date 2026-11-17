@@ -16,7 +16,7 @@ Desde 09/09/2026 o perfil é dividido em abas. A razão principal não é organi
 | **Visão geral** | Faixa executiva, o que merece atenção, [[03 - Artistas/Health Score]] e [[03 - Artistas/Estágio (IGE)]] |
 | **Canais** | Comparativo lado a lado e os cards de Instagram, TikTok e YouTube |
 | **Streaming** | Consumo pela OneRPM, análise de faixas e skip, e os fonogramas |
-| **Receita** | Resumo financeiro e contratos |
+| **Receita** | Resumo financeiro e contratos — inclusive emitir e assinar, ver [[03 - Artistas/Contratos]] |
 | **Cadastro** | Projeto comercial, [[03 - Artistas/Dossiê do artista]], [[03 - Artistas/Diagnósticos e questionários]] e acessos |
 
 A ordem segue o uso: a primeira aba responde "como esse artista está e o que merece atenção", que é o que se quer ao abrir. As outras servem para investigar depois que a primeira apontou onde olhar.

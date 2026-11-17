@@ -18,7 +18,7 @@ Todas leem a **mesma** coleção e o mesmo recorte de filtros. Trocar de visão 
 | Quadro | Em que etapa cada demanda está. Kanban, arrastar entre colunas, raias por artista/responsável/área, limite de WIP por coluna. O card é enxuto de propósito: título (já com o artista na frente) e responsável. |
 | Cronograma | Quando cada coisa acontece. Barras de início a prazo, dependências entre demandas, marcos, caminho crítico, arrastar para reprogramar. |
 | Lista | Muita demanda de uma vez, ordenável por prazo, prioridade, progresso ou responsável. |
-| Calendário | O que vence no mês, pela data de entrega. O dia mostra até 6 demandas; o "+N" abre o resto ali mesmo. |
+| Calendário | O que vence no mês, pela data de entrega. O dia mostra até 6 demandas; o "+N" abre o resto ali mesmo. Arrastar o card pra outro dia reprograma a demanda. |
 | Carga do time | Quanto cada pessoa está segurando, em pontos de esforço, mais o tempo médio por etapa. |
 
 O filtro de **artista** fica na barra principal, ao lado da busca, e acende quando há um escolhido (pedido da cliente em 11/2026): é o recorte que a equipe mais faz. Responsável, área, tipo, prioridade, etiqueta, concluídas e atrasadas continuam em **Filtros**.
@@ -53,6 +53,12 @@ Pedido da cliente em 11/2026, para saber de imediato de que artista é cada dema
 - Na dúvida, o nome **fica** — repetido é feio, cortado errado some texto, e salvar o formulário grava o corte. Por isso não sai: no meio do título ("Revisar redes de Nenho (YouTube)"); dentro de parêntese ou aspas com mais coisa ("Show (Nenho & Glauco)", 'Divulgar “Arraiá do Nenho”'); depois de artigo, conector ou vírgula ("Ajustar a luz", "Nenho feat. Glauco", "Show do Nenho e do Glauco", "CARD FELIZ ANIVERSÁRIO, GLAUCO!"); em traço colado dos dois lados ("Beira-Mar", "instagram.com/nenho"); depois de barra ("JUNINHO/NENHO" é dupla). Num título que mistura maiúsculas e minúsculas, nome escrito em minúscula é palavra comum ("Mapa de luz" para uma artista Luz).
 - Com o nome no título, a linha do artista saiu do card do quadro e o nome pequeno saiu da lista: só repetiam. O link para o perfil do artista continua no detalhe da demanda.
 - A busca e a ordenação por título da lista usam o título como aparece — ordenar por título já agrupa por artista.
+
+## Duplicar
+
+Pedido da cliente em 11/2026, para a rotina que se repete (o "CARD NOTICIAS" de toda semana). O botão fica no detalhe, ao lado do editar, e abre o **mesmo formulário de editar** preenchido com a demanda — salvando, cria outra. Nada é gravado até confirmar: uma cópia instantânea apareceria no quadro com título e data idênticos aos do original, e a primeira coisa a fazer seria procurá-la pra ajustar. Depois de salvar, o detalhe da cópia abre sozinho, que é como se enxerga que o que está na tela é a nova.
+
+A cópia **não** herda antecessoras — uma demanda que se liga sozinha ao caminho crítico dá mais trabalho pra desfazer do que pra refazer, e o detalhe tem "Adicionar dependência" a um clique. O checklist vem junto, mas zerado: item marcado afirmaria um trabalho que não aconteceu. O progresso manual, que é medida da original, começa vazio. Subtarefa duplicada vira irmã dela, não filha da cópia. A escolha de modelo não aparece: o modelo ali é a própria demanda copiada.
 
 ## Modelos de projeto
 
@@ -89,7 +95,8 @@ Links da demanda só viram link clicável quando são endereço da web, e-mail (
 - Uma coluna, tipo ou área **em uso** não pode ser removida na configuração — a tela mostra quantas demandas dependem dela e bloqueia. Remover deixaria demandas invisíveis.
 - O campo **Responsável** não pode ser desligado enquanto houver colaborador ativo com acesso às Atividades: ele só enxerga as demandas em que é o responsável, e sem o campo o quadro dele fica vazio. Se o campo já estiver desligado, a configuração mostra o aviso e deixa ligar. Foi o que travou o primeiro designer da Imagine em 21/10/2026.
 - Renomear uma coluna é seguro a qualquer momento: a chave gravada nas demandas não muda, só o rótulo na tela.
-- Arrastar a barra de uma demanda que tem sucessoras **não** empurra ninguém sozinho; o cronograma oferece o empurrão numa faixa de confirmação.
+- Arrastar a barra de uma demanda que tem sucessoras **não** empurra ninguém sozinho; o cronograma oferece o empurrão numa faixa de confirmação. O arrasto do calendário segue a mesma regra, com a mesma faixa.
+- No calendário, soltar o card num dia faz a **janela inteira** andar a mesma distância: o prazo vai pro dia onde caiu e o início acompanha. Arrastar reprograma, não estica — quem quer mudar a duração tem as pontas da barra no cronograma. Marco anda pela data dele. É uma escrita só, sem releitura. Como no quadro e no cronograma, arrasto é mouse: no celular e no teclado o caminho continua sendo abrir a demanda e trocar a data.
 - Excluir uma demanda solta as subtarefas dela (viram demandas de topo) e remove as setas que apontavam pra ela.
 - Se a conferência de uso não carregar, a remoção de coluna também fica bloqueada — "não sei quantas demandas há aqui" é tratado como "não deixa", que é o lado seguro.
 - No calendário o dia mostra até **6** demandas (eram 3) e a célula cresce com o conteúdo a partir de um piso de 140px — um mês tranquilo continua compacto, e a semana que tem um dia cheio é a única que estica. O **+N demandas** é um botão: abre as escondidas na própria célula e vira "mostrar menos".

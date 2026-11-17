@@ -6,6 +6,26 @@ tipo: registro-de-decisoes
 
 Registre aqui decisões que evitam rediscussão no futuro. Cada nova entrada deve ter data, contexto, decisão, motivo e consequência.
 
+## 2026-11-17 — Assinatura de contrato é própria, sem serviço externo
+
+**Contexto:** a cliente pediu emitir o contrato pelo painel e mandar um link para o artista preencher e assinar, e não sabia como resolver a assinatura. As duas saídas eram contratar um serviço de assinatura (ZapSign, Clicksign, Autentique, D4Sign) ou construir.
+
+**Decisão:** assinatura eletrônica simples feita pelo painel — traço desenhado num quadro, aceite explícito, e trilha carimbada pelo servidor: data, IP, user-agent e o SHA-256 do texto renderizado. Sem serviço externo. O PDF sai pela impressão do navegador.
+
+**Motivo:** o serviço custaria mensalidade (a API só entra nos planos mais caros) e resolveria, de quebra, o problema de onde guardar o PDF assinado. A escolha da cliente foi não ter custo recorrente. O que sustenta a assinatura própria é a trilha, e o contrato da própria Imagine já declara, na cláusula de fecho, que vale em formato eletrônico e que a assinatura digital comprova autenticidade e integridade.
+
+**Consequência:** a prova é mais fraca que a de um terceiro com fé pública — não há identificação do signatário além do canal por onde o link foi enviado. Em compensação, nada precisa ser armazenado: o documento é **regerado** do que está no Firestore, então a decisão de não ter Storage continua de pé. Isso também qualifica a decisão de 09/09/2026 de descartar PDF: ela era sobre a exportação do artista, cujo destino é uma IA ou o Excel. Contrato é o caso oposto — existe para ser impresso, assinado e arquivado. Ver [[03 - Artistas/Contratos]].
+
+## 2026-11-17 — Serviços na lista de artistas custam uma varredura, e tudo bem
+
+**Contexto:** a cliente pediu ver e filtrar, na lista de artistas, os serviços previstos do projeto comercial. Eles moram em `projetos/{slug}`, que a lista não lia.
+
+**Decisão:** uma terceira varredura de coleção cacheada, do mesmo feitio das duas que a tela já faz. A lista passou de cerca de 232 para cerca de 348 leituras por janela de cache.
+
+**Motivo:** a alternativa barata — um resumo desnormalizado, uma leitura em vez de 116 — exigiria backfill dos 116 artistas já cadastrados antes de a coluna dizer a verdade, e um resumo que saísse de sincronia mostraria serviço errado **em silêncio**. Dado errado sem aviso é pior que leitura cara.
+
+**Consequência:** num orçamento de 50 mil leituras por dia, a tela mais aberta do painel ficou 50% mais cara. Se apertar, a troca é num lugar só, `listarProjetosServicos`, e aí o backfill passa a ser o preço. Ver [[06 - Tecnologia/Custo de leitura do Firestore]].
+
 ## 2026-10-21 — Colaborador é um papel à parte, fora da equipe
 
 **Contexto:** a cliente quis dar acesso a um designer só ao quadro de Atividades e sugeriu uma opção "Outros" com caixas do que a pessoa pode ver. A matriz de permissões já existia, mas só valia em cima de marketing, e ser da equipe dá acesso fixo a artistas, métricas e ao time.

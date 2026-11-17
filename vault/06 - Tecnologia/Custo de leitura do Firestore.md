@@ -32,6 +32,12 @@ A 740 por perfil, 68 aberturas esgotavam o dia inteiro. A 82, cabem mais de 600 
 
 O que ainda pesa, e é legítimo: as cinco séries diárias de 90 dias somam cerca de 420 leituras. Elas alimentam gráficos que estão de fato na tela (o comparativo de canais desenha quatro curvas, o Health Score desenha a sua). Encurtar a janela para 30 dias economizaria bastante, mas **mudaria o significado dos números** — "variação no período" passaria a ser de um mês em vez de três. É decisão da Imagine, não otimização.
 
+## Quanto custa a lista de artistas
+
+Ela faz varreduras de coleção inteira, cacheadas: `artistas` e `metricas-sociais`, cerca de 232 leituras por janela de cache. Em 11/2026 entrou uma terceira, `projetos`, para a coluna de serviços previstos — a tela passou a cerca de **348**.
+
+Foi decisão consciente, e a alternativa está registrada porque é para ela que se volta se o custo apertar: um **resumo desnormalizado**, um documento só com `{endereço: serviços}` escrito pelas rotas que gravam `projetos`, custaria **uma** leitura em vez de 116. Não foi o caminho por dois motivos — exigiria um backfill dos 116 artistas já cadastrados antes de a coluna dizer a verdade, e um resumo dessincronizado mostraria serviço errado **em silêncio**, que é pior do que caro. A troca, se vier, é num lugar só: `listarProjetosServicos`.
+
 ## Os padrões que o painel usa
 
 **Contador desnormalizado.** Quando a tela só precisa de "quantos", o número fica gravado no próprio cadastro do artista e é atualizado por quem mexe na coleção. Contar ao vivo custaria uma leitura por documento. É assim com os fonogramas.

@@ -555,7 +555,10 @@ export async function excluirArtista(
     adminDb.doc(`tiktok-tokens/${s}`).delete(),
     adminDb.doc(`youtube-tokens/${s}`).delete(),
   ])
-  await ref.delete()
+  await adminDb.batch()
+    .delete(ref)
+    .delete(adminDb.doc(`${PROJETOS}/${s}/acompanhamentoContratual/status`))
+    .commit()
 
   // Auditoria: quem excluiu o quê e quando.
   await adminDb.collection(CADASTROS).add({

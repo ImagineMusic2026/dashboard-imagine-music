@@ -19,6 +19,7 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { ContratoDialog } from '@/components/artistas/contrato-dialog'
 import { GerarContratoDialog } from '@/components/artistas/gerar-contrato-dialog'
 import { AssinarImagineDialog } from '@/components/artistas/assinar-imagine-dialog'
+import { StatusContratoForm } from '@/components/artistas/status-contrato-form'
 import { imprimirContrato } from '@/lib/contratos/imprimir'
 import { renderizar, valoresAutomaticos } from '@/lib/contratos/modelo'
 import {
@@ -62,6 +63,7 @@ export function ContratosArtistaCard({ slug, nome }: { slug: string; nome?: stri
   const { user, pode, loading } = useAuth()
   const podeVer = !loading && pode('contratos')
   const [contratos, setContratos] = useState<Contrato[] | null>(null)
+  const [erroContratos, setErroContratos] = useState(false)
   /** `contratoId` → token do link público ativo. */
   const [links, setLinks] = useState<Record<string, string>>({})
   const [dialogo, setDialogo] = useState<Dialogo>(null)
@@ -74,9 +76,10 @@ export function ContratosArtistaCard({ slug, nome }: { slug: string; nome?: stri
     try {
       lista = await listarContratos(slug)
       setContratos(lista)
+      setErroContratos(false)
     } catch {
-      // Sem permissão / offline: o card some em vez de mostrar erro no perfil.
       setContratos(null)
+      setErroContratos(true)
       return
     }
     // A consulta dos links só acontece se houver contrato GERADO. Contrato
@@ -100,7 +103,7 @@ export function ContratosArtistaCard({ slug, nome }: { slug: string; nome?: stri
     carregar()
   }, [podeVer, carregar])
 
-  if (!podeVer || contratos === null) return null
+  if (!podeVer) return null
 
   async function remover(c: Contrato) {
     setExcluindo(c.id)
@@ -188,7 +191,7 @@ export function ContratosArtistaCard({ slug, nome }: { slug: string; nome?: stri
 
   return (
     <div className="bg-bg-900 border border-bg-700/40 rounded-xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-bg-700/30 flex items-center gap-2">
+      <div className="px-5 py-4 border-b border-bg-700/30 flex flex-wrap items-center gap-2">
         <FileText className="w-4 h-4 text-violet-400 shrink-0" />
         <span className="font-bold text-ink-100">Contratos</span>
         <span className="text-[10px] tracking-wider font-bold text-ink-500 px-2 py-0.5 rounded-full bg-bg-800 border border-bg-700/50">
@@ -212,7 +215,13 @@ export function ContratosArtistaCard({ slug, nome }: { slug: string; nome?: stri
         </button>
       </div>
 
-      {contratos.length === 0 ? (
+      <StatusContratoForm key={slug} slug={slug} />
+
+      {contratos === null ? (
+        <div className="p-8 text-center text-sm text-ink-400" role={erroContratos ? 'alert' : 'status'}>
+          {erroContratos ? 'Não foi possível carregar a lista de contratos.' : 'Carregando contratos…'}
+        </div>
+      ) : contratos.length === 0 ? (
         <div className="p-8 text-center text-sm text-ink-500">
           Nenhum contrato cadastrado ainda. Use <span className="text-violet-300">Novo</span> para
           registrar a vigência e apontar o PDF digitalizado.

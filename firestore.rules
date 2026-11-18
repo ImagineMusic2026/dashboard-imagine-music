@@ -293,6 +293,16 @@ service cloud.firestore {
       allow create, update, delete: if podeContratos();
     }
 
+    // Acompanhamento da equipe por artista, inclusive sem contrato cadastrado.
+    match /projetos/{slug}/acompanhamentoContratual/status {
+      allow get: if podeContratos();
+      allow create, update: if podeContratos()
+        && exists(/databases/$(database)/documents/artistas/$(slug))
+        && request.resource.data.keys().hasOnly(['status', 'atualizadoEm'])
+        && request.resource.data.status in ['ativo', 'sem-contrato', 'aguardando-assinatura', 'renovacao']
+        && request.resource.data.atualizadoEm == request.time;
+    }
+
     // Questionário de estruturação (diagnóstico). Respondem o ARTISTA (no portal) e a
     // EQUIPE (no painel, quando a resposta veio por fora: reunião, WhatsApp, o
     // formulário antigo) — por isso é a única coleção com escrita pelo client fora da

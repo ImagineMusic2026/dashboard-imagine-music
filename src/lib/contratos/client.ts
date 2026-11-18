@@ -3,8 +3,10 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -84,6 +86,33 @@ const cache = memoCurtaPorChave(lerContratos, (slug) => slug)
 /** Contratos de um artista, já ordenados por urgência. */
 export function listarContratos(slug: string): Promise<Contrato[]> {
   return cache(slug)
+}
+
+export const STATUS_CONTRATO_OPCOES = [
+  { valor: 'ativo', rotulo: 'Contrato ativo' },
+  { valor: 'sem-contrato', rotulo: 'Sem contrato' },
+  { valor: 'aguardando-assinatura', rotulo: 'Aguardando assinatura' },
+  { valor: 'renovacao', rotulo: 'Renovação de contrato' },
+] as const
+
+export type StatusContrato = (typeof STATUS_CONTRATO_OPCOES)[number]['valor']
+
+function caminhoStatus(slug: string) {
+  return doc(db, 'projetos', slug, 'acompanhamentoContratual', 'status')
+}
+
+export function statusContratoValido(valor: unknown): valor is StatusContrato {
+  return STATUS_CONTRATO_OPCOES.some((opcao) => opcao.valor === valor)
+}
+
+export async function lerStatusContrato(slug: string): Promise<StatusContrato | ''> {
+  const snap = await getDoc(caminhoStatus(slug))
+  const status: unknown = snap.data()?.status
+  return statusContratoValido(status) ? status : ''
+}
+
+export async function salvarStatusContrato(slug: string, status: StatusContrato): Promise<void> {
+  await setDoc(caminhoStatus(slug), { status, atualizadoEm: serverTimestamp() })
 }
 
 function limpar(dados: DadosContrato) {

@@ -90,7 +90,7 @@ export const CAPACIDADES: { cap: Capacidade; label: string; descricao: string }[
     cap: 'contratos',
     label: 'Contratos do artista',
     descricao:
-      'Ver e manter a ficha de contrato no perfil do artista (vigência, percentual e link do documento).',
+      'Acompanhar o status e manter os documentos de contrato no perfil do artista.',
   },
   { cap: 'integracoes', label: 'Integrações', descricao: 'Descobrir contas e sincronizar métricas.' },
   { cap: 'importar', label: 'Importar dados', descricao: 'Subir planilhas de OneRPM e roster.' },

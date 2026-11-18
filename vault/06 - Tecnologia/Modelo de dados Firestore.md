@@ -32,6 +32,7 @@ Regra do Firestore é **por documento** e não esconde campo. Quando parte de um
 | Subcoleção | Por quê |
 | --- | --- |
 | `projetos/{slug}/contratos/{id}` | Vigência, percentual e o PDF assinado exigem `contratos`, enquanto o projeto inteiro é legível por toda a equipe. |
+| `projetos/{slug}/acompanhamentoContratual/status` | Status manual por artista, com data de atualização. Apenas quem tem `contratos` lê ou altera. |
 | `projetos/{slug}/patrimonio/inventario` | Mesma razão: IPI, IPN, licenciamento e o parecer "Restrito" exigem `contratos`. Ver [[03 - Artistas/Dossiê do artista]]. |
 | `atividades/{id}/comentarios/{id}` | Aqui o motivo é **custo**, não sigilo: comentários viajariam em toda leitura do quadro. O card mostra só o contador denormalizado `qtdComentarios`; o fio só é lido ao abrir a demanda. |
 

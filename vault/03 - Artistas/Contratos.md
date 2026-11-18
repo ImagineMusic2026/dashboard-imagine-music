@@ -14,7 +14,13 @@ A ficha de contrato de cada artista e, desde 11/2026, a **emissão e a assinatur
 | **Anexado** | O de sempre: a ficha (tipo, vigência, percentual, observações) com um **link** para o PDF que já vive no Drive. O painel não guarda arquivo. |
 | **Gerado** | Emitido a partir de um modelo. O texto, os campos preenchidos e as duas assinaturas moram dentro do próprio documento do contrato. |
 
-A **situação** (vigente, a vencer, vencido, encerrado, a iniciar) é derivada das datas, como sempre foi. O **estado** do gerado (rascunho, aguardando o artista, falta a Imagine, assinado) também é derivado — das assinaturas. Nenhum dos dois é gravado: status guardado envelhece sozinho e vira mentira na tela.
+A **situação** de cada documento (vigente, a vencer, vencido, encerrado, a iniciar) é calculada pelas datas. O **estado** do contrato gerado (rascunho, aguardando o artista, falta a Imagine, assinado) é calculado pelas assinaturas e pelo link ativo.
+
+## Status do contrato do artista
+
+Em **Receita → Contratos**, a equipe pode selecionar e salvar **Contrato ativo**, **Sem contrato**, **Aguardando assinatura** ou **Renovação de contrato**. O acompanhamento é manual e fica disponível mesmo sem um documento cadastrado, inclusive para contratos tratados fora do painel. O campo começa sem seleção até a equipe registrar o status. Datas, assinaturas e estados dos documentos seguem seus próprios fluxos.
+
+O status fica em `projetos/{slug}/acompanhamentoContratual/status` e usa a capacidade `contratos` para leitura e escrita.
 
 ## Modelos
 

@@ -26,7 +26,7 @@ Duas consequências:
 - **Custa leitura.** Os serviços moram em `projetos/{slug}`, que a lista não lia. Ver [[06 - Tecnologia/Custo de leitura do Firestore]].
 - **Só staff vê.** As regras negam `projetos` para o resto; se a leitura falhar ou a pessoa não for staff, a coluna e o filtro somem — melhor que uma tabela afirmando que ninguém tem serviço.
 
-A ordem dos serviços no cadastro importa, porque é a ordem das posições: acrescentar no fim é seguro, reordenar muda o que cada posição significa. Ver [[03 - Artistas/Projeto comercial interno]].
+A ordem das cinco opções padrão define as posições dos indicadores. Os serviços adicionais, cadastrados por artista em **Editar → Serviços previstos**, entram na contagem e no filtro. No cadastro e no card **Projeto**, aparecem pelo nome.
 
 ## Quem entra no roster
 

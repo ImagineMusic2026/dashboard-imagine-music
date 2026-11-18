@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { Check, ChevronDown, Plus } from 'lucide-react'
+import { Check, ChevronDown, Plus, X } from 'lucide-react'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { idadeEm, isoLocal, lerDataNascimento, NASCIMENTO_MIN } from '@/lib/artistas/aniversario'
+import { normalizarServicosPrevistos, SERVICOS_PREVISTOS, servicoChave } from '@/lib/artistas/servicos'
 import { cn } from '@/lib/utils'
 
 /**
@@ -19,35 +20,40 @@ export const TEXTAREA = cn(INPUT, 'resize-y min-h-[72px] leading-relaxed')
 
 const GENEROS = ['Sertanejo', 'Piseiro', 'Forró', 'Pagode', 'Funk', 'Gospel', 'MPB', 'Pop', 'Rock', 'Rap', 'Arrocha', 'Brega', 'Axé', 'Eletrônica']
 
-// A lista mora em `@/lib/artistas/servicos` desde que a tabela de artistas
-// passou a mostrar e filtrar por serviço. Importada E reexportada: o `export
-// from` sozinho não traz o nome pro escopo deste arquivo, que usa a lista nos
-// checkboxes logo abaixo.
-import { SERVICOS_PREVISTOS } from '@/lib/artistas/servicos'
-
-export { SERVICOS_PREVISTOS }
-
 /** Lado COMERCIAL do cadastro: a relação do selo com o artista, não a presença dele nas plataformas. */
 export interface DadosProjeto {
   contaArtistaSelo: string
   emailProjeto: string
   servicosPrevistos: string[]
+  servicosAdicionais: string[]
   anotacoesGerais: string
+}
+
+type DadosProjetoDoc = Omit<DadosProjeto, 'servicosAdicionais'>
+
+export function dadosProjetoParaEnvio({ servicosAdicionais, ...projeto }: DadosProjeto): DadosProjetoDoc {
+  return {
+    ...projeto,
+    servicosPrevistos: normalizarServicosPrevistos([...projeto.servicosPrevistos, ...servicosAdicionais]),
+  }
 }
 
 export const PROJETO_VAZIO: DadosProjeto = {
   contaArtistaSelo: '',
   emailProjeto: '',
   servicosPrevistos: [],
+  servicosAdicionais: [],
   anotacoesGerais: '',
 }
 
 /** Aceita o que vier do Firestore (campo ausente, tipo errado) sem quebrar o form. */
-export function projetoDeDoc(x: Partial<Record<keyof DadosProjeto, unknown>> | null | undefined): DadosProjeto {
+export function projetoDeDoc(x: Partial<Record<keyof DadosProjetoDoc, unknown>> | null | undefined): DadosProjeto {
+  const servicos = normalizarServicosPrevistos(x?.servicosPrevistos)
   return {
     contaArtistaSelo: typeof x?.contaArtistaSelo === 'string' ? x.contaArtistaSelo : '',
     emailProjeto: typeof x?.emailProjeto === 'string' ? x.emailProjeto : '',
-    servicosPrevistos: Array.isArray(x?.servicosPrevistos) ? x.servicosPrevistos.filter((s): s is string => typeof s === 'string') : [],
+    servicosPrevistos: servicos.filter((s) => SERVICOS_PREVISTOS.includes(s)),
+    servicosAdicionais: servicos.filter((s) => !SERVICOS_PREVISTOS.includes(s)),
     anotacoesGerais: typeof x?.anotacoesGerais === 'string' ? x.anotacoesGerais : '',
   }
 }
@@ -85,6 +91,9 @@ export function CamposProjeto({
   idPrefixo: string
 }) {
   const set = <K extends keyof DadosProjeto>(k: K, v: DadosProjeto[K]) => onChange({ ...valor, [k]: v })
+  const focoNovoServico = useRef(false)
+  const chavesPadrao = new Set(SERVICOS_PREVISTOS.map(servicoChave))
+  const chavesAdicionais = valor.servicosAdicionais.map(servicoChave)
 
   return (
     <div className="space-y-4 pt-4 border-t border-bg-700/40">
@@ -138,6 +147,59 @@ export function CamposProjeto({
               }
             />
           ))}
+        </div>
+        <div className="mt-3 space-y-2">
+          {valor.servicosAdicionais.map((nome, indice) => {
+            const chave = chavesAdicionais[indice]
+            const duplicado = Boolean(chave && (
+              chavesPadrao.has(chave) || chavesAdicionais.indexOf(chave) !== indice
+            ))
+            return (
+              <div key={indice} className="flex items-center gap-2">
+                <input
+                  ref={(input) => {
+                    if (!input) return
+                    input.setCustomValidity(duplicado ? 'Este serviço já está na lista.' : '')
+                    if (focoNovoServico.current && indice === valor.servicosAdicionais.length - 1) {
+                      focoNovoServico.current = false
+                      input.focus()
+                    }
+                  }}
+                  type="text"
+                  autoComplete="off"
+                  aria-label={`Nome do serviço adicional ${indice + 1}`}
+                  aria-invalid={duplicado || undefined}
+                  placeholder="Nome do serviço"
+                  value={nome}
+                  onChange={(e) => {
+                    const adicionais = [...valor.servicosAdicionais]
+                    adicionais[indice] = e.target.value
+                    set('servicosAdicionais', adicionais)
+                  }}
+                  className={cn(INPUT, 'min-w-0', duplicado && 'border-red-500/60')}
+                />
+                <button
+                  type="button"
+                  aria-label={nome.trim() ? `Remover serviço ${nome.trim()}` : 'Remover serviço sem nome'}
+                  onClick={() => set('servicosAdicionais', valor.servicosAdicionais.filter((_, i) => i !== indice))}
+                  className="grid size-10 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-red-500/10 hover:text-red-300 focus-visible:outline focus-visible:outline-violet-500"
+                >
+                  <X aria-hidden className="size-4" />
+                </button>
+              </div>
+            )
+          })}
+          <button
+            type="button"
+            onClick={() => {
+              focoNovoServico.current = true
+              set('servicosAdicionais', [...valor.servicosAdicionais, ''])
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-violet-300 hover:bg-violet-500/10 focus-visible:outline focus-visible:outline-violet-500"
+          >
+            <Plus aria-hidden className="size-4" />
+            Adicionar serviço
+          </button>
         </div>
       </fieldset>
 

@@ -1,6 +1,7 @@
 import admin from 'firebase-admin'
 import { adminDb } from '@/lib/firebase-admin'
 import { lerDataNascimento, type OrigemDataNascimento } from '@/lib/artistas/aniversario'
+import { normalizarServicosPrevistos } from '@/lib/artistas/servicos'
 import { slugify } from '../onerpm/aggregate'
 import { extrairInstagram, extrairSpotify, extrairTiktok, extrairYoutube } from './extrair'
 import type {
@@ -263,7 +264,7 @@ function montarCamposProjeto(input: DadosProjetoInput, apagarVazio: boolean): Re
   texto('anotacoesGerais')
 
   if (input.servicosPrevistos !== undefined) {
-    const lista = (input.servicosPrevistos ?? []).map((s) => s.trim()).filter(Boolean)
+    const lista = normalizarServicosPrevistos(input.servicosPrevistos)
     if (lista.length) out.servicosPrevistos = lista
     else if (apagarVazio) out.servicosPrevistos = APAGAR
   }

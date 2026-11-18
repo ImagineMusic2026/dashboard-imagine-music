@@ -391,7 +391,7 @@ export function PerfilArtistaReal({
         <>
           {/* Projeto — cadastro comercial, SÓ staff (o portal do artista renderiza este
               mesmo perfil). O card se autoprotege e some quando nada foi preenchido. */}
-          <ProjetoArtistaCard slug={a.slug} />
+          <ProjetoArtistaCard key={nonce} slug={a.slug} />
 
           {/* Dossiê das alavancas (IAOS). Só equipe — o componente se autoprotege,
               porque este perfil é o mesmo que o portal do artista renderiza. */}

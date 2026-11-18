@@ -10,6 +10,7 @@ import {
   GeneroCombobox,
   CampoDataNascimento,
   CamposProjeto,
+  dadosProjetoParaEnvio,
   PROJETO_VAZIO,
   type DadosProjeto,
 } from '@/components/artistas/artista-form-fields'
@@ -71,7 +72,7 @@ export function CriarArtistaDialog({ onClose, onCreated }: { onClose: () => void
           youtubeUrl,
           instagramUrl,
           tiktokUrl,
-          ...projeto,
+          ...dadosProjetoParaEnvio(projeto),
         }),
       })
       const data = await res.json().catch(() => null)

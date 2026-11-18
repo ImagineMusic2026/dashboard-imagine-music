@@ -9,6 +9,7 @@ import {
   GeneroCombobox,
   CampoDataNascimento,
   CamposProjeto,
+  dadosProjetoParaEnvio,
   PROJETO_VAZIO,
   projetoDeDoc,
   type DadosProjeto,
@@ -77,10 +78,8 @@ export function EditarArtistaDialog({
   // O cadastro comercial vive em `projetos/{slug}`, fora do doc do artista (ver
   // firestore.rules), então carrega em separado.
   const [projeto, setProjeto] = useState<DadosProjeto>(PROJETO_VAZIO)
-  // Enquanto não carregou, os campos NÃO vão no envio: mandar vazio apagaria o que
-  // está gravado (na edição, vazio é deliberado). Sem isto, salvar rápido demais
-  // — antes do fetch responder — zeraria o projeto do artista.
-  const [projetoCarregado, setProjetoCarregado] = useState(false)
+  const [projetoInicial, setProjetoInicial] = useState<DadosProjeto | null>(null)
+  const [erroProjeto, setErroProjeto] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [confirmando, setConfirmando] = useState(false)
@@ -91,13 +90,11 @@ export function EditarArtistaDialog({
     getProjeto(artista.slug)
       .then((p) => {
         if (!vivo) return
-        if (p) setProjeto(projetoDeDoc(p))
-        setProjetoCarregado(true)
+        const inicial = projetoDeDoc(p)
+        setProjeto(inicial)
+        setProjetoInicial(inicial)
       })
-      // Doc inexistente já resolve como null; erro aqui é falta de permissão ou
-      // rede. Marca como carregado mesmo assim: o form fica utilizável e o envio
-      // só manda o que o usuário digitar.
-      .catch(() => vivo && setProjetoCarregado(true))
+      .catch(() => vivo && setErroProjeto(true))
     return () => {
       vivo = false
     }
@@ -120,6 +117,12 @@ export function EditarArtistaDialog({
     try {
       const token = await auth.currentUser?.getIdToken()
       if (!token) throw new Error('Sua sessão expirou. Entre novamente.')
+      const atual = dadosProjetoParaEnvio(projeto)
+      const inicial = projetoInicial && dadosProjetoParaEnvio(projetoInicial)
+      const mudouServico = inicial && (
+        atual.servicosPrevistos.length !== inicial.servicosPrevistos.length ||
+        atual.servicosPrevistos.some((nome, i) => nome !== inicial.servicosPrevistos[i])
+      )
       const res = await fetch('/api/artistas/atualizar', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -134,8 +137,13 @@ export function EditarArtistaDialog({
           youtubeUrl,
           instagramUrl,
           tiktokUrl,
-          // Só depois de carregado — ver o comentário em `projetoCarregado`.
-          ...(projetoCarregado ? projeto : {}),
+          // Omite campos não editados para preservar alterações feitas após a leitura.
+          ...(inicial ? {
+            contaArtistaSelo: atual.contaArtistaSelo !== inicial.contaArtistaSelo ? atual.contaArtistaSelo : undefined,
+            emailProjeto: atual.emailProjeto !== inicial.emailProjeto ? atual.emailProjeto : undefined,
+            servicosPrevistos: mudouServico ? atual.servicosPrevistos : undefined,
+            anotacoesGerais: atual.anotacoesGerais !== inicial.anotacoesGerais ? atual.anotacoesGerais : undefined,
+          } : {}),
         }),
       })
       const data = await res.json().catch(() => null)
@@ -321,7 +329,13 @@ export function EditarArtistaDialog({
             Trocar a URL refaz a identificação (re-mapeia o canal/perfil).
           </p>
 
-          <CamposProjeto valor={projeto} onChange={setProjeto} idPrefixo="edit" />
+          {projetoInicial ? (
+            <CamposProjeto valor={projeto} onChange={setProjeto} idPrefixo="edit" />
+          ) : (
+            <p role="status" className="text-xs text-ink-500">
+              {erroProjeto ? 'Não foi possível carregar os dados do projeto.' : 'Carregando dados do projeto…'}
+            </p>
+          )}
 
           {erro && (
             <div

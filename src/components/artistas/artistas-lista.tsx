@@ -16,7 +16,7 @@ import {
   type ArtistaDoc,
   type ReceitaResumo,
 } from '@/lib/artistas/client'
-import { SERVICOS_PREVISTOS, servicoCurto } from '@/lib/artistas/servicos'
+import { SERVICOS_PREVISTOS, servicoChave, servicoCurto } from '@/lib/artistas/servicos'
 import { ehStaff } from '@/lib/permissions'
 import { getHistoricoHealth, listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
@@ -81,28 +81,33 @@ function AcessoCelula({ nivel }: { nivel: NivelAcesso }) {
  */
 function ServicosCelula({ servicos }: { servicos: string[] }) {
   const ativos = SERVICOS_PREVISTOS.filter((s) => servicos.includes(s))
-  // Serviço gravado que não está mais na lista oficial (renomeado, descontinuado):
-  // não tem quadradinho, mas continua dito por extenso — sumir seria mentir.
-  const fora = servicos.filter((s) => !SERVICOS_PREVISTOS.includes(s))
-  const nomes = [...ativos, ...fora].map(servicoCurto)
+  const adicionais = servicos.filter((s) => !SERVICOS_PREVISTOS.includes(s))
+  const nomes = [...ativos, ...adicionais].map(servicoCurto)
   const rotulo = nomes.length ? nomes.join(', ') : 'nenhum serviço previsto'
   return (
-    <div className="flex items-center gap-2" title={rotulo}>
-      <div className="flex gap-1 shrink-0" aria-hidden>
-        {SERVICOS_PREVISTOS.map((s) => (
-          <span
-            key={s}
-            className={cn(
-              'w-2 h-2 rounded-[3px]',
-              servicos.includes(s) ? 'bg-violet-400' : 'bg-bg-700/60',
-            )}
-          />
-        ))}
+    <div className="min-w-0" title={rotulo}>
+      <div className="flex items-center gap-2" aria-hidden>
+        <div className="flex gap-1 shrink-0">
+          {SERVICOS_PREVISTOS.map((s) => (
+            <span
+              key={s}
+              className={cn(
+                'w-2 h-2 rounded-[3px]',
+                servicos.includes(s) ? 'bg-violet-400' : 'bg-bg-700/60',
+              )}
+            />
+          ))}
+        </div>
+        <span className="text-[10px] num text-ink-500 shrink-0">
+          {nomes.length ? `${ativos.length}/${SERVICOS_PREVISTOS.length}` : '—'}
+          {adicionais.length ? ` +${adicionais.length}` : ''}
+        </span>
       </div>
-      <span className="text-[10px] num text-ink-500 shrink-0">
-        {ativos.length ? `${ativos.length}/${SERVICOS_PREVISTOS.length}` : '—'}
-        {fora.length ? ` +${fora.length}` : ''}
-      </span>
+      {adicionais.length > 0 && (
+        <span aria-hidden className="block text-xs text-ink-400 [overflow-wrap:anywhere] lg:max-w-32 lg:truncate">
+          {adicionais.join(', ')}
+        </span>
+      )}
       <span className="sr-only">Serviços: {rotulo}</span>
     </div>
   )
@@ -388,6 +393,23 @@ export function ArtistasLista() {
     void recarregar()
   }, [loading, role, recarregar])
 
+  const opcoesServico = useMemo(() => {
+    const padrao = new Map(SERVICOS_PREVISTOS.map((nome) => [servicoChave(nome), nome]))
+    const adicionais = new Map<string, string>()
+
+    if (servicos) {
+      for (const artista of artistas ?? []) {
+        for (const nome of servicos[artista.slug] ?? []) {
+          const chave = servicoChave(nome)
+          if (!padrao.has(chave) && !adicionais.has(chave)) adicionais.set(chave, nome)
+        }
+      }
+    }
+
+    return new Map([...Array.from(padrao), ...Array.from(adicionais).sort(([, a], [, b]) => a.localeCompare(b, 'pt-BR'))])
+  }, [artistas, servicos])
+  const servicoSelecionado = opcoesServico.has(servicoFiltro) ? servicoFiltro : ''
+
   const filtrados = useMemo(() => {
     if (!artistas) return []
     const q = busca.trim().toLowerCase()
@@ -395,11 +417,11 @@ export function ArtistasLista() {
     if (soFavoritos) arr = arr.filter((a) => favoritos.has(a.slug))
     // Sem `servicos` o filtro nem aparece na tela; a guarda aqui é pra um
     // filtro escolhido antes não esvaziar a lista se a leitura cair depois.
-    if (servicoFiltro && servicos) {
-      arr = arr.filter((a) => (servicos[a.slug] ?? []).includes(servicoFiltro))
+    if (servicoSelecionado && servicos) {
+      arr = arr.filter((a) => (servicos[a.slug] ?? []).some((nome) => servicoChave(nome) === servicoSelecionado))
     }
     return arr
-  }, [artistas, busca, soFavoritos, favoritos, servicoFiltro, servicos])
+  }, [artistas, busca, soFavoritos, favoritos, servicoSelecionado, servicos])
 
   // Health Score + alertas por artista — derivados das métricas (mesma lib da home).
   const { saudePorSlug, alertasPorSlug } = useMemo(() => {
@@ -572,7 +594,7 @@ export function ArtistasLista() {
           </div>
           {servicos && (
             <select
-              value={servicoFiltro}
+              value={servicoSelecionado}
               onChange={(e) => {
                 setServicoFiltro(e.target.value)
                 setPagina(1)
@@ -582,16 +604,16 @@ export function ArtistasLista() {
               // Atividades: um filtro ligado que parece desligado faz a pessoa
               // achar que o roster encolheu.
               className={cn(
-                'py-2 px-3 bg-bg-800/50 border rounded-lg text-sm focus:outline-none focus:border-violet-500/40',
-                servicoFiltro
+                'max-w-full py-2 px-3 bg-bg-800/50 border rounded-lg text-sm focus:outline-none focus:border-violet-500/40',
+                servicoSelecionado
                   ? 'border-violet-500/40 text-violet-300'
                   : 'border-bg-700/40 text-ink-300',
               )}
             >
               <option value="">Todos os serviços</option>
-              {SERVICOS_PREVISTOS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+              {Array.from(opcoesServico, ([chave, nome]) => (
+                <option key={chave} value={chave}>
+                  {nome}
                 </option>
               ))}
             </select>

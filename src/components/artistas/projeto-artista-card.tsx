@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Briefcase } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
+import { normalizarServicosPrevistos } from '@/lib/artistas/servicos'
 import { ehStaff } from '@/lib/permissions'
 import { getProjeto, type ProjetoDoc } from '@/lib/artistas/client'
 
@@ -39,7 +40,7 @@ export function ProjetoArtistaCard({ slug }: { slug: string }) {
 
   if (!staff || !projeto) return null
 
-  const servicos = projeto.servicosPrevistos ?? []
+  const servicos = normalizarServicosPrevistos(projeto.servicosPrevistos)
   const temAlgo =
     Boolean(projeto.contaArtistaSelo || projeto.emailProjeto || projeto.anotacoesGerais) || servicos.length > 0
   if (!temAlgo) return null
@@ -69,7 +70,7 @@ export function ProjetoArtistaCard({ slug }: { slug: string }) {
               {servicos.map((s) => (
                 <span
                   key={s}
-                  className="text-[12px] text-violet-200 bg-violet-500/10 border border-violet-500/25 rounded-full px-2.5 py-1"
+                  className="min-w-0 [overflow-wrap:anywhere] text-[12px] text-violet-200 bg-violet-500/10 border border-violet-500/25 rounded-full px-2.5 py-1"
                 >
                   {s}
                 </span>

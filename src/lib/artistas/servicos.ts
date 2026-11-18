@@ -17,6 +17,33 @@ export const SERVICOS_PREVISTOS = [
   'Produção de Vídeo',
 ]
 
+function limparNomeServico(nome: string): string {
+  return nome.trim().replace(/\s+/g, ' ')
+}
+
+export function servicoChave(nome: string): string {
+  return limparNomeServico(nome)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+const SERVICOS_PADRAO_POR_CHAVE = new Map(SERVICOS_PREVISTOS.map((nome) => [servicoChave(nome), nome]))
+
+export function normalizarServicosPrevistos(valor: unknown): string[] {
+  if (!Array.isArray(valor)) return []
+
+  const nomes = new Map<string, string>()
+  for (const item of valor) {
+    if (typeof item !== 'string') continue
+    const chave = servicoChave(item)
+    if (chave && !nomes.has(chave)) {
+      nomes.set(chave, SERVICOS_PADRAO_POR_CHAVE.get(chave) ?? limparNomeServico(item))
+    }
+  }
+  return Array.from(nomes.values())
+}
+
 /**
  * Nome curto pro que não cabe numa coluna de tabela.
  *
@@ -32,5 +59,5 @@ export const SERVICO_CURTO: Record<string, string> = {
 }
 
 export function servicoCurto(nome: string): string {
-  return SERVICO_CURTO[nome] ?? nome
+  return Object.hasOwn(SERVICO_CURTO, nome) ? SERVICO_CURTO[nome] : nome
 }

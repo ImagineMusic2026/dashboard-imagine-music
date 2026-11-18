@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { invalidarCachesDeLeitura, memoCurta, memoCurtaPorChave } from '@/lib/cache-leitura'
 import type { OrigemDataNascimento } from '@/lib/artistas/aniversario'
+import { normalizarServicosPrevistos } from '@/lib/artistas/servicos'
 import type { OneRpmAggregate } from '@/lib/onerpm/types'
 import type { SoundchartsSnapshot } from '@/lib/soundcharts/tipos'
 import type {
@@ -336,7 +337,7 @@ async function lerProjetos(): Promise<Record<string, string[]>> {
   const porSlug: Record<string, string[]> = {}
   snap.docs.forEach((d) => {
     const s = (d.data() as { servicosPrevistos?: unknown })?.servicosPrevistos
-    porSlug[d.id] = Array.isArray(s) ? s.filter((x): x is string => typeof x === 'string') : []
+    porSlug[d.id] = normalizarServicosPrevistos(s)
   })
   return porSlug
 }

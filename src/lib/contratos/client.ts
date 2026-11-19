@@ -9,15 +9,17 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import { memoCurtaPorChave, invalidarCachesDeLeitura } from '@/lib/cache-leitura'
+import { auth, db } from '@/lib/firebase'
+import { memoCurta, memoCurtaPorChave, invalidarCachesDeLeitura } from '@/lib/cache-leitura'
 import {
   hojeISO,
   situacaoDe,
+  statusContratoValido,
   type Contrato,
   type DadosContrato,
   type ModeloContrato,
   type SituacaoContrato,
+  type StatusContrato,
 } from '@/lib/contratos/tipos'
 import { limparValores } from '@/lib/contratos/modelo'
 
@@ -88,21 +90,24 @@ export function listarContratos(slug: string): Promise<Contrato[]> {
   return cache(slug)
 }
 
-export const STATUS_CONTRATO_OPCOES = [
-  { valor: 'ativo', rotulo: 'Contrato ativo' },
-  { valor: 'sem-contrato', rotulo: 'Sem contrato' },
-  { valor: 'aguardando-assinatura', rotulo: 'Aguardando assinatura' },
-  { valor: 'renovacao', rotulo: 'Renovação de contrato' },
-] as const
+const cacheStatusContrato = memoCurta(async () => {
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error('Sessão expirada.')
 
-export type StatusContrato = (typeof STATUS_CONTRATO_OPCOES)[number]['valor']
+  const resp = await fetch('/api/contratos/status', {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!resp.ok) throw new Error('Não foi possível carregar os status de contrato.')
+
+  const dados = (await resp.json()) as { statusPorSlug: Record<string, StatusContrato> }
+  return new Map(Object.entries(dados.statusPorSlug))
+})
+
+export const listarStatusContrato = cacheStatusContrato.ler
 
 function caminhoStatus(slug: string) {
   return doc(db, 'projetos', slug, 'acompanhamentoContratual', 'status')
-}
-
-export function statusContratoValido(valor: unknown): valor is StatusContrato {
-  return STATUS_CONTRATO_OPCOES.some((opcao) => opcao.valor === valor)
 }
 
 export async function lerStatusContrato(slug: string): Promise<StatusContrato | ''> {
@@ -113,6 +118,7 @@ export async function lerStatusContrato(slug: string): Promise<StatusContrato | 
 
 export async function salvarStatusContrato(slug: string, status: StatusContrato): Promise<void> {
   await setDoc(caminhoStatus(slug), { status, atualizadoEm: serverTimestamp() })
+  cacheStatusContrato.invalidar()
 }
 
 function limpar(dados: DadosContrato) {

@@ -17,6 +17,7 @@ import {
   type ReceitaResumo,
 } from '@/lib/artistas/client'
 import { SERVICOS_PREVISTOS, servicoChave, servicoCurto } from '@/lib/artistas/servicos'
+import { listarStatusContrato, STATUS_CONTRATO_OPCOES, type StatusContrato } from '@/lib/contratos/client'
 import { ehStaff } from '@/lib/permissions'
 import { getHistoricoHealth, listarMetricasSociais } from '@/lib/metricas-sociais/client'
 import type { MetricasSociaisDoc } from '@/lib/metricas-sociais/types'
@@ -44,6 +45,26 @@ function dadosReceita(r: ReceitaResumo | undefined) {
 }
 
 const TH = 'text-[11px] tracking-wider text-ink-400 font-semibold uppercase py-3 px-4'
+
+const SEM_STATUS_CONTRATO = 'Sem status definido'
+const CORES_STATUS_CONTRATO: Record<StatusContrato, string> = {
+  ativo: 'bg-emerald-500/15 text-emerald-400',
+  'sem-contrato': 'bg-bg-700/60 text-ink-300',
+  'aguardando-assinatura': 'bg-amber-500/15 text-amber-300',
+  renovacao: 'bg-violet-500/15 text-violet-300',
+}
+
+function StatusContratoArtista({ status }: { status?: StatusContrato }) {
+  const rotulo = STATUS_CONTRATO_OPCOES.find(({ valor }) => valor === status)?.rotulo
+  return (
+    <span className={cn(
+      'mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium leading-tight',
+      status ? CORES_STATUS_CONTRATO[status] : 'bg-bg-800 text-ink-400',
+    )}>
+      {rotulo ?? SEM_STATUS_CONTRATO}
+    </span>
+  )
+}
 
 /**
  * Nível de acesso/integração do artista, compacto pra célula da lista: mini-barra
@@ -337,6 +358,8 @@ export function ArtistasLista() {
    */
   const [servicos, setServicos] = useState<Record<string, string[]> | null>(null)
   const [servicoFiltro, setServicoFiltro] = useState('')
+  const [statusPorSlug, setStatusPorSlug] = useState<Map<string, StatusContrato> | null>(null)
+  const [statusFiltro, setStatusFiltro] = useState('')
   // Padrão: maior audiência primeiro (a cliente pediu o roster ordenado por alcance).
   const [sort, setSort] = useState<EstadoSort>({ coluna: 'audiencia', dir: 'desc' })
   const [pagina, setPagina] = useState(1)
@@ -348,9 +371,11 @@ export function ArtistasLista() {
   // é permissão à parte — marketing tem por padrão.
   const ehAdmin = role === 'admin'
   const podeCadastrar = role !== 'artista' && pode('editarArtistas')
+  const podeContratos = pode('contratos')
+  const statusVisiveis = podeContratos ? statusPorSlug : null
 
   /**
-   * As três leituras em PARALELO, e a lista só aparece quando todas voltam.
+   * As leituras são paralelas, e a lista só aparece quando todas voltam.
    *
    * Antes eram três `await` em sequência, e como são independentes entre si a
    * segunda só começava depois de a primeira terminar. O efeito na tela era
@@ -359,13 +384,11 @@ export function ArtistasLista() {
    * cada onda mexendo no layout. Quem olhava via uma tela quebrada se
    * consertando sozinha.
    *
-   * `allSettled` e não `all`: métricas e receita continuam sendo secundárias —
-   * se uma delas falhar, a lista ainda tem que aparecer com o que deu certo.
-   * Só a falha do roster é erro de verdade.
+   * As leituras secundárias podem falhar sem impedir a exibição do roster.
    */
   const recarregar = useCallback(async () => {
     setCarregando(true)
-    const [oRoster, oMetricas, oReceitas, oServicos] = await Promise.allSettled([
+    const [oRoster, oMetricas, oReceitas, oServicos, oStatus] = await Promise.allSettled([
       listarArtistas(),
       listarMetricasSociais(),
       ehAdmin ? listarReceitas() : Promise.resolve(new Map<string, ReceitaResumo>()),
@@ -373,6 +396,7 @@ export function ArtistasLista() {
       // Só staff lê `projetos`; pro resto nem se pede, pra não gastar uma
       // chamada que as regras vão negar.
       ehStaff(role) ? listarProjetosServicos() : Promise.resolve(null),
+      podeContratos ? listarStatusContrato() : Promise.resolve(null),
     ])
 
     if (oRoster.status === 'fulfilled') {
@@ -384,9 +408,10 @@ export function ArtistasLista() {
     if (oMetricas.status === 'fulfilled') setMetricas(oMetricas.value)
     if (oReceitas.status === 'fulfilled') setReceitas(oReceitas.value)
     setServicos(oServicos.status === 'fulfilled' ? oServicos.value : null)
+    setStatusPorSlug(oStatus.status === 'fulfilled' ? oStatus.value : null)
 
     setCarregando(false)
-  }, [ehAdmin, role])
+  }, [ehAdmin, podeContratos, role])
 
   useEffect(() => {
     if (loading || !role) return
@@ -420,8 +445,11 @@ export function ArtistasLista() {
     if (servicoSelecionado && servicos) {
       arr = arr.filter((a) => (servicos[a.slug] ?? []).some((nome) => servicoChave(nome) === servicoSelecionado))
     }
+    if (statusFiltro && statusVisiveis) {
+      arr = arr.filter((a) => (statusVisiveis.get(a.slug) ?? 'sem-status') === statusFiltro)
+    }
     return arr
-  }, [artistas, busca, soFavoritos, favoritos, servicoSelecionado, servicos])
+  }, [artistas, busca, soFavoritos, favoritos, servicoSelecionado, servicos, statusFiltro, statusVisiveis])
 
   // Health Score + alertas por artista — derivados das métricas (mesma lib da home).
   const { saudePorSlug, alertasPorSlug } = useMemo(() => {
@@ -528,6 +556,9 @@ export function ArtistasLista() {
   }
 
   const colSpan = ehAdmin ? 10 : 9
+  const mensagemVazia = soFavoritos && favoritos.size === 0
+    ? 'Você ainda não favoritou nenhum artista.'
+    : 'Nenhum artista encontrado com os filtros selecionados.'
 
   return (
     <div className="space-y-4">
@@ -618,8 +649,39 @@ export function ArtistasLista() {
               ))}
             </select>
           )}
+          {statusVisiveis && (
+            <select
+              value={statusFiltro}
+              onChange={(e) => {
+                setStatusFiltro(e.target.value)
+                setPagina(1)
+              }}
+              aria-label="Filtrar por status do contrato"
+              className={cn(
+                'max-w-full py-2 px-3 bg-bg-800/50 border rounded-lg text-sm focus:outline-none focus:border-violet-500/40',
+                statusFiltro
+                  ? 'border-violet-500/40 text-violet-300'
+                  : 'border-bg-700/40 text-ink-300',
+              )}
+            >
+              <option value="">Todos os status de contrato</option>
+              {STATUS_CONTRATO_OPCOES.map(({ valor, rotulo }) => (
+                <option key={valor} value={valor}>{rotulo}</option>
+              ))}
+              <option value="sem-status">{SEM_STATUS_CONTRATO}</option>
+            </select>
+          )}
         </div>
       </div>
+
+      {podeContratos && !carregando && !erro && !statusVisiveis && (
+        <div role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-amber-300">
+          Não foi possível carregar os status de contrato.
+          <button type="button" onClick={() => void recarregar()} className="font-semibold underline">
+            Tentar novamente
+          </button>
+        </div>
+      )}
 
       {erro ? (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
@@ -672,6 +734,7 @@ export function ArtistasLista() {
                             <div className="text-[11px] text-ink-500 num truncate">
                               {a.redes?.instagram?.handle ? `@${a.redes.instagram.handle}` : a.slug}
                             </div>
+                            {statusVisiveis && <StatusContratoArtista status={statusVisiveis.get(a.slug)} />}
                           </div>
                         </Link>
                       </td>
@@ -763,9 +826,7 @@ export function ArtistasLista() {
                 {filtrados.length === 0 && (
                   <tr>
                     <td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-ink-500">
-                      {soFavoritos
-                        ? 'Você ainda não favoritou nenhum artista.'
-                        : `Nenhum artista encontrado para “${busca}”.`}
+                      {mensagemVazia}
                     </td>
                   </tr>
                 )}
@@ -827,6 +888,7 @@ export function ArtistasLista() {
                         {a.redes?.instagram?.handle ? `@${a.redes.instagram.handle}` : a.slug}
                         {a.genero ? ` · ${a.genero}` : ''}
                       </div>
+                      {statusVisiveis && <StatusContratoArtista status={statusVisiveis.get(a.slug)} />}
                     </div>
                     <FavStar slug={a.slug} nome={a.nome} />
                     {saude ? (
@@ -882,9 +944,7 @@ export function ArtistasLista() {
             })}
             {filtrados.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-ink-500">
-                {soFavoritos
-                  ? 'Você ainda não favoritou nenhum artista.'
-                  : `Nenhum artista encontrado para “${busca}”.`}
+                {mensagemVazia}
               </div>
             )}
           </div>

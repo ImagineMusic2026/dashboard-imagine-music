@@ -37,6 +37,20 @@ export function ehTipoContrato(v: unknown): v is TipoContrato {
   return typeof v === 'string' && (TIPOS_CONTRATO as string[]).includes(v)
 }
 
+/** Acompanhamento manual do artista no painel. */
+export const STATUS_CONTRATO_OPCOES = [
+  { valor: 'ativo', rotulo: 'Contrato ativo' },
+  { valor: 'sem-contrato', rotulo: 'Sem contrato' },
+  { valor: 'aguardando-assinatura', rotulo: 'Aguardando assinatura' },
+  { valor: 'renovacao', rotulo: 'Renovação de contrato' },
+] as const
+
+export type StatusContrato = (typeof STATUS_CONTRATO_OPCOES)[number]['valor']
+
+export function statusContratoValido(valor: unknown): valor is StatusContrato {
+  return STATUS_CONTRATO_OPCOES.some((opcao) => opcao.valor === valor)
+}
+
 /**
  * Situação derivada das datas — não é campo guardado de propósito: um status
  * gravado envelhece sozinho (o contrato vence sem ninguém tocar no doc) e vira

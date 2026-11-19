@@ -22,6 +22,10 @@ Em **Receita → Contratos**, a equipe pode selecionar e salvar **Contrato ativo
 
 O status fica em `projetos/{slug}/acompanhamentoContratual/status` e usa a capacidade `contratos` para leitura e escrita.
 
+Na lista de **Artistas**, a etapa aparece abaixo do nome e pode ser usada como filtro junto com a busca, Favoritos e Serviços. **Sem status definido** identifica artistas cujo acompanhamento ainda não foi preenchido. O filtro e os indicadores exigem a permissão **Contratos do artista**.
+
+O painel consulta os documentos de acompanhamento em lote pela rota protegida `GET /api/contratos/status`. A lista reaproveita a consulta por até cinco minutos e renova o cache depois que a equipe salva uma etapa no perfil.
+
 ## Modelos
 
 Editáveis só pelo admin em **Configurações › Modelos de contrato**. O contrato é texto comum, com `{{chave}}` onde varia; cada chave vira um campo marcado como "a equipe preenche" (ao emitir) ou "o artista preenche" (pelo link). A tela acusa variável citada sem campo e campo que o texto não usa.

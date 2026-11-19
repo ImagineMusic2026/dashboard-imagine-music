@@ -562,7 +562,7 @@ export function ArtistasLista() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
           <h1 className="text-3xl font-bold text-ink-100">Artistas</h1>
           <p className="text-sm text-ink-400 mt-1">
@@ -581,36 +581,38 @@ export function ArtistasLista() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {podeCadastrar && (
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-fit">
+          <div className="flex flex-wrap items-center gap-2">
+            {podeCadastrar && (
+              <button
+                type="button"
+                onClick={() => setDialogAberto(true)}
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-violet-500 px-3 text-sm font-semibold whitespace-nowrap text-white transition-colors hover:bg-violet-600"
+              >
+                <UserPlus className="w-4 h-4" />
+                Novo artista
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setDialogAberto(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-sm font-semibold whitespace-nowrap transition-colors"
+              onClick={() => {
+                setSoFavoritos((v) => !v)
+                setPagina(1)
+              }}
+              aria-pressed={soFavoritos}
+              className={cn(
+                'inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold whitespace-nowrap transition-colors',
+                soFavoritos
+                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  : 'text-ink-300 border-bg-700/50 hover:bg-bg-800',
+              )}
             >
-              <UserPlus className="w-4 h-4" />
-              Novo artista
+              <Star className={cn('w-4 h-4', soFavoritos && 'fill-amber-400 text-amber-400')} />
+              Favoritos
+              {favoritos.size > 0 && <span className="num text-[12px]">{favoritos.size}</span>}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              setSoFavoritos((v) => !v)
-              setPagina(1)
-            }}
-            aria-pressed={soFavoritos}
-            className={cn(
-              'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold whitespace-nowrap transition-colors',
-              soFavoritos
-                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                : 'text-ink-300 border-bg-700/50 hover:bg-bg-800',
-            )}
-          >
-            <Star className={cn('w-4 h-4', soFavoritos && 'fill-amber-400 text-amber-400')} />
-            Favoritos
-            {favoritos.size > 0 && <span className="num text-[12px]">{favoritos.size}</span>}
-          </button>
-          <div className="relative w-full max-w-xs">
+          </div>
+          <div className="relative w-full min-w-0 lg:w-56 xl:w-64">
             <Search className="w-4 h-4 text-ink-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
@@ -619,57 +621,59 @@ export function ArtistasLista() {
                 setBusca(e.target.value)
                 setPagina(1)
               }}
+              aria-label="Filtrar por nome"
               placeholder="Filtrar por nome…"
-              className="w-full pl-9 pr-3 py-2 bg-bg-800/50 border border-bg-700/40 rounded-lg text-sm text-ink-200 placeholder:text-ink-500 focus:outline-none focus:border-violet-500/40"
+              className="h-10 w-full rounded-lg border border-bg-700/40 bg-bg-800/50 pl-9 pr-3 text-sm text-ink-200 placeholder:text-ink-500 focus:outline-none focus:border-violet-500/40"
             />
           </div>
-          {servicos && (
-            <select
-              value={servicoSelecionado}
-              onChange={(e) => {
-                setServicoFiltro(e.target.value)
-                setPagina(1)
-              }}
-              aria-label="Filtrar por serviço previsto"
-              // Acende quando há escolha, como o filtro de artista das
-              // Atividades: um filtro ligado que parece desligado faz a pessoa
-              // achar que o roster encolheu.
-              className={cn(
-                'max-w-full py-2 px-3 bg-bg-800/50 border rounded-lg text-sm focus:outline-none focus:border-violet-500/40',
-                servicoSelecionado
-                  ? 'border-violet-500/40 text-violet-300'
-                  : 'border-bg-700/40 text-ink-300',
+          {(servicos || statusVisiveis) && (
+            <div className="grid w-full min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-2 lg:flex lg:w-auto">
+              {servicos && (
+                <select
+                  value={servicoSelecionado}
+                  onChange={(e) => {
+                    setServicoFiltro(e.target.value)
+                    setPagina(1)
+                  }}
+                  aria-label="Filtrar por serviço previsto"
+                  className={cn(
+                    'h-10 w-full min-w-0 truncate rounded-lg border bg-bg-800/50 px-3 text-sm focus:outline-none focus:border-violet-500/40 lg:w-60',
+                    servicoSelecionado
+                      ? 'border-violet-500/40 text-violet-300'
+                      : 'border-bg-700/40 text-ink-300',
+                  )}
+                >
+                  <option value="">Todos os serviços</option>
+                  {Array.from(opcoesServico, ([chave, nome]) => (
+                    <option key={chave} value={chave}>
+                      {nome}
+                    </option>
+                  ))}
+                </select>
               )}
-            >
-              <option value="">Todos os serviços</option>
-              {Array.from(opcoesServico, ([chave, nome]) => (
-                <option key={chave} value={chave}>
-                  {nome}
-                </option>
-              ))}
-            </select>
-          )}
-          {statusVisiveis && (
-            <select
-              value={statusFiltro}
-              onChange={(e) => {
-                setStatusFiltro(e.target.value)
-                setPagina(1)
-              }}
-              aria-label="Filtrar por status do contrato"
-              className={cn(
-                'max-w-full py-2 px-3 bg-bg-800/50 border rounded-lg text-sm focus:outline-none focus:border-violet-500/40',
-                statusFiltro
-                  ? 'border-violet-500/40 text-violet-300'
-                  : 'border-bg-700/40 text-ink-300',
+              {statusVisiveis && (
+                <select
+                  value={statusFiltro}
+                  onChange={(e) => {
+                    setStatusFiltro(e.target.value)
+                    setPagina(1)
+                  }}
+                  aria-label="Filtrar por status do contrato"
+                  className={cn(
+                    'h-10 w-full min-w-0 truncate rounded-lg border bg-bg-800/50 px-3 text-sm focus:outline-none focus:border-violet-500/40 lg:w-60',
+                    statusFiltro
+                      ? 'border-violet-500/40 text-violet-300'
+                      : 'border-bg-700/40 text-ink-300',
+                  )}
+                >
+                  <option value="">Todos os status de contrato</option>
+                  {STATUS_CONTRATO_OPCOES.map(({ valor, rotulo }) => (
+                    <option key={valor} value={valor}>{rotulo}</option>
+                  ))}
+                  <option value="sem-status">{SEM_STATUS_CONTRATO}</option>
+                </select>
               )}
-            >
-              <option value="">Todos os status de contrato</option>
-              {STATUS_CONTRATO_OPCOES.map(({ valor, rotulo }) => (
-                <option key={valor} value={valor}>{rotulo}</option>
-              ))}
-              <option value="sem-status">{SEM_STATUS_CONTRATO}</option>
-            </select>
+            </div>
           )}
         </div>
       </div>

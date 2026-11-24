@@ -160,7 +160,7 @@ Total: **177** arquivos `.ts`/`.tsx` (em `src/` + `scripts/`).
 
 ## 5. Modelo de Dados (Firestore)
 
-Projeto: `painel-imagine-music`. **Escrita: exclusivamente via Admin SDK** (regras negam escrita no cliente em todas as coleções modeladas). **Leitura: cliente, respeitando papel/permissões.**
+Projeto: `painel-imagine-music`. **Escrita: via Admin SDK na maior parte das coleções** (as regras negam escrita no cliente no cadastro, na receita e no catálogo). As exceções são os dados **manuais da equipe**, que o painel grava direto pelo SDK web com as regras conferindo a capacidade: `agenda`, `atividades` (e seus comentários) e `configuracoes/{doc}`, esta só por admin — é onde moram a configuração do quadro, os modelos de contrato e o catálogo de serviços previstos. **Leitura: cliente, respeitando papel/permissões.**
 
 ### Coleções de topo
 
@@ -266,7 +266,7 @@ Padrão por papel (`PADRAO` em `permissions.ts`):
 3. **Aceite** (`src/app/(auth)/aceitar-convite/page.tsx`): `createUserWithEmailAndPassword` → cria `users/{uid}` (role, ativo=true, `conviteToken`, `artistaSlug` se aplicável) → `marcarConviteAceito(token)` → redireciona `/home`.
 4. Regra Firestore permite `create` em `users` se `isAdmin()` OU (self && email/role/artistaSlug conferem com o convite && convite pendente). Sem auto-promoção: a role vem do convite.
 
-**Gerenciamento (Configurações):** abas time / artistas / permissões / notificações. Diálogo de convidar membro, ações por membro (mudar papel, desativar/reativar, remover), matriz de permissões (override por pessoa via `updateUserPermissoes`), convites pendentes (copiar link, cancelar).
+**Gerenciamento (Configurações):** abas time / artistas / permissões / quadro de atividades / modelos de contrato / notificações / perfil. A aba **artistas** reúne os logins de artista e o catálogo de serviços previstos (só admin edita). Diálogo de convidar membro, ações por membro (mudar papel, desativar/reativar, remover), matriz de permissões (override por pessoa via `updateUserPermissoes`), convites pendentes (copiar link, cancelar).
 
 ### Link público do questionário (responder sem login)
 

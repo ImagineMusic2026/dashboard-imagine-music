@@ -18,7 +18,7 @@ Todas leem a **mesma** coleção e o mesmo recorte de filtros. Trocar de visão 
 | Quadro | Em que etapa cada demanda está. Kanban, arrastar entre colunas, raias por artista/responsável/área, limite de WIP por coluna. O card é enxuto de propósito: título (já com o artista na frente) e responsável. |
 | Cronograma | Quando cada coisa acontece. Barras de início a prazo, dependências entre demandas, marcos, caminho crítico, arrastar para reprogramar. |
 | Lista | Muita demanda de uma vez, ordenável por prazo, prioridade, progresso ou responsável. |
-| Calendário | O que vence no mês, pela data de entrega. O dia mostra até 6 demandas; o "+N" abre o resto ali mesmo. Arrastar o card pra outro dia reprograma a demanda. |
+| Calendário | O que vence no mês, pela data de entrega, mais as datas marcadas da **Agenda** (azul) e os **aniversários** do roster (rosa). O dia mostra até 6 demandas; o "+N" abre o resto ali mesmo. Arrastar o card — ou o evento azul — pra outro dia reprograma. |
 | Carga do time | Quanto cada pessoa está segurando, em pontos de esforço, mais o tempo médio por etapa. |
 
 O filtro de **artista** fica na barra principal, ao lado da busca, e acende quando há um escolhido (pedido da cliente em 11/2026): é o recorte que a equipe mais faz. Responsável, área, tipo, prioridade, etiqueta, concluídas e atrasadas continuam em **Filtros**.
@@ -73,6 +73,19 @@ O card mostra **título e responsável** — nada mais. O artista vem na frente 
 Duas exceções ficaram, porque não custam altura e custam caro de perder: a barra colorida da esquerda (cor da etapa, vermelha quando atrasou) e o selo **Atrasada**, que impede o atraso de ser sinalizado só por cor.
 
 A coluna também tem **teto de altura** e rola por dentro. Sem ele o quadro crescia com os cards e a barra de rolagem horizontal — a que anda entre as etapas — ia parar no pé da página.
+
+## Agenda e aniversários no calendário
+
+Pedido da cliente em 11/2026, e a outra metade dele está em [[01 - Produto/Agenda]]: a equipe criava demanda de lançamento só para marcar a data, e uma demanda pede etapa, responsável, prazo e carga de time que ninguém ia preencher. A data mora na Agenda; o calendário é onde ela precisava aparecer.
+
+Duas camadas entram no mês, acima das demandas do dia:
+
+- **Evento da agenda**, em azul e com ícone de calendário (a cor sozinha não distinguiria de uma etapa que o admin pintou de azul). Arrasta para outro dia (muda só a data, sem cascata — evento não tem sucessora), abre para editar no clique e nasce ali pelo botão **Novo evento**, que já vem com o dia do mês que está na tela. Salvando, o calendário pula para o mês do evento. Só quem tem a capacidade `agenda` vê a camada; sem ela, o calendário é o de antes. Se a leitura da agenda falhar, uma faixa avisa — mês sem evento e mês que não carregou não podem parecer a mesma coisa.
+- **Aniversário do artista**, em rosa, com o nome e o link para o perfil. Vem da data de nascimento do cadastro, não se arrasta — quem nasceu em 12/03 não nasce noutro dia — e quem nasceu em 29/02 aparece em 28/02 nos anos comuns, a mesma régua do alerta. Artista sem data de nascimento no cadastro não aparece; se NINGUÉM no roster tiver data, a camada não é oferecida e uma linha explica de onde a data vem, em vez de um botão que não liga nada. O colaborador não recebe data de nascimento, então para ele a camada não existe.
+
+Os dois botões do cabeçalho ligam e desligam cada camada e servem de legenda (a bolinha é a cor que se procura na grade). O teto de 6 por dia continua valendo **só para demandas**: esconder a data do lançamento atrás de um "+N" desfaria o motivo de ela estar ali.
+
+O aniversário não custa leitura nenhuma: sai do roster que o seletor de artista já carrega. A agenda custa uma varredura da coleção, pedida **só quando o calendário abre** — as outras quatro visões não pagam por ela. A leitura é cacheada e dividida com a tela Agenda, mas o cache dura 5 minutos e qualquer escrita do painel (editar artista, importar, sincronizar) o derruba junto com os outros, então numa sessão de trabalho ela é repaga algumas vezes. Ver [[06 - Tecnologia/Custo de leitura do Firestore]]. O colaborador recebe o roster sem data de nascimento, então para ele a camada rosa fica vazia.
 
 ## Indicadores
 

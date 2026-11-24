@@ -343,8 +343,11 @@ async function lerProjetos(): Promise<Record<string, string[]>> {
 }
 
 /**
- * Os serviços previstos de TODO o roster, por slug — o que a coluna "Serviços"
- * da lista de artistas precisa.
+ * Os serviços previstos de TODO o roster, por slug.
+ *
+ * Dois consumidores: a coluna "Serviços" da lista de artistas e a contagem de
+ * uso de **Configurações › Artistas**, que bloqueia a remoção de um serviço que
+ * algum artista ainda tem. Os dois dividem o mesmo cache.
  *
  * ## Por que uma varredura, e o que ela custa
  *
@@ -365,7 +368,19 @@ async function lerProjetos(): Promise<Record<string, string[]>> {
  * quem chama trata como "não sei os serviços" — escondendo a coluna, não
  * quebrando a lista.
  */
-export const listarProjetosServicos = memoCurta(lerProjetos).ler
+const cacheProjetosServicos = memoCurta(lerProjetos)
+
+export const listarProjetosServicos = cacheProjetosServicos.ler
+
+/**
+ * Derruba o cache da varredura acima. Serve a quem precisa da contagem FRESCA
+ * para decidir: a configuração do catálogo de serviços relê antes de gravar uma
+ * remoção, porque a contagem em tela pode ter até 5 minutos e o bloqueio de
+ * "serviço em uso" existe justamente para esse caso.
+ */
+export function invalidarProjetosServicos(): void {
+  cacheProjetosServicos.invalidar()
+}
 
 /**
  * Declara (ou desfaz) o nível de mercado ao vivo do artista. Passa por rota —

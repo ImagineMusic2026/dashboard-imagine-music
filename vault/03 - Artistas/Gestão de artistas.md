@@ -19,14 +19,14 @@ area: artistas
 
 ## Serviços previstos na lista
 
-Pedido da cliente em 11/2026. A lista mostra, entre Acesso e Receita, quais serviços do projeto comercial cada artista tem, e dá pra filtrar por um deles. A coluna usa a mesma linguagem da de Acesso ao lado: cinco posições **fixas**, na ordem do cadastro, mais a contagem — é o que deixa varrer de cima a baixo e achar quem tem Tráfego Pago sem ler rótulo nenhum. Os quadradinhos são decoração; quem usa leitor de tela recebe os nomes escritos. No celular, onde a lista é de cards, os serviços entram em linha própria e só quando há algum.
+Pedido da cliente em 11/2026. A lista mostra, entre Acesso e Receita, quais serviços do projeto comercial cada artista tem, e dá pra filtrar por um deles. A coluna usa a mesma linguagem da de Acesso ao lado: uma posição **fixa** por serviço do catálogo, na ordem dele, mais a contagem — é o que deixa varrer de cima a baixo e achar quem tem Tráfego Pago sem ler rótulo nenhum. Os quadradinhos são decoração; quem usa leitor de tela recebe os nomes escritos. No celular, onde a lista é de cards, os serviços entram em linha própria e só quando há algum.
 
 Duas consequências:
 
 - **Custa leitura.** Os serviços moram em `projetos/{slug}`, que a lista não lia. Ver [[06 - Tecnologia/Custo de leitura do Firestore]].
 - **Só staff vê.** As regras negam `projetos` para o resto; se a leitura falhar ou a pessoa não for staff, a coluna e o filtro somem — melhor que uma tabela afirmando que ninguém tem serviço.
 
-A ordem das cinco opções padrão define as posições dos indicadores. Os serviços adicionais, cadastrados por artista em **Editar → Serviços previstos**, entram na contagem e no filtro. No cadastro e no card **Projeto**, aparecem pelo nome.
+A ordem do **catálogo** (Configurações → Artistas) define as posições dos indicadores, e a contagem é sobre o tamanho dele. Serviço marcado num artista que não está no catálogo — ficha antiga, ou serviço retirado da lista — entra na contagem como `+N`, aparece escrito abaixo e continua no filtro. No cadastro e no card **Projeto**, todos aparecem pelo nome, com o rótulo ATUAL do catálogo. Ver [[03 - Artistas/Projeto comercial interno]].
 
 ## Quem entra no roster
 

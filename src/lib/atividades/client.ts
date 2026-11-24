@@ -252,6 +252,13 @@ export function listarResponsaveis(): Promise<AppUser[]> {
 export interface ArtistaOpcao {
   slug: string
   nome: string
+  /**
+   * Data de nascimento ('YYYY-MM-DD'), quando o cadastro tem — é o que põe o
+   * aniversário no calendário sem nenhuma leitura a mais: o roster já é lido
+   * aqui para o seletor de artista. Falta no colaborador, que recebe a lista
+   * pelo servidor com só slug e nome.
+   */
+  dataNascimento?: string | null
 }
 
 /**

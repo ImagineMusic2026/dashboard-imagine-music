@@ -6,6 +6,26 @@ tipo: registro-de-decisoes
 
 Registre aqui decisões que evitam rediscussão no futuro. Cada nova entrada deve ter data, contexto, decisão, motivo e consequência.
 
+## 2026-11-24 — O artista grava a CHAVE do serviço, não o rótulo
+
+**Contexto:** a cliente pediu que incluir um serviço novo valesse para todos os artistas, e não só para aquele onde ele foi digitado, e que só admin pudesse mexer na lista. O catálogo virou `configuracoes/artistas`, com uma chave estável ao lado de cada nome.
+
+**Decisão:** `projetos/{slug}.servicosPrevistos` guarda a **chave** do serviço. O rótulo vem sempre do catálogo, na hora de mostrar.
+
+**Motivo:** gravar o nome foi a primeira tentativa e tem um furo estrutural. A chave do catálogo nasce do nome e **nunca é recalculada** — é isso que faz renomear um serviço não soltar quem já o tinha. Só que, depois do primeiro rename, a chave deixa de ser derivável do rótulo: quem marcasse o serviço dali em diante gravava um nome cuja chave não existia no catálogo. Na prática a caixinha voltava desmarcada no mesmo instante, o serviço caía em "fora do catálogo", a contagem de uso parava de contar e o bloqueio de remoção deixava de proteger. É a mesma escolha que o quadro de atividades já fazia: a demanda grava a `key` da etapa, não o rótulo.
+
+**Consequência:** nenhuma migração. `servicoChave` é idempotente sobre uma chave e leva o nome antigo à mesma chave, então cadastro de antes continua casando e os dois formatos convivem. O preço é que o dado cru em `projetos` ficou menos legível para quem olhar o Firestore direto — quem lê pelo painel vê sempre o rótulo atual. Ver [[06 - Tecnologia/Modelo de dados Firestore]] e [[03 - Artistas/Projeto comercial interno]].
+
+## 2026-11-24 — A agenda no calendário é lida sob demanda, e a falha é visível
+
+**Contexto:** a cliente criava demanda de lançamento no quadro só para marcar uma data. A data passou a viver na Agenda e a aparecer na visão Calendário das Atividades.
+
+**Decisão:** a varredura da coleção `agenda` só acontece quando a visão Calendário monta, não no carregamento da tela. E, quando a leitura falha, o calendário diz — em vez de mostrar um mês sem evento.
+
+**Motivo:** das cinco visões, só o calendário mostra evento, e o padrão de fábrica é o Quadro; ler no provider fazia toda abertura de Atividades pagar a coleção sem ninguém ver um evento, num painel que já estourou a cota do plano gratuito uma vez. Quanto ao silêncio: lista vazia por falha é visualmente idêntica a mês sem evento, e a pessoa que conclui "a data não está aqui" volta a criar a demanda no quadro — exatamente o que a mudança veio acabar.
+
+**Consequência:** trocar de visão não relê (o estado fica no provider), e a coleção é lida inteira, sem piso de data, porque o calendário navega para trás. Se um dia pesar, o corte natural é a tela Agenda filtrar na consulta — ela já descarta o passado no cliente. Ver [[06 - Tecnologia/Custo de leitura do Firestore]].
+
 ## 2026-11-17 — Assinatura de contrato é própria, sem serviço externo
 
 **Contexto:** a cliente pediu emitir o contrato pelo painel e mandar um link para o artista preencher e assinar, e não sabia como resolver a assinatura. As duas saídas eram contratar um serviço de assinatura (ZapSign, Clicksign, Autentique, D4Sign) ou construir.

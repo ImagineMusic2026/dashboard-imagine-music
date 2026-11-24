@@ -16,7 +16,13 @@ import {
   type ArtistaDoc,
   type ReceitaResumo,
 } from '@/lib/artistas/client'
-import { SERVICOS_PREVISTOS, servicoChave, servicoCurto } from '@/lib/artistas/servicos'
+import { carregarCatalogoServicos } from '@/lib/artistas/config'
+import {
+  SERVICOS_PADRAO,
+  servicoChave,
+  servicoCurto,
+  type ServicoPrevisto,
+} from '@/lib/artistas/servicos'
 import { listarStatusContrato, STATUS_CONTRATO_OPCOES, type StatusContrato } from '@/lib/contratos/client'
 import { ehStaff } from '@/lib/permissions'
 import { getHistoricoHealth, listarMetricasSociais } from '@/lib/metricas-sociais/client'
@@ -93,40 +99,44 @@ function AcessoCelula({ nivel }: { nivel: NivelAcesso }) {
  * Os serviços previstos do artista, em posições FIXAS.
  *
  * Mesma linguagem da coluna Acesso ao lado: marcadores + contagem. A posição de
- * cada serviço é a ordem de `SERVICOS_PREVISTOS` e não muda de linha pra linha
- * — é isso que deixa varrer a coluna de cima a baixo e ver quem tem Tráfego
- * Pago sem ler rótulo nenhum.
+ * cada serviço é a ordem do CATÁLOGO (Configurações › Artistas) e não muda de
+ * linha pra linha — é isso que deixa varrer a coluna de cima a baixo e ver quem
+ * tem Tráfego Pago sem ler rótulo nenhum. Reordenar o catálogo reordena a
+ * coluna inteira de uma vez.
  *
  * Os quadradinhos são decoração (`aria-hidden`): quem usa leitor de tela recebe
- * a lista escrita, não cinco "preenchido, vazio, preenchido".
+ * a lista escrita, não uma fila de "preenchido, vazio, preenchido".
  */
-function ServicosCelula({ servicos }: { servicos: string[] }) {
-  const ativos = SERVICOS_PREVISTOS.filter((s) => servicos.includes(s))
-  const adicionais = servicos.filter((s) => !SERVICOS_PREVISTOS.includes(s))
-  const nomes = [...ativos, ...adicionais].map(servicoCurto)
+function ServicosCelula({ servicos, catalogo }: { servicos: string[]; catalogo: ServicoPrevisto[] }) {
+  const marcadas = new Set(servicos.map(servicoChave))
+  const ativos = catalogo.filter((s) => marcadas.has(s.chave))
+  // Serviço gravado que o catálogo não tem: cadastro de antes de 11/2026, ou
+  // serviço retirado da lista depois. Continua contando — o artista tem.
+  const fora = servicos.filter((nome) => !catalogo.some((s) => s.chave === servicoChave(nome)))
+  const nomes = [...ativos.map((s) => s.nome), ...fora].map(servicoCurto)
   const rotulo = nomes.length ? nomes.join(', ') : 'nenhum serviço previsto'
   return (
     <div className="min-w-0" title={rotulo}>
       <div className="flex items-center gap-2" aria-hidden>
         <div className="flex gap-1 shrink-0">
-          {SERVICOS_PREVISTOS.map((s) => (
+          {catalogo.map((s) => (
             <span
-              key={s}
+              key={s.chave}
               className={cn(
                 'w-2 h-2 rounded-[3px]',
-                servicos.includes(s) ? 'bg-violet-400' : 'bg-bg-700/60',
+                marcadas.has(s.chave) ? 'bg-violet-400' : 'bg-bg-700/60',
               )}
             />
           ))}
         </div>
         <span className="text-[10px] num text-ink-500 shrink-0">
-          {nomes.length ? `${ativos.length}/${SERVICOS_PREVISTOS.length}` : '—'}
-          {adicionais.length ? ` +${adicionais.length}` : ''}
+          {nomes.length ? `${ativos.length}/${catalogo.length}` : '—'}
+          {fora.length ? ` +${fora.length}` : ''}
         </span>
       </div>
-      {adicionais.length > 0 && (
+      {fora.length > 0 && (
         <span aria-hidden className="block text-xs text-ink-400 [overflow-wrap:anywhere] lg:max-w-32 lg:truncate">
-          {adicionais.join(', ')}
+          {fora.join(', ')}
         </span>
       )}
       <span className="sr-only">Serviços: {rotulo}</span>
@@ -357,6 +367,12 @@ export function ArtistasLista() {
    * filtro somem, em vez de a tabela inteira dizer que ninguém tem serviço.
    */
   const [servicos, setServicos] = useState<Record<string, string[]> | null>(null)
+  /**
+   * O catálogo de serviços do painel (Configurações › Artistas). Ele dá a ORDEM
+   * e os rótulos atuais da coluna — vem na mesma leva de `servicos` pra os dois
+   * aparecerem juntos, em vez de a coluna piscar com os nomes de fábrica.
+   */
+  const [catalogo, setCatalogo] = useState<ServicoPrevisto[]>(SERVICOS_PADRAO)
   const [servicoFiltro, setServicoFiltro] = useState('')
   const [statusPorSlug, setStatusPorSlug] = useState<Map<string, StatusContrato> | null>(null)
   const [statusFiltro, setStatusFiltro] = useState('')
@@ -388,7 +404,7 @@ export function ArtistasLista() {
    */
   const recarregar = useCallback(async () => {
     setCarregando(true)
-    const [oRoster, oMetricas, oReceitas, oServicos, oStatus] = await Promise.allSettled([
+    const [oRoster, oMetricas, oReceitas, oServicos, oCatalogo, oStatus] = await Promise.allSettled([
       listarArtistas(),
       listarMetricasSociais(),
       ehAdmin ? listarReceitas() : Promise.resolve(new Map<string, ReceitaResumo>()),
@@ -396,6 +412,8 @@ export function ArtistasLista() {
       // Só staff lê `projetos`; pro resto nem se pede, pra não gastar uma
       // chamada que as regras vão negar.
       ehStaff(role) ? listarProjetosServicos() : Promise.resolve(null),
+      // Um documento, cacheado — só se pede pra quem vai ver a coluna.
+      ehStaff(role) ? carregarCatalogoServicos() : Promise.resolve(SERVICOS_PADRAO),
       podeContratos ? listarStatusContrato() : Promise.resolve(null),
     ])
 
@@ -408,6 +426,7 @@ export function ArtistasLista() {
     if (oMetricas.status === 'fulfilled') setMetricas(oMetricas.value)
     if (oReceitas.status === 'fulfilled') setReceitas(oReceitas.value)
     setServicos(oServicos.status === 'fulfilled' ? oServicos.value : null)
+    setCatalogo(oCatalogo.status === 'fulfilled' ? oCatalogo.value : SERVICOS_PADRAO)
     setStatusPorSlug(oStatus.status === 'fulfilled' ? oStatus.value : null)
 
     setCarregando(false)
@@ -419,20 +438,22 @@ export function ArtistasLista() {
   }, [loading, role, recarregar])
 
   const opcoesServico = useMemo(() => {
-    const padrao = new Map(SERVICOS_PREVISTOS.map((nome) => [servicoChave(nome), nome]))
-    const adicionais = new Map<string, string>()
+    const doCatalogo = new Map(catalogo.map((s) => [s.chave, s.nome]))
+    const fora = new Map<string, string>()
 
     if (servicos) {
       for (const artista of artistas ?? []) {
         for (const nome of servicos[artista.slug] ?? []) {
           const chave = servicoChave(nome)
-          if (!padrao.has(chave) && !adicionais.has(chave)) adicionais.set(chave, nome)
+          if (!doCatalogo.has(chave) && !fora.has(chave)) fora.set(chave, nome)
         }
       }
     }
 
-    return new Map([...Array.from(padrao), ...Array.from(adicionais).sort(([, a], [, b]) => a.localeCompare(b, 'pt-BR'))])
-  }, [artistas, servicos])
+    // O catálogo primeiro, na ordem dele (a mesma dos quadradinhos); o que está
+    // fora dele vem depois, em ordem alfabética.
+    return new Map([...Array.from(doCatalogo), ...Array.from(fora).sort(([, a], [, b]) => a.localeCompare(b, 'pt-BR'))])
+  }, [artistas, servicos, catalogo])
   const servicoSelecionado = opcoesServico.has(servicoFiltro) ? servicoFiltro : ''
 
   const filtrados = useMemo(() => {
@@ -779,7 +800,7 @@ export function ArtistasLista() {
 
                       {servicos && (
                         <td className="px-4 py-3">
-                          <ServicosCelula servicos={servicos[a.slug] ?? []} />
+                          <ServicosCelula servicos={servicos[a.slug] ?? []} catalogo={catalogo} />
                         </td>
                       )}
 
@@ -927,7 +948,7 @@ export function ArtistasLista() {
                       celular, e quem não tem serviço não ganha linha vazia. */}
                   {!!servicos?.[a.slug]?.length && (
                     <div className="mt-2">
-                      <ServicosCelula servicos={servicos[a.slug]} />
+                      <ServicosCelula servicos={servicos[a.slug]} catalogo={catalogo} />
                     </div>
                   )}
                   {ehAdmin &&

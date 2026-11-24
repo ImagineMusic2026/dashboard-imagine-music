@@ -32,9 +32,19 @@ A 740 por perfil, 68 aberturas esgotavam o dia inteiro. A 82, cabem mais de 600 
 
 O que ainda pesa, e é legítimo: as cinco séries diárias de 90 dias somam cerca de 420 leituras. Elas alimentam gráficos que estão de fato na tela (o comparativo de canais desenha quatro curvas, o Health Score desenha a sua). Encurtar a janela para 30 dias economizaria bastante, mas **mudaria o significado dos números** — "variação no período" passaria a ser de um mês em vez de três. É decisão da Imagine, não otimização.
 
+## Quanto custa a agenda no calendário
+
+Desde 11/2026 a visão Calendário das Atividades mostra os eventos da agenda. A leitura é a coleção `agenda` inteira (não dá para pedir por mês sem pagar uma consulta a cada mês visitado) e é **sob demanda**: só acontece quando aquela visão monta. Das cinco visões, só ela mostra evento, e o padrão de fábrica é o Quadro — ler no carregamento da tela fazia toda abertura de Atividades pagar a coleção sem ninguém ver um evento.
+
+Hoje a coleção tem dezenas de documentos. Ela cresce com o uso e não tem piso de data: se um dia pesar, é aqui que se corta, e o corte natural é a tela Agenda (que já descarta o passado no cliente) passar a filtrar na consulta, deixando a varredura inteira só para o calendário, que navega para trás.
+
+Os aniversários do mesmo calendário custam **zero**: saem do roster que o seletor de artista já carrega.
+
 ## Quanto custa a lista de artistas
 
-Ela faz varreduras de coleção inteira, cacheadas: `artistas` e `metricas-sociais`, cerca de 232 leituras por janela de cache. Em 11/2026 entrou uma terceira, `projetos`, para a coluna de serviços previstos — a tela passou a cerca de **348**.
+Ela faz varreduras de coleção inteira, cacheadas: `artistas` e `metricas-sociais`, cerca de 232 leituras por janela de cache. Em 11/2026 entrou uma terceira, `projetos`, para a coluna de serviços previstos — a tela passou a cerca de **348**. Depois dela entrou mais **um documento** (`configuracoes/artistas`, o catálogo de serviços), que é desprezível e vem na mesma leva.
+
+A varredura de `projetos` deixou de ser exclusiva desta tela: **Configurações › Artistas** usa a mesma para contar quantos artistas dependem de cada serviço antes de deixar removê-lo. É a mesma leitura cacheada, então abrir as duas na mesma janela paga uma vez só — mas ao gravar uma remoção aquela tela relê de propósito, porque uma contagem de cinco minutos atrás não serve para decidir o que apagar.
 
 Foi decisão consciente, e a alternativa está registrada porque é para ela que se volta se o custo apertar: um **resumo desnormalizado**, um documento só com `{endereço: serviços}` escrito pelas rotas que gravam `projetos`, custaria **uma** leitura em vez de 116. Não foi o caminho por dois motivos — exigiria um backfill dos 116 artistas já cadastrados antes de a coluna dizer a verdade, e um resumo dessincronizado mostraria serviço errado **em silêncio**, que é pior do que caro. A troca, se vier, é num lugar só: `listarProjetosServicos`.
 

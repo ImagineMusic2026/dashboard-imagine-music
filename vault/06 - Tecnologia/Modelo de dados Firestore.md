@@ -50,6 +50,14 @@ Regra do Firestore é **por documento** e não esconde campo. Quando parte de um
 
 `alertas-vistos/{uid}` é documento próprio, e não campo do perfil, de propósito: o perfil é lido pela equipe inteira e só aceita auto-edição de `favoritos` — a trava que fecha a escalada de papel. O mapa é regravado inteiro numa transação a cada marca (sem merge, para a poda conseguir apagar chaves) e tem teto de 500 chaves nas regras.
 
+`configuracoes/artistas` guarda o **catálogo de serviços previstos** (`servicos`: lista de `{chave, nome}`), que o cadastro de todo artista oferece para marcar. Um documento só, cacheado, como o do quadro e o dos contratos. Enquanto o documento não existir, vale o catálogo de fábrica do código.
+
+`projetos/{slug}.servicosPrevistos` guarda a **chave** de cada serviço marcado, não o rótulo — a mesma escolha das etapas do quadro, onde a demanda grava a `key` e o nome vem da configuração. É o que faz renomear um serviço valer em todo artista que já o tinha, sem migração.
+
+Gravar o NOME foi tentado primeiro e **não funciona**, por um motivo que vale ficar escrito: a `chave` do catálogo nasce do nome e nunca é recalculada, então depois do primeiro rename ela deixa de ser derivável do rótulo. Quem marcasse o serviço depois disso gravava um nome cuja chave não existia mais no catálogo — a caixinha voltava desmarcada, o serviço caía em "fora do catálogo" e a contagem de uso passava a mentir.
+
+Os dois formatos convivem sem migração: `servicoChave` é idempotente sobre uma chave e leva o nome antigo à mesma chave ("Selo digital" e "selo digital" dão `selo digital`). Cadastro de antes de 11/2026 continua casando; o que ele perde é só o rótulo atualizado quando o serviço for renomeado **e** o nome gravado não for mais derivável — por isso quem exibe sempre passa pelo catálogo.
+
 `configuracoes/contratos` guarda os modelos de contrato: nome, tipo, o texto com `{{chave}}` e a definição dos campos. Um documento só, cacheado, como o do quadro. O contrato de distribuição da cliente vive **aqui**, e não no código — o repositório é público.
 
 `projetos/{slug}/contratos/{id}` ganhou os campos do contrato **gerado**: `origem` (`anexo`, que é o que todo contrato anterior é, ou `gerado`), `modeloKey`, `modeloNome`, `emitidoEm`, `textoModelo` e `campos` (as cópias do modelo na hora de emitir), `valores` e as duas assinaturas, `assinaturaArtista` e `assinaturaImagine`. Cada assinatura guarda nome, documento, a PNG do traço em dataURL, e o que **o servidor** carimba: data, IP, user-agent e o SHA-256 do texto renderizado.

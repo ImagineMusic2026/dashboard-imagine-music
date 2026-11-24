@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { ConfigQuadroTab } from '@/components/atividades/config-quadro'
+import { ConfigArtistasServicos } from '@/components/configuracoes/config-artistas'
 import { ConfigContratosTab } from '@/components/configuracoes/config-contratos'
 import { MembrosTime } from '@/components/configuracoes/membros-time'
 import { ConvitesPendentes } from '@/components/configuracoes/convites-pendentes'
@@ -87,6 +88,7 @@ export function ConfiguracoesView() {
             <>
               <MembrosTime modo="artistas" />
               <ConvitesPendentes modo="artistas" />
+              <ConfigArtistasServicos />
             </>
           )}
           {abaAtual === 'permissoes' && <MatrizPermissoes />}

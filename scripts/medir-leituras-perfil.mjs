@@ -88,6 +88,9 @@ async function medir(slug) {
 
   conta('Cadastro', 'diagnosticos/{slug}/questionarios/projeto', 1)
   conta('Cadastro', 'diagnosticos/{slug}/questionarios/artista', 1)
+  // O card Projeto lê o catálogo de serviços para mostrar o rótulo ATUAL de
+  // cada serviço marcado (11/2026). Um documento, cacheado com o resto.
+  conta('Cadastro', 'configuracoes/artistas (catálogo de serviços)', 1)
 
   return { linhas, sobDemanda }
 }

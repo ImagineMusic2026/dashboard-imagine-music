@@ -35,23 +35,26 @@ completa e bonita, com a camada de acesso já real, mas os dados de negócio ain
 
 ### ✅ Já funciona de verdade (Firebase)
 - **Login** com e-mail/senha, **sessão** persistente e **route guard** (rotas protegidas).
-- **Papéis (RBAC):** `admin` e `marketing`.
+- **Papéis (RBAC):** `admin`, `marketing`, `colaborador` e `artista` (ver `src/lib/users.ts`), com capacidades por pessoa sobrepondo o padrão do papel.
 - **Gestão de time:** listar membros, trocar papel, remover e **ativar/desativar acesso**.
   Desativar é real: desabilita a credencial no Firebase Auth (login bloqueado), derruba a
   sessão e as regras do Firestore barram o acesso aos dados (via `/api/membros/ativo` + Admin SDK).
 - **Convites por e-mail** (EmailJS): admin convida → e-mail com link → tela "aceitar convite".
 - **Regras do Firestore** (`firestore.rules`) e scripts admin (`bootstrap-firebase.mjs`, `set-role.mjs`).
 
-### 🟡 Existe na tela, mas ainda NÃO é funcional / é dado fictício
-- **Todas as métricas** (health score, receita, audiência, gráficos, ranking, zona de risco)
-  vêm de **arquivos mock** em `src/lib/mock-data/`.
-- O mock tem **~9 artistas**, mas a UI exibe números "de produção" **fixos no código**
-  (ex.: "127 artistas", "7 alertas") — são placeholders visuais, não refletem o mock.
-- **Botões de ação** (Novo artista, upload de DDEX/planilha, conectar integração) são **visuais**:
-  ainda não têm backend.
-- O **gate de receita** (esconder receita do papel `marketing`) hoje é **só na interface**
-  (`src/lib/permissions.ts` → `podeVerReceita`). **Ainda não há proteção real no banco** — isso
-  só vira seguro quando a receita estiver no Firestore com security rules.
+### ⚠️ Este arquivo descreve o painel de 2025, não o de hoje
+
+As ressalvas abaixo **deixaram de valer**. Ficam registradas porque o arquivo é
+citado em conversas antigas, mas a fonte de verdade sobre o produto é o
+`vault/` do repositório.
+
+- **Métricas em mock:** não existe mais. A pasta `src/lib/mock-data/` foi
+  removida; artistas, métricas, receita, alertas e catálogo vêm do Firestore.
+- **Botões sem backend:** existem `/api/artistas/criar|atualizar|excluir`,
+  `/api/importar/roster/**`, `/api/importar/onerpm` e as integrações Meta,
+  TikTok, YouTube e OneRPM.
+- **Gate de receita só na interface:** `firestore.rules` tem `podeVerReceita()`
+  e a aplica na coleção `receitas`.
 
 ## 4. Estrutura de pastas
 
@@ -71,7 +74,7 @@ src/
     invites.ts           lógica de convites
     email.ts             envio via EmailJS
     permissions.ts       regras de "quem vê o quê" (UI)
-    mock-data/           ⚠️ dados fictícios (artistas, alertas, agenda, conteudo, ...)
+    (mock-data/ foi removida — nada no painel usa dado fictício)
     types em src/types/index.ts
 scripts/                 bootstrap-firebase.mjs, set-role.mjs (Admin SDK)
 firestore.rules          regras de segurança do Firestore
@@ -95,8 +98,10 @@ firestore.rules          regras de segurança do Firestore
 
 | Papel | Pode |
 |---|---|
-| **admin** | Tudo: gerencia o time, envia convites e **vê a receita** dos artistas. |
-| **marketing** | Acesso parcial: **NÃO vê a receita** dos artistas. |
+| **admin** | Tudo: gerencia o time, envia convites, configura o quadro, os modelos de contrato e o catálogo de serviços, e **vê a receita** dos artistas. |
+| **marketing** | Equipe: cuida do cadastro, da agenda e das atividades. **NÃO vê a receita** por padrão. |
+| **colaborador** | De fora do time fixo: só as áreas marcadas no convite, e nas Atividades só as demandas em que é o responsável. |
+| **artista** | Só o próprio portal (`/meu-perfil`), nunca o painel. |
 
 Não há cadastro público — todo mundo entra por **convite** (Configurações → Membros do time).
 
@@ -104,16 +109,15 @@ Não há cadastro público — todo mundo entra por **convite** (Configurações
 
 `/home` (visão geral + KPIs + alertas + ranking) · `/artistas` (lista) · `/artistas/[id]`
 (perfil detalhado) · `/alertas` · `/conteudo` · `/agenda` · `/importar` (DDEX/CSV/manual) ·
-`/integracoes` (Spotify, Meta, TikTok, OneRPM...) · `/configuracoes` (time e convites).
+`/integracoes` (Spotify, Meta, TikTok, OneRPM...) · `/configuracoes` (sete abas: time, artistas, permissões, quadro de atividades, modelos de contrato, notificações e perfil).
 
 ## 8. Frentes em aberto (candidatas a "próximas etapas")
 
 > Estas são as direções naturais a partir do estado atual. **Não estão priorizadas** — servem
 > para a IA propor um plano e para você escolher por onde ir.
 
-- **A. Sair do mock:** modelar artistas/métricas no **Firestore** e ler de lá (em vez de
-  `src/lib/mock-data/`).
-- **B. Cadastro de artistas:** o botão "Novo artista" virar um fluxo real (form + escrita no banco).
+- ~~**A. Sair do mock**~~ — feito: tudo vem do Firestore.
+- ~~**B. Cadastro de artistas**~~ — feito: criar, editar e excluir por rota.
 - **C. Importação real:** a tela **Importar** processar de verdade **DDEX (OneRPM)** e **CSV/XLSX**
   (parsing → normalização → gravação).
 - **D. Integrações reais:** OAuth e sincronização com **Spotify / Meta / TikTok / OneRPM**.

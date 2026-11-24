@@ -5,7 +5,7 @@ rota: /configuracoes
 
 # Configurações e equipe
 
-É a área administrativa do painel. Tem seis abas: **Time**, **Artistas**, **Permissões**, **Quadro de atividades**, **Notificações** e **Perfil**. O colaborador vê só a aba **Perfil**.
+É a área administrativa do painel. Tem sete abas: **Time**, **Artistas**, **Permissões**, **Quadro de atividades**, **Modelos de contrato**, **Notificações** e **Perfil**. O colaborador vê só a aba **Perfil**.
 
 ## Time — somente admin
 
@@ -19,6 +19,8 @@ rota: /configuracoes
 ## Artistas
 
 Pessoas com `convidarArtistas` podem convidar somente artistas para o portal, copiar ou cancelar seus convites pendentes. Convites para admin ou marketing seguem exclusivos do admin.
+
+Abaixo dos convites fica o catálogo de **Serviços previstos** — a lista que o cadastro de todo artista oferece para marcar. Só **admin** edita (quem não é admin vê o card explicando onde se marca o serviço de um artista). Cada linha mostra quantos artistas dependem daquele serviço; serviço em uso não é removido, e renomear é seguro. Serviço marcado em algum artista mas fora da lista aparece num aviso, com um botão que o traz para o catálogo. Veja [[03 - Artistas/Projeto comercial interno]].
 
 ## Permissões
 

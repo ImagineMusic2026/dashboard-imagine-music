@@ -162,3 +162,22 @@ export function aniversariosProximos(
   }
   return out.sort((x, y) => x.dias - y.dias || x.nome.localeCompare(y.nome, 'pt-BR'))
 }
+
+/** 'MM-DD' da data de nascimento — a chave que casa um aniversário com um dia. */
+export function chaveDiaMes(n: DataNascimento): string {
+  return `${String(n.mes).padStart(2, '0')}-${String(n.dia).padStart(2, '0')}`
+}
+
+/**
+ * As chaves 'MM-DD' que um dia do calendário comemora.
+ *
+ * Normalmente é uma só — a do próprio dia. A exceção é 28/02 em ano comum, que
+ * também recebe quem nasceu em 29/02: é a mesma regra de `proximoAniversario`,
+ * e sem ela o aniversário dessas pessoas só apareceria de quatro em quatro anos.
+ */
+export function chavesDeAniversario(iso: string): string[] {
+  const [ano, mes, dia] = iso.split('-')
+  const chave = `${mes}-${dia}`
+  const bissexto = diasNoMes(Number(ano), 2) === 29
+  return chave === '02-28' && !bissexto ? [chave, '02-29'] : [chave]
+}

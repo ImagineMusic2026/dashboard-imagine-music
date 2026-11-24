@@ -16,9 +16,17 @@ visibilidade: staff
 
 ## Serviços previstos
 
-Em **Artistas → Novo artista** ou **Perfil do artista → Editar**, a seção **Serviços previstos** permite marcar as opções padrão e usar **Adicionar serviço** para incluir outras no cadastro daquele artista. O nome do serviço adicional é editável e o botão de remover retira a linha. As mudanças são gravadas ao salvar o cadastro.
+Em **Artistas → Novo artista** ou **Perfil do artista → Editar**, a seção **Serviços previstos** marca os serviços daquele artista. A lista oferecida é o **catálogo do painel**, igual para todos.
 
-Os serviços adicionais aparecem no card do projeto e entram no filtro de serviços da lista de artistas.
+O catálogo é editado em **Configurações → Artistas**, e só por admin. Foi pedido da cliente em 11/2026: até então um serviço novo era digitado dentro da ficha de um artista e só existia lá — o serviço criado para o Fulano não aparecia para marcar no Beltrano. O que se grava no artista é a **chave** do serviço, e o rótulo vem sempre do catálogo (ver [[06 - Tecnologia/Modelo de dados Firestore]] para o porquê). Cadastro antigo, que gravou o nome, continua casando pela mesma chave.
+
+Três consequências:
+
+- **Renomear é seguro a qualquer momento.** Só o rótulo muda; todo artista que já tinha o serviço continua com ele, com o nome novo, sem migração.
+- **Serviço em uso não é removido.** A configuração mostra quantos artistas dependem dele e bloqueia — é a mesma regra das colunas do quadro. Se a conferência de uso não carregar, a remoção também fica bloqueada.
+- **A ordem do catálogo é a ordem da coluna Serviços** na lista de artistas. Reordenar ali reordena a coluna inteira.
+
+Serviço que um artista tem e que não está no catálogo — ficha de antes de 11/2026, ou serviço retirado da lista depois — aparece no formulário num bloco **Fora do catálogo**, marcado, e sai no X. Na configuração ele aparece com um botão que o traz para a lista, que é o caminho de "criei isso num artista e agora quero em todos" sem redigitar.
 
 ## Por que é separado
 

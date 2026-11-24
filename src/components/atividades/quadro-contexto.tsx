@@ -10,6 +10,12 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '@/components/auth/auth-provider'
+import {
+  invalidarAgenda,
+  listarEventos,
+  reprogramarEvento,
+  type EventoAgenda,
+} from '@/lib/agenda/client'
 import { listarArtistas } from '@/lib/artistas/client'
 import { carregarConfig } from '@/lib/atividades/config'
 import {
@@ -133,6 +139,36 @@ interface QuadroCtx {
   aplicarLocal: (a: Atividade) => void
   excluindo: string | null
   setErro: (e: string | null) => void
+  /**
+   * Os eventos da AGENDA (releases, shows, contratos, reuniões). Entram aqui
+   * porque o calendário mostra os dois lados — a demanda, que é trabalho, e a
+   * data marcada, que é só data — e a agenda já é uma coleção pequena, lida de
+   * uma vez. Vazia para quem não tem a capacidade `agenda`.
+   */
+  eventos: EventoAgenda[]
+  /** Se esta pessoa lê e grava a agenda (capacidade `agenda`). */
+  podeAgenda: boolean
+  /**
+   * A leitura da agenda FALHOU (e a pessoa tem a capacidade). Quem mostra os
+   * eventos precisa saber disto: uma lista vazia por falha é visualmente igual
+   * a um mês sem evento, e a pessoa volta a marcar a data no quadro — o
+   * comportamento que esta camada veio justamente substituir.
+   */
+  agendaIndisponivel: boolean
+  /**
+   * Pede a agenda. Ela NÃO é lida no carregamento da tela: das cinco visões, só
+   * o calendário mostra evento, e o padrão de fábrica é o quadro — ler no
+   * provider fazia toda abertura de Atividades pagar a coleção inteira sem
+   * ninguém ver um evento. O calendário chama isto ao montar; a partir daí o
+   * estado fica aqui e trocar de visão não relê.
+   */
+  pedirEventos: () => void
+  /** Se faz sentido mostrar aniversários (o colaborador não recebe a data). */
+  podeAniversarios: boolean
+  /** Muda só a data do evento — o arrasto do calendário. */
+  reagendarEvento: (id: string, data: string) => Promise<void>
+  /** Relê a agenda do BANCO (depois de criar, editar ou excluir um evento). */
+  recarregarEventos: () => Promise<void>
 }
 
 const Ctx = createContext<QuadroCtx | null>(null)
@@ -144,7 +180,8 @@ export function useQuadro(): QuadroCtx {
 }
 
 export function QuadroProvider({ children }: { children: ReactNode }) {
-  const { user, appUser } = useAuth()
+  const { user, appUser, pode } = useAuth()
+  const podeAgenda = pode('agenda')
   // O colaborador enxerga só as demandas em que é o responsável (a regra do
   // Firestore recorta do mesmo jeito) e não lê o roster nem o time.
   const colaborador = ehColaborador(appUser?.role ?? null)
@@ -153,6 +190,9 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
   const [todas, setTodas] = useState<Atividade[] | null>(null)
   const [artistas, setArtistas] = useState<ArtistaOpcao[]>([])
   const [equipe, setEquipe] = useState<AppUser[]>([])
+  const [eventos, setEventos] = useState<EventoAgenda[]>([])
+  const [eventosPedidos, setEventosPedidos] = useState(false)
+  const [agendaIndisponivel, setAgendaIndisponivel] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [excluindo, setExcluindo] = useState<string | null>(null)
   const [filtros, setFiltros] = useState<FiltrosQuadro>(FILTROS_VAZIOS)
@@ -180,6 +220,49 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
       .then(setConfig)
       .catch(() => setConfig(CONFIG_PADRAO))
   }, [carregar])
+
+  /**
+   * A agenda. Uma leitura da coleção inteira, como a do quadro — ela é pequena
+   * (um documento por data marcada) e o calendário precisa dela toda, não de um
+   * mês: quem anda de mês não pode pagar uma consulta por mês visitado.
+   *
+   * SOB DEMANDA: só roda depois de `pedirEventos()`, que o calendário chama ao
+   * montar. Era no carregamento da tela, e aí as outras quatro visões — o
+   * quadro, que é o padrão de fábrica, inclusive — pagavam a coleção inteira
+   * sem ter onde mostrar um evento.
+   *
+   * `forcar` derruba o cache antes de ler: é o que o caminho de ERRO precisa,
+   * porque reler sem invalidar devolve a mesma promessa cacheada e a tela
+   * continua mostrando o estado velho.
+   */
+  const carregarEventos = useCallback(
+    async (forcar = false) => {
+      if (!podeAgenda) {
+        setEventos([])
+        setAgendaIndisponivel(false)
+        return
+      }
+      if (forcar) invalidarAgenda()
+      try {
+        setEventos(await listarEventos())
+        setAgendaIndisponivel(false)
+      } catch {
+        // Quem não tem a capacidade já saiu no `return` acima: cair aqui é a
+        // leitura ter falhado de verdade, e isso a tela precisa dizer.
+        setEventos([])
+        setAgendaIndisponivel(true)
+      }
+    },
+    [podeAgenda],
+  )
+
+  useEffect(() => {
+    if (!eventosPedidos) return
+    void carregarEventos()
+  }, [eventosPedidos, carregarEventos])
+
+  const pedirEventos = useCallback(() => setEventosPedidos(true), [])
+  const recarregarEventos = useCallback(() => carregarEventos(true), [carregarEventos])
 
   // Listas dos seletores. Para a equipe, o roster e quem pode receber demanda
   // (equipe + colaboradores). Para o colaborador, os artistas vêm do servidor
@@ -392,6 +475,26 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
     [lista, recarregar],
   )
 
+  /**
+   * Reagenda um evento da agenda: estado local na hora, UMA escrita de um campo,
+   * sem releitura — o mesmo contrato do `reagendar` das demandas.
+   */
+  const reagendarEvento = useCallback(
+    async (id: string, data: string) => {
+      setEventos((atual) => atual.map((e) => (e.id === id ? { ...e, data } : e)))
+      try {
+        await reprogramarEvento(id, data)
+        setErro(null)
+      } catch {
+        setErro('Não consegui salvar a nova data do evento. A agenda foi recarregada.')
+        // `true`: sem invalidar, a releitura devolveria o cache e a mensagem
+        // estaria mentindo.
+        await carregarEventos(true)
+      }
+    },
+    [carregarEventos],
+  )
+
   const aplicarLocal = useCallback((a: Atividade) => {
     setTodas((atual) => {
       if (!atual) return atual
@@ -429,6 +532,13 @@ export function QuadroProvider({ children }: { children: ReactNode }) {
     aplicarLocal,
     excluindo,
     setErro,
+    eventos,
+    podeAgenda,
+    agendaIndisponivel,
+    pedirEventos,
+    podeAniversarios: !colaborador,
+    reagendarEvento,
+    recarregarEventos,
   }
 
   // `user` só entra aqui pra deixar explícito que o quadro é área logada; o

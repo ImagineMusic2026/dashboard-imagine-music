@@ -274,7 +274,7 @@ A **Agenda** guarda os eventos da equipe — **releases, shows, contratos e reun
 
 ## 13. Configurações (time, artistas, permissões, notificações)
 
-A página **Configurações** é onde o admin gerencia pessoas e acessos. Ela tem quatro abas: **Time, Artistas, Permissões e Notificações.**
+A página **Configurações** é onde o admin gerencia pessoas, acessos e as listas que o painel inteiro usa. Ela tem sete abas: **Time, Artistas, Permissões, Quadro de atividades, Modelos de contrato, Notificações e Perfil.** Em **Artistas** ficam os logins de artista e o catálogo de **serviços previstos** — a lista que o cadastro de todo artista oferece para marcar, que só o admin edita.
 
 ### Convidar um novo membro *(admin)*
 

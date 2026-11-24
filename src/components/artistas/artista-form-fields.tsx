@@ -1,10 +1,19 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import Link from 'next/link'
 import { Check, ChevronDown, Plus, X } from 'lucide-react'
+import { useAuth } from '@/components/auth/auth-provider'
 import { PlataformaIcon, type PlataformaTipo } from '@/components/artistas/plataforma-icon'
 import { idadeEm, isoLocal, lerDataNascimento, NASCIMENTO_MIN } from '@/lib/artistas/aniversario'
-import { normalizarServicosPrevistos, SERVICOS_PREVISTOS, servicoChave } from '@/lib/artistas/servicos'
+import { catalogoServicosOuPadrao } from '@/lib/artistas/config'
+import {
+  normalizarServicosPrevistos,
+  SERVICOS_PADRAO,
+  separarServicos,
+  servicoChave,
+  type ServicoPrevisto,
+} from '@/lib/artistas/servicos'
 import { cn } from '@/lib/utils'
 
 /**
@@ -20,40 +29,40 @@ export const TEXTAREA = cn(INPUT, 'resize-y min-h-[72px] leading-relaxed')
 
 const GENEROS = ['Sertanejo', 'Piseiro', 'Forró', 'Pagode', 'Funk', 'Gospel', 'MPB', 'Pop', 'Rock', 'Rap', 'Arrocha', 'Brega', 'Axé', 'Eletrônica']
 
-/** Lado COMERCIAL do cadastro: a relação do selo com o artista, não a presença dele nas plataformas. */
+/**
+ * Lado COMERCIAL do cadastro: a relação do selo com o artista, não a presença
+ * dele nas plataformas.
+ *
+ * `servicosPrevistos` guarda os NOMES dos serviços, que é o que está gravado em
+ * `projetos/{slug}`. Desde 11/2026 não existe mais uma lista "adicional" por
+ * artista: quem marca é o catálogo de **Configurações › Artistas** (ver
+ * `@/lib/artistas/config`). O que sobrou de serviço fora do catálogo em
+ * cadastros antigos continua aqui dentro, e o formulário mostra como tal.
+ */
 export interface DadosProjeto {
   contaArtistaSelo: string
   emailProjeto: string
   servicosPrevistos: string[]
-  servicosAdicionais: string[]
   anotacoesGerais: string
 }
 
-type DadosProjetoDoc = Omit<DadosProjeto, 'servicosAdicionais'>
-
-export function dadosProjetoParaEnvio({ servicosAdicionais, ...projeto }: DadosProjeto): DadosProjetoDoc {
-  return {
-    ...projeto,
-    servicosPrevistos: normalizarServicosPrevistos([...projeto.servicosPrevistos, ...servicosAdicionais]),
-  }
+export function dadosProjetoParaEnvio(projeto: DadosProjeto): DadosProjeto {
+  return { ...projeto, servicosPrevistos: normalizarServicosPrevistos(projeto.servicosPrevistos) }
 }
 
 export const PROJETO_VAZIO: DadosProjeto = {
   contaArtistaSelo: '',
   emailProjeto: '',
   servicosPrevistos: [],
-  servicosAdicionais: [],
   anotacoesGerais: '',
 }
 
 /** Aceita o que vier do Firestore (campo ausente, tipo errado) sem quebrar o form. */
-export function projetoDeDoc(x: Partial<Record<keyof DadosProjetoDoc, unknown>> | null | undefined): DadosProjeto {
-  const servicos = normalizarServicosPrevistos(x?.servicosPrevistos)
+export function projetoDeDoc(x: Partial<Record<keyof DadosProjeto, unknown>> | null | undefined): DadosProjeto {
   return {
     contaArtistaSelo: typeof x?.contaArtistaSelo === 'string' ? x.contaArtistaSelo : '',
     emailProjeto: typeof x?.emailProjeto === 'string' ? x.emailProjeto : '',
-    servicosPrevistos: servicos.filter((s) => SERVICOS_PREVISTOS.includes(s)),
-    servicosAdicionais: servicos.filter((s) => !SERVICOS_PREVISTOS.includes(s)),
+    servicosPrevistos: normalizarServicosPrevistos(x?.servicosPrevistos),
     anotacoesGerais: typeof x?.anotacoesGerais === 'string' ? x.anotacoesGerais : '',
   }
 }
@@ -66,7 +75,7 @@ function Checkbox({ marcado, onChange, rotulo }: { marcado: boolean; onChange: (
         aria-hidden
         className={cn(
           'w-4 h-4 rounded border grid place-items-center shrink-0 transition-colors',
-          'peer-focus-visible:ring-2 peer-focus-visible:ring-violet-500/40',
+          'peer-focus-visible:ring-2 peer-focus-visible:ring-violet-400 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg-950',
           marcado ? 'bg-violet-500 border-violet-500' : 'border-bg-700 group-hover:border-bg-600'
         )}
       >
@@ -90,10 +99,45 @@ export function CamposProjeto({
   onChange: (v: DadosProjeto) => void
   idPrefixo: string
 }) {
+  const { role } = useAuth()
   const set = <K extends keyof DadosProjeto>(k: K, v: DadosProjeto[K]) => onChange({ ...valor, [k]: v })
-  const focoNovoServico = useRef(false)
-  const chavesPadrao = new Set(SERVICOS_PREVISTOS.map(servicoChave))
-  const chavesAdicionais = valor.servicosAdicionais.map(servicoChave)
+
+  // O catálogo de serviços do painel. `null` enquanto carrega: cair no padrão de
+  // fábrica nesse intervalo faria os rótulos piscarem e, pior, mostraria como
+  // "fora do catálogo" um serviço que está dentro.
+  const [catalogo, setCatalogo] = useState<ServicoPrevisto[] | null>(null)
+  useEffect(() => {
+    let vivo = true
+    // Nunca rejeita: na falha vem o catálogo de fábrica, que é melhor do que um
+    // cadastro sem serviço nenhum pra marcar.
+    catalogoServicosOuPadrao()
+      .then((c) => vivo && setCatalogo(c))
+      .catch(() => vivo && setCatalogo(SERVICOS_PADRAO))
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  const { chaves, foraDoCatalogo } = useMemo(
+    () => separarServicos(valor.servicosPrevistos, catalogo ?? []),
+    [valor.servicosPrevistos, catalogo],
+  )
+  const marcadas = useMemo(() => new Set(chaves), [chaves])
+
+  /**
+   * Marca/desmarca um serviço. O que se grava é a CHAVE dele.
+   *
+   * Gravar o nome parecia mais legível e estava errado: a chave do catálogo não
+   * é recalculada no rename, então depois de um "Selo digital" virar "Selo
+   * Digital Plus" o nome gravado deixava de casar com a entrada, a caixinha
+   * voltava desmarcada e o serviço caía em "fora do catálogo". Gravando a
+   * chave, o casamento é exato para sempre, e o cadastro antigo (que tem o
+   * nome) continua casando porque `servicoChave` leva os dois à mesma chave.
+   */
+  function alternarServico(servico: ServicoPrevisto) {
+    const sem = valor.servicosPrevistos.filter((v) => servicoChave(v) !== servico.chave)
+    set('servicosPrevistos', marcadas.has(servico.chave) ? sem : [...sem, servico.chave])
+  }
 
   return (
     <div className="space-y-4 pt-4 border-t border-bg-700/40">
@@ -131,76 +175,90 @@ export function CamposProjeto({
         <legend className="text-sm font-medium text-ink-300 mb-1.5">
           Serviços previstos <span className="text-ink-500 font-normal text-xs">· opcional</span>
         </legend>
-        <div className="space-y-1.5">
-          {SERVICOS_PREVISTOS.map((s) => (
-            <Checkbox
-              key={s}
-              rotulo={s}
-              marcado={valor.servicosPrevistos.includes(s)}
-              onChange={() =>
-                set(
-                  'servicosPrevistos',
-                  valor.servicosPrevistos.includes(s)
-                    ? valor.servicosPrevistos.filter((x) => x !== s)
-                    : [...valor.servicosPrevistos, s]
-                )
-              }
-            />
-          ))}
-        </div>
-        <div className="mt-3 space-y-2">
-          {valor.servicosAdicionais.map((nome, indice) => {
-            const chave = chavesAdicionais[indice]
-            const duplicado = Boolean(chave && (
-              chavesPadrao.has(chave) || chavesAdicionais.indexOf(chave) !== indice
-            ))
-            return (
-              <div key={indice} className="flex items-center gap-2">
-                <input
-                  ref={(input) => {
-                    if (!input) return
-                    input.setCustomValidity(duplicado ? 'Este serviço já está na lista.' : '')
-                    if (focoNovoServico.current && indice === valor.servicosAdicionais.length - 1) {
-                      focoNovoServico.current = false
-                      input.focus()
-                    }
-                  }}
-                  type="text"
-                  autoComplete="off"
-                  aria-label={`Nome do serviço adicional ${indice + 1}`}
-                  aria-invalid={duplicado || undefined}
-                  placeholder="Nome do serviço"
-                  value={nome}
-                  onChange={(e) => {
-                    const adicionais = [...valor.servicosAdicionais]
-                    adicionais[indice] = e.target.value
-                    set('servicosAdicionais', adicionais)
-                  }}
-                  className={cn(INPUT, 'min-w-0', duplicado && 'border-red-500/60')}
-                />
-                <button
-                  type="button"
-                  aria-label={nome.trim() ? `Remover serviço ${nome.trim()}` : 'Remover serviço sem nome'}
-                  onClick={() => set('servicosAdicionais', valor.servicosAdicionais.filter((_, i) => i !== indice))}
-                  className="grid size-10 shrink-0 place-items-center rounded-lg text-ink-400 hover:bg-red-500/10 hover:text-red-300 focus-visible:outline focus-visible:outline-violet-500"
+
+        {catalogo === null ? (
+          <p className="text-sm text-ink-500">Carregando os serviços…</p>
+        ) : catalogo.length === 0 ? (
+          <p className="text-sm text-ink-500">
+            Nenhum serviço cadastrado ainda. A lista é montada em Configurações › Artistas.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {catalogo.map((s) => (
+              <Checkbox
+                key={s.chave}
+                rotulo={s.nome}
+                marcado={marcadas.has(s.chave)}
+                onChange={() => alternarServico(s)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/*
+          Serviço que este artista tem e que não está (mais) no catálogo —
+          cadastro feito antes de 11/2026, quando cada ficha podia inventar o
+          seu, ou serviço retirado da lista depois. Fica marcado e some no X;
+          apagá-lo sozinho seria jogar fora o que alguém digitou.
+
+          O `catalogo !== null` não é detalhe: sem ele, no intervalo entre abrir
+          o formulário e o catálogo chegar, TODO serviço do artista aparecia
+          aqui como "cadastrado só neste artista", cada um com um X que remove
+          de verdade.
+        */}
+        {catalogo !== null && foraDoCatalogo.length > 0 && (
+          <div className="mt-3 rounded-lg border border-bg-700/50 bg-bg-950/60 p-3">
+            <p className="text-[11px] font-semibold text-ink-400">
+              Fora do catálogo
+              <span className="font-normal text-ink-500">
+                {' '}
+                · cadastrado só neste artista
+              </span>
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {foraDoCatalogo.map((nome) => (
+                <span
+                  key={nome}
+                  className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 py-1 pl-2.5 pr-1 text-[12px] text-amber-200"
                 >
-                  <X aria-hidden className="size-4" />
-                </button>
-              </div>
-            )
-          })}
-          <button
-            type="button"
-            onClick={() => {
-              focoNovoServico.current = true
-              set('servicosAdicionais', [...valor.servicosAdicionais, ''])
-            }}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-violet-300 hover:bg-violet-500/10 focus-visible:outline focus-visible:outline-violet-500"
-          >
-            <Plus aria-hidden className="size-4" />
-            Adicionar serviço
-          </button>
-        </div>
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{nome}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remover o serviço ${nome} deste artista`}
+                    onClick={() =>
+                      set(
+                        'servicosPrevistos',
+                        valor.servicosPrevistos.filter((s) => servicoChave(s) !== servicoChave(nome)),
+                      )
+                    }
+                    className="grid size-5 shrink-0 place-items-center rounded-full text-amber-300/80 hover:bg-amber-500/20 hover:text-amber-100 focus-visible:outline focus-visible:outline-violet-500"
+                  >
+                    <X aria-hidden className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="mt-2 text-[11px] text-ink-500">
+          A lista vale para todos os artistas e só o admin a edita
+          {role === 'admin' ? (
+            <>
+              {' '}
+              em{' '}
+              <Link
+                href="/configuracoes?aba=artistas"
+                className="text-violet-300 hover:text-violet-200 underline underline-offset-2"
+              >
+                Configurações › Artistas
+              </Link>
+              .
+            </>
+          ) : (
+            <> em Configurações › Artistas.</>
+          )}
+        </p>
       </fieldset>
 
       <div>

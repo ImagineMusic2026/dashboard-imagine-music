@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react'
 import { Briefcase } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
-import { normalizarServicosPrevistos } from '@/lib/artistas/servicos'
+import { catalogoServicosOuPadrao } from '@/lib/artistas/config'
+import {
+  normalizarServicosPrevistos,
+  SERVICOS_PADRAO,
+  servicoChave,
+  type ServicoPrevisto,
+} from '@/lib/artistas/servicos'
 import { ehStaff } from '@/lib/permissions'
 import { getProjeto, type ProjetoDoc } from '@/lib/artistas/client'
 
@@ -24,6 +30,9 @@ import { getProjeto, type ProjetoDoc } from '@/lib/artistas/client'
 export function ProjetoArtistaCard({ slug }: { slug: string }) {
   const { role, loading } = useAuth()
   const [projeto, setProjeto] = useState<ProjetoDoc | null>(null)
+  // O catálogo manda no RÓTULO: um serviço renomeado em Configurações aparece
+  // com o nome novo aqui, sem tocar em nenhum documento de `projetos`.
+  const [catalogo, setCatalogo] = useState<ServicoPrevisto[]>(SERVICOS_PADRAO)
   const staff = !loading && ehStaff(role)
 
   useEffect(() => {
@@ -38,9 +47,26 @@ export function ProjetoArtistaCard({ slug }: { slug: string }) {
     }
   }, [slug, staff])
 
+  useEffect(() => {
+    if (!staff) return
+    let vivo = true
+    catalogoServicosOuPadrao()
+      .then((c) => vivo && setCatalogo(c))
+      .catch(() => {})
+    return () => {
+      vivo = false
+    }
+  }, [staff])
+
   if (!staff || !projeto) return null
 
-  const servicos = normalizarServicosPrevistos(projeto.servicosPrevistos)
+  // Na ordem do catálogo, como na coluna da lista; o que está fora dele vai no fim.
+  const gravados = normalizarServicosPrevistos(projeto.servicosPrevistos)
+  const marcadas = new Set(gravados.map(servicoChave))
+  const servicos = [
+    ...catalogo.filter((s) => marcadas.has(s.chave)).map((s) => s.nome),
+    ...gravados.filter((nome) => !catalogo.some((s) => s.chave === servicoChave(nome))),
+  ]
   const temAlgo =
     Boolean(projeto.contaArtistaSelo || projeto.emailProjeto || projeto.anotacoesGerais) || servicos.length > 0
   if (!temAlgo) return null

@@ -447,12 +447,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Configurações gerais do painel (ex.: `configuracoes/geral` com o WhatsApp
-    // que recebe as solicitações de vínculo do portal). Legível por QUALQUER
-    // membro ativo — o artista precisa do número no portal. Escrita só ADMIN,
-    // direto do painel (aba Perfil das Configurações).
+    // Configurações gerais do painel. Escrita só ADMIN, direto do painel.
+    //
+    // Leitura por QUALQUER membro ativo é o padrão, e é proposital: o artista
+    // precisa do WhatsApp de vínculo (`geral`) no portal, e o catálogo de
+    // serviços (`artistas`) e a configuração do quadro (`atividades`) são
+    // rótulos que qualquer tela do painel mostra.
+    //
+    // `contratos` é a exceção, e a regra curinga a estava deixando passar: ali
+    // moram os MODELOS de contrato — o texto que o painel emite, com as
+    // cláusulas da cliente. Na interface esse conteúdo sempre esteve atrás da
+    // capacidade `contratos`; aqui ele estava aberto a qualquer login ativo,
+    // inclusive o do artista no portal. As três camadas agora concordam.
     match /configuracoes/{doc} {
-      allow read: if isAtivo();
+      allow read: if doc == 'contratos' ? podeContratos() : isAtivo();
       allow write: if isAdmin();
     }
 

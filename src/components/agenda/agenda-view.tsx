@@ -10,6 +10,7 @@ import {
   eventoTipoMeta,
   excluirEvento,
   listarEventos,
+  metaDoTipo,
   type EventoAgenda,
   type EventoTipo,
 } from '@/lib/agenda/client'
@@ -76,7 +77,8 @@ export function AgendaView() {
     const fim = Number.isFinite(dias) ? addDias(hoje, dias) : null
     const lista = (eventos ?? []).filter((e) => e.data >= hoje && (fim === null || e.data <= fim))
     const contagem: Record<EventoTipo, number> = { release: 0, show: 0, contrato: 0, reuniao: 0 }
-    for (const e of lista) contagem[e.tipo]++
+    // Documento com `tipo` fora dos quatro não entra na contagem (viraria NaN).
+    for (const e of lista) if (contagem[e.tipo] !== undefined) contagem[e.tipo]++
     return { lista, contagem }
   }, [eventos, dias])
 
@@ -166,7 +168,7 @@ export function AgendaView() {
             ) : (
               <div className="divide-y divide-bg-700/30">
                 {lista.map((ev) => {
-                  const tipo = eventoTipoMeta[ev.tipo]
+                  const tipo = metaDoTipo(ev.tipo)
                   const d = parseData(ev.data)
                   return (
                     <div
